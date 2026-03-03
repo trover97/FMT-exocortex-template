@@ -120,6 +120,7 @@ bash ~/Github/FMT-exocortex-template/roles/strategist/scripts/strategist.sh day-
 | Справочная | `memory/*.md` | По запросу |
 
 MEMORY.md — личные (текущие задачи, РП недели). Редактируется каждую сессию.
+`DS-strategy/docs/WP-REGISTRY.md` — полный реестр всех РП от последнего к первому (DP.WP.015). Обновляется на Close при изменении статуса.
 Остальные memory/*.md — платформенные. Обновляются из upstream через `update.sh`.
 
 ---
