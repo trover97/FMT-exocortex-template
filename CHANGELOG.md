@@ -5,6 +5,19 @@ All notable changes to FMT-exocortex-template will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [Semantic Versioning](https://semver.org/).
 
+## [0.6.4] — 2026-03-16
+
+### Fixed
+- **gh repo fork:** убран несовместимый флаг `--remote` из SETUP-GUIDE, setup.sh, ADR-001
+- **README.md:** `git clone` → `gh repo fork --clone` (согласованность с SETUP-GUIDE)
+- **strategist.sh:** `cleanup-processed-notes.py` → `.sh` (файл .py не существовал)
+- **strategist.sh:** хардкод авторского пути к notify.sh → относительный через `$SCRIPT_DIR`
+- **strategist.sh, dt-collect.sh:** `$HOME/IWE` → `{{WORKSPACE_DIR}}` (подставляется setup.sh)
+- **update.sh:** нумерация шагов `[1/4],[2/4]` → `[1/6],[2/6]`
+- **setup-wakatime.md:** `wakatime-cli` → `~/.wakatime/wakatime-cli` (полный путь)
+- **SETUP-GUIDE.md:** MCP-команды отделены от bash-блока (пользователи пытались запускать в терминале)
+- **DS-strategy naming:** унифицировано `DS-my-strategy` → `DS-strategy` в protocol-open.md (15 замен). Убран FAQ-костыль из LEARNING-PATH
+
 ## [0.6.3] — 2026-03-16
 
 ### Fixed
