@@ -7,10 +7,10 @@ set -e
 # Конфигурация
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
-WORKSPACE="{{WORKSPACE_DIR}}/DS-strategy"
+WORKSPACE="/Users/avlakriv/IWE/DS-strategy"
 PROMPTS_DIR="$REPO_DIR/prompts"
 LOG_DIR="$HOME/logs/strategist"
-CLAUDE_PATH="{{CLAUDE_PATH}}"
+CLAUDE_PATH="/Users/avlakriv/.local/bin/claude"
 
 # Создаём папку для логов
 mkdir -p "$LOG_DIR"
@@ -35,7 +35,21 @@ notify() {
 
 notify_telegram() {
     local scenario="$1"
+<<<<<<< Updated upstream
     "$(dirname "$(dirname "$SCRIPT_DIR")")/synchronizer/scripts/notify.sh" strategist "$scenario" >> "$LOG_FILE" 2>&1 || true
+=======
+    "/Users/avlakriv/IWE/DS-exocortex/roles/synchronizer/scripts/notify.sh" strategist "$scenario" >> "$LOG_FILE" 2>&1 || true
+}
+
+fetch_wakatime_data() {
+    local mode="$1"  # "day" or "week"
+    local fetch_script="$SCRIPT_DIR/fetch-wakatime.sh"
+    if [ -x "$fetch_script" ]; then
+        "$fetch_script" "$mode" 2>/dev/null || echo "(WakaTime данные недоступны)"
+    else
+        echo "(fetch-wakatime.sh не найден)"
+    fi
+>>>>>>> Stashed changes
 }
 
 run_claude() {
@@ -173,10 +187,19 @@ case "$1" in
         fi
         log "Sunday: running week review"
         run_claude "week-review"
+<<<<<<< Updated upstream
         # Fallback push for Knowledge Index (week-review creates a post there)
         KI_REPO="{{WORKSPACE_DIR}}/DS-Knowledge-Index"
         if git -C "$KI_REPO" log --oneline -1 --since="1 hour ago" --grep="week-review" 2>/dev/null | grep -q .; then
             git -C "$KI_REPO" push >> "$LOG_FILE" 2>&1 && log "Pushed Knowledge Index (fallback)" || log "WARN: KI push failed"
+=======
+        # Fallback push for Knowledge Index (optional, skip if repo doesn't exist)
+        KI_REPO="/Users/avlakriv/IWE/DS-Knowledge-Index-trover97"
+        if [ -d "$KI_REPO/.git" ]; then
+            if git -C "$KI_REPO" log --oneline -1 --since="1 hour ago" --grep="week-review" 2>/dev/null | grep -q .; then
+                git -C "$KI_REPO" push >> "$LOG_FILE" 2>&1 && log "Pushed Knowledge Index (fallback)" || log "WARN: KI push failed"
+            fi
+>>>>>>> Stashed changes
         fi
         notify_telegram "week-review"
         ;;

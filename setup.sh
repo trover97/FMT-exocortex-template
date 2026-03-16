@@ -1,6 +1,6 @@
 #!/bin/bash
 # Exocortex Setup Script
-# Configures a forked FMT-exocortex-template: placeholders, memory, launchd, DS-strategy
+# Configures a forked DS-exocortex: placeholders, memory, launchd, DS-strategy
 #
 # Usage:
 #   bash setup.sh          # Полная установка (git + GitHub CLI + Claude Code + автоматизация)
@@ -62,12 +62,17 @@ TEMPLATE_DIR="$SCRIPT_DIR"
 
 # Verify we're inside the template
 if [ ! -f "$TEMPLATE_DIR/CLAUDE.md" ] || [ ! -d "$TEMPLATE_DIR/memory" ]; then
-    echo "ERROR: This script must be run from the root of FMT-exocortex-template."
+    echo "ERROR: This script must be run from the root of DS-exocortex."
     echo "  Expected: $TEMPLATE_DIR/CLAUDE.md and $TEMPLATE_DIR/memory/"
     echo ""
     echo "  Steps:"
+<<<<<<< Updated upstream
     echo "    gh repo fork TserenTserenov/FMT-exocortex-template --clone"
     echo "    cd FMT-exocortex-template"
+=======
+    echo "    gh repo fork TserenTserenov/DS-exocortex --clone --remote"
+    echo "    cd DS-exocortex"
+>>>>>>> Stashed changes
     echo "    bash setup.sh"
     exit 1
 fi
@@ -213,6 +218,7 @@ fi
 echo ""
 echo "[1/6] Configuring placeholders..."
 
+<<<<<<< Updated upstream
 if $DRY_RUN; then
     PLACEHOLDER_FILES=$(find "$TEMPLATE_DIR" -type f \( -name "*.md" -o -name "*.json" -o -name "*.sh" -o -name "*.plist" -o -name "*.yaml" -o -name "*.yml" \) | wc -l | tr -d ' ')
     echo "  [DRY RUN] Would substitute placeholders in $PLACEHOLDER_FILES files"
@@ -235,6 +241,19 @@ else
             -e "s|{{HOME_DIR}}|$HOME_DIR|g" \
             "$file"
     done
+=======
+find "$TEMPLATE_DIR" -type f \( -name "*.md" -o -name "*.json" -o -name "*.sh" -o -name "*.plist" -o -name "*.yaml" -o -name "*.yml" \) | while read file; do
+    sed -i '' \
+        -e "s|trover97|$GITHUB_USER|g" \
+        -e "s|/Users/avlakriv/IWE|$WORKSPACE_DIR|g" \
+        -e "s|/Users/avlakriv/.local/bin/claude|$CLAUDE_PATH|g" \
+        -e "s|-Users-avlakriv-IWE|$CLAUDE_PROJECT_SLUG|g" \
+        -e "s|4|$TIMEZONE_HOUR|g" \
+        -e "s|UTC+3|$TIMEZONE_DESC|g" \
+        -e "s|/Users/avlakriv|$HOME_DIR|g" \
+        "$file"
+done
+>>>>>>> Stashed changes
 
     echo "  Placeholders substituted."
 
@@ -245,7 +264,7 @@ else
     fi
 fi
 
-# === 1b. Rename repo (if name differs from FMT-exocortex-template) ===
+# === 1b. Rename repo (if name differs from DS-exocortex) ===
 CURRENT_DIR_NAME="$(basename "$TEMPLATE_DIR")"
 if [ "$EXOCORTEX_REPO" != "$CURRENT_DIR_NAME" ]; then
     echo ""

@@ -109,26 +109,158 @@ IWE подходит тем, кто:
 
 ```bash
 cd ~/IWE
+<<<<<<< Updated upstream
 gh repo fork TserenTserenov/FMT-exocortex-template --clone
 cd FMT-exocortex-template
+=======
+gh repo fork TserenTserenov/DS-exocortex --clone --remote
+cd DS-exocortex
+>>>>>>> Stashed changes
 bash setup.sh
 ```
 
 Пошаговое руководство от чистого компьютера: **[SETUP-GUIDE.md](docs/SETUP-GUIDE.md)**
 
+<<<<<<< Updated upstream
 После установки:
+=======
+```bash
+cd ~/IWE
+git clone https://github.com/TserenTserenov/DS-exocortex.git
+cd DS-exocortex
+bash setup.sh --core
+```
+
+Скрипт спросит:
+- GitHub username (можно пропустить в core-режиме)
+- Рабочую директорию (по умолчанию — родительская папка шаблона)
+- Путь к Claude CLI и часовой пояс (только в полном режиме)
+
+<details>
+<summary>Что делает setup.sh</summary>
+
+1. Проверяет prerequisites (git, gh, claude)
+2. Показывает политику данных и запрашивает согласие ([DATA-POLICY.md](docs/DATA-POLICY.md))
+3. Заменяет 7 плейсхолдеров (`trover97`, `/Users/avlakriv/IWE` и др.)
+4. Копирует `CLAUDE.md` → корень рабочей директории
+5. Копирует `memory/*.md` → `~/.claude/projects/.../memory/`
+6. Устанавливает launchd-агентов для Стратега
+7. Создаёт `DS-strategy/` — приватный репозиторий для стратегирования
+
+Посмотреть без выполнения: `bash setup.sh --dry-run`
+</details>
+
+<details>
+<summary>Ручная настройка (если setup.sh не подходит)</summary>
+
+1. Замените `trover97` на ваш GitHub username во всех файлах
+2. Замените `/Users/avlakriv/IWE` на путь к рабочей директории (напр. `~/IWE`)
+3. Замените `/Users/avlakriv` на домашнюю директорию (значение `$HOME`)
+4. Замените `-Users-avlakriv-IWE` на путь через дефисы (напр. для `~/IWE` → `-Users-yourname-IWE`)
+5. Замените `4` на час запуска стратега в UTC (напр. `4` для 7:00 MSK)
+6. Замените `UTC+3` на описание времени (напр. `7:00 MSK`)
+7. Замените `/Users/avlakriv/.local/bin/claude` на путь к Claude CLI (напр. `/opt/homebrew/bin/claude`)
+8. Установите launchd-агентов: `cd roles/strategist && bash install.sh`
+9. Скопируйте `memory/` в `~/.claude/projects/.../memory/`
+10. Скопируйте `CLAUDE.md` в корень рабочей директории
+
+</details>
+
+### Шаг 2: Проверить установку
+
+```bash
+# Проверить файлы
+ls ~/IWE/CLAUDE.md
+ls ~/.claude/projects/*/memory/
+
+# Проверить launchd (только macOS)
+launchctl list | grep strategist
+
+# Проверить DS-strategy
+ls ~/IWE/DS-strategy/
+```
+
+### Шаг 3: Первая сессия (~30 мин)
+>>>>>>> Stashed changes
 
 ```bash
 cd ~/IWE
 claude
 ```
 
+<<<<<<< Updated upstream
 Скажите Claude: **«Проведём первую стратегическую сессию»** — и он проведёт вас через определение целей, создание первого плана и настройку среды.
+=======
+Скажи Claude: **«Проведём первую стратегическую сессию»**
+
+Claude прочитает CLAUDE.md и memory/ и проведёт тебя через:
+1. **Определение целей** — Кем ты хочешь быть через год? Чему научиться?
+2. **Неудовлетворённости** — Что мешает? Где разрыв между текущим и желаемым?
+3. **Первый WeekPlan** — Конкретные задачи на неделю с бюджетами времени
+4. **Обновление MEMORY.md** — Твои РП появятся в таблице
+
+После этого Claude в каждой сессии будет видеть твой план и работать по нему.
+
+---
+
+## Обновления
+
+Протоколы, промпты и справочники обновляются из upstream. Твои личные данные (планы, MEMORY.md, стратегия) **не затрагиваются**.
+
+```bash
+cd ~/IWE/DS-exocortex
+bash update.sh
+```
+
+| Команда | Что делает |
+|---------|-----------|
+| `bash update.sh` | Скачивает обновления из upstream, применяет к стандартным файлам |
+| `bash update.sh --check` | Показать доступные обновления без применения |
+| `bash update.sh --dry-run` | Показать что изменится, не применять |
+
+**Что обновляется (standard):** CLAUDE.md, memory/*.md (кроме MEMORY.md), промпты Стратега.
+**Что НЕ трогается (personal):** MEMORY.md (твои РП), DS-strategy/ (твои планы).
+
+---
+
+## Совместимость с AI CLI
+
+Ядро IWE (CLAUDE.md, memory/, промпты) — это markdown-файлы. Они работают с **любым** AI CLI, который умеет читать файлы в рабочей директории.
+
+| AI CLI | Интерактивная работа | Автоматизация (Стратег) | MCP-серверы | Примечание |
+|--------|:-------------------:|:----------------------:|:-----------:|------------|
+| **Claude Code** (рекомендуемый) | Полная | Полная | Да | Hooks, skills, settings. `npm install -g @anthropic-ai/claude-code` |
+| **Codex** (OpenAI) | Работает | Через `AI_CLI=codex` | Нет | `npm install -g @openai/codex` |
+| **Aider** | Работает | Через `AI_CLI=aider` | Нет | `pip install aider-chat`. Флаг: `AI_CLI_PROMPT_FLAG=--message` |
+| **Continue.dev** | Работает | Нет | Частично | VS Code extension. Нет CLI для автоматизации |
+| **Cursor** | Работает | Нет | Нет | Встроенный AI. Читает CLAUDE.md как project rules |
+
+<details>
+<summary>Как переключить AI CLI для автоматизации Стратега</summary>
+
+```bash
+# По умолчанию — Claude Code (ничего менять не нужно)
+bash roles/strategist/scripts/strategist.sh morning
+
+# Codex
+AI_CLI=codex AI_CLI_PROMPT_FLAG=-p AI_CLI_EXTRA_FLAGS="" bash roles/strategist/scripts/strategist.sh morning
+
+# Aider
+AI_CLI=aider AI_CLI_PROMPT_FLAG=--message AI_CLI_EXTRA_FLAGS="" bash roles/strategist/scripts/strategist.sh morning
+```
+
+</details>
+
+> **WakaTime** трекает время работы: по проектам, категориям, редакторам. Бесплатный план: статистика за 2 недели. **Настройка:** `/setup-wakatime` в Claude Code. Подробнее: [wakatime.com](https://wakatime.com).
+
+> **Автоматизация Стратега:** на macOS — launchd (устанавливается автоматически). На Linux — cron (`crontab -e`). Без автоматизации — Стратег запускается вручную: `bash roles/strategist/scripts/strategist.sh morning`
+>>>>>>> Stashed changes
 
 ---
 
 ## Документация
 
+<<<<<<< Updated upstream
 | Документ | Что внутри |
 |----------|-----------|
 | **[SETUP-GUIDE.md](docs/SETUP-GUIDE.md)** | Пошаговая установка от чистого компьютера. Требования, режимы (core/full), проверка |
@@ -138,6 +270,72 @@ claude
 | **[principles-vs-skills.md](docs/principles-vs-skills.md)** | Почему принципы важнее навыков: генеративная иерархия |
 | **[ONTOLOGY.md](ONTOLOGY.md)** | Онтология: все термины и аббревиатуры IWE |
 | **[CHANGELOG.md](CHANGELOG.md)** | История изменений шаблона |
+=======
+> **Первая установка?**
+> [SETUP-GUIDE.md](docs/SETUP-GUIDE.md) — пошаговое руководство от чистого компьютера (30-60 мин).
+>
+> **Политика данных:**
+> [DATA-POLICY.md](docs/DATA-POLICY.md) — какие данные собираются, где хранятся, как удалить.
+>
+> **Путь изучения:**
+> [LEARNING-PATH.md](docs/LEARNING-PATH.md) — принципы, протоколы, агенты, Pack, SOTA.
+>
+> **Быстрая справка / FAQ:**
+> [IWE-HELP.md](docs/IWE-HELP.md) — то же, что знает бот @aist_me_bot.
+>
+> **Почему принципы, а не навыки?**
+> [principles-vs-skills.md](docs/principles-vs-skills.md) — аргументация и генеративная иерархия.
+
+---
+
+## Структура
+
+```
+DS-exocortex/
+│
+├── CLAUDE.md                        # Правила для Claude Code (протоколы, архитектура)
+├── README.md                        # Этот файл
+├── REPO-TYPE.md                     # Тип репозитория (Format)
+├── ONTOLOGY.md                      # Онтология IWE
+├── update.sh                        # Обновление из upstream
+│
+├── memory/                          # Оперативная память (≤10 файлов, ≤100 строк каждый)
+│   ├── MEMORY.md                    # ★ PERSONAL: задачи недели, навигация (авто-загрузка)
+│   ├── protocol-open.md             # Протокол открытия сессии
+│   ├── protocol-work.md             # Протокол работы
+│   ├── protocol-close.md            # Протокол закрытия сессии
+│   ├── navigation.md                # Навигация по репозиториям
+│   ├── hard-distinctions.md         # Жёсткие различения
+│   ├── fpf-reference.md             # Первые принципы (FPF)
+│   ├── checklists.md                # Чеклисты
+│   ├── sota-reference.md            # SOTA-практики
+│   └── repo-type-rules.md           # Правила по типам репозиториев
+│
+├── docs/                            # Справочная документация
+│   ├── SETUP-GUIDE.md               # Пошаговое руководство установки
+│   ├── LEARNING-PATH.md             # Путь изучения IWE
+│   ├── IWE-HELP.md                  # Справочник IWE для бота (FAQ, глоссарий)
+│   ├── DATA-POLICY.md               # Политика данных IWE
+│   ├── principles-vs-skills.md      # Почему принципы, а не навыки
+│   └── adr/                         # Architecture Decision Records
+│
+├── roles/                           # Роли (точка расширения)
+│   ├── strategist/                  # Роль: Стратег (R1)
+│   │   ├── install.sh
+│   │   ├── prompts/                 # 9 сценариев
+│   │   └── scripts/                 # Скрипты запуска + launchd plist
+│   ├── extractor/                   # Роль: Экстрактор знаний (R2)
+│   └── synchronizer/                # Роль: Синхронизатор (R8)
+│
+├── seed/                            # Шаблоны → отдельные репо после setup
+│   └── strategy/                    # → DS-strategy/ (стратегический хаб)
+│
+└── .claude/                         # Конфигурация Claude Code
+    ├── settings.local.json          # MCP-серверы + разрешения
+    ├── hooks/wakatime-heartbeat.sh  # WakaTime heartbeat
+    └── skills/setup-wakatime.md     # /setup-wakatime
+```
+>>>>>>> Stashed changes
 
 ---
 
