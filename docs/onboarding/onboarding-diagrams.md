@@ -6,52 +6,50 @@
 
 ## Схема 1. Карта компонентов IWE
 
-> Что внутри IWE и как компоненты связаны друг с другом.
+> Ты в центре. Принципы — общий фундамент для тебя и ИИ. Знания создаёшь ты — и они обогащают обоих.
 
 ```mermaid
 graph TB
-    subgraph tools["<b>ИНСТРУМЕНТЫ</b>"]
+    subgraph principles["<b>ПРИНЦИПЫ</b>"]
         direction LR
-        CC["<b>Claude Code</b><br/>ИИ-ассистент<br/>в редакторе"]
-        VSC["<b>VS Code</b><br/>Редактор<br/>для текстов"]
-        GH["<b>GitHub</b><br/>Облачное хранилище<br/>с историей"]
+        ZP["<b>Нулевые (ZP)</b><br/>Базовые правила<br/>мышления"]
+        FPF["<b>Первые (FPF)</b><br/>Фреймворк<br/>корректности"]
+        ZP --> FPF
+    end
+
+    subgraph pair["<b>ПАРА: ТЫ + ИИ</b>"]
+        direction LR
+        USER["<b>Ты</b><br/>Принимаешь решения<br/>Мыслишь, направляешь<br/>Создаёшь знания"]
+        AI["<b>Claude Code</b><br/>Усиливает, структурирует<br/>Берёт рутину<br/>Использует твои знания"]
+        USER <-->|"сотрудничество"| AI
     end
 
     subgraph knowledge["<b>ЗНАНИЯ</b>"]
         direction LR
         EXO["<b>Экзокортекс</b><br/>Вторая память:<br/>планы, контекст, выводы"]
-        PACK["<b>Pack</b><br/>База знаний<br/>по предметным областям"]
+        PACK["<b>Pack</b><br/>Вторые принципы:<br/>твои доменные знания"]
     end
 
     subgraph practice["<b>ПРАКТИКА</b>"]
         direction LR
+        TOOLS["<b>VS Code + GitHub</b><br/>Редактор + хранилище"]
         BOT["<b>Бот @aist_me_bot</b><br/>Помощник<br/>в Telegram"]
         ORZ["<b>Ритуалы ОРЗ</b><br/>Открытие → Работа<br/>→ Закрытие"]
     end
 
-    subgraph foundation["<b>ФУНДАМЕНТ</b>"]
-        direction LR
-        SM["<b>Системное мышление</b><br/>Видеть целое,<br/>а не только части"]
-        FPF["<b>Принципы</b><br/>Нулевые и первые<br/>принципы мышления"]
-    end
-
-    CC -->|"читает и обновляет"| EXO
-    CC -->|"структурирует"| PACK
-    VSC -->|"редактируешь файлы"| EXO
-    GH -->|"хранит историю"| EXO
-    GH -->|"хранит историю"| PACK
+    principles -->|"формируют мышление"| USER
+    principles -->|"встроены в правила"| AI
+    USER -->|"создаёт"| PACK
+    AI -->|"структурирует"| EXO
+    PACK -->|"обогащает"| AI
     EXO -->|"контекст для"| ORZ
     PACK -->|"знания для"| BOT
-    ORZ -->|"напоминания через"| BOT
-    SM -.->|"усиливает"| tools
-    SM -.->|"усиливает"| knowledge
-    SM -.->|"усиливает"| practice
-    FPF -.->|"направляет"| SM
+    knowledge --> practice
 
-    style tools fill:#e8f5e9,stroke:#43a047,stroke-width:2px
+    style principles fill:#fce4ec,stroke:#e53935,stroke-width:2px
+    style pair fill:#f3e5f5,stroke:#8e24aa,stroke-width:2px
     style knowledge fill:#fff3e0,stroke:#fb8c00,stroke-width:2px
-    style practice fill:#e3f2fd,stroke:#1e88e5,stroke-width:2px
-    style foundation fill:#fce4ec,stroke:#e53935,stroke-width:2px
+    style practice fill:#e8f5e9,stroke:#43a047,stroke-width:2px
 ```
 
 ---
@@ -126,7 +124,43 @@ graph BT
 
 ---
 
-## Схема 5. Экзоскелет vs Протез
+## Схема 5. Иерархия принципов — кто создаёт, кто использует
+
+> Принципы текут сверху вниз. Знания — снизу вверх (от твоего опыта обратно в Pack).
+
+```mermaid
+graph TD
+    ZP["<b>Нулевые принципы (ZP)</b><br/>Базовые правила мышления<br/><i>Даны платформой</i>"]
+    FPF["<b>Первые принципы (FPF)</b><br/>Фреймворк корректности<br/><i>Даны платформой</i>"]
+    PACK["<b>Вторые принципы (Pack)</b><br/>Доменные знания<br/><i>Создаёшь ты</i>"]
+    DS["<b>Третьи принципы (DS)</b><br/>Реализация<br/><i>Создаёшь ты + ИИ</i>"]
+
+    ZP -->|"формируют"| FPF
+    FPF -->|"направляют"| PACK
+    PACK -->|"определяют"| DS
+
+    USER["<b>Ты</b><br/>Изучаешь → системное мышление"]
+    AI["<b>ИИ</b><br/>Принципы встроены в правила"]
+
+    ZP -.->|"изучаешь"| USER
+    FPF -.->|"изучаешь"| USER
+    ZP -.->|"встроены"| AI
+    FPF -.->|"встроены"| AI
+    USER -->|"создаёт"| PACK
+    PACK -->|"обогащает"| AI
+    AI -->|"помогает структурировать"| PACK
+
+    style ZP fill:#fce4ec,stroke:#e53935,stroke-width:2px
+    style FPF fill:#fce4ec,stroke:#e53935,stroke-width:2px
+    style PACK fill:#fff3e0,stroke:#fb8c00,stroke-width:2px
+    style DS fill:#e8f5e9,stroke:#43a047,stroke-width:2px
+    style USER fill:#f3e5f5,stroke:#8e24aa,stroke-width:2px
+    style AI fill:#e3f2fd,stroke:#1e88e5,stroke-width:2px
+```
+
+---
+
+## Схема 6. Экзоскелет vs Протез
 
 > Ключевое различение IWE: ИИ **усиливает** мышление, а не **заменяет** его.
 
@@ -154,7 +188,7 @@ graph LR
 
 ---
 
-## Схема 6. Проблема → Решение
+## Схема 7. Проблема → Решение
 
 > Связь между типичными проблемами и компонентами IWE.
 
