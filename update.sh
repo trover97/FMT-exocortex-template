@@ -118,22 +118,14 @@ echo "[3/6] Re-substituting placeholders..."
 PLACEHOLDER_COUNT=$(grep -r '/Users/avlakriv/IWE' "$EXOCORTEX_DIR" --include="*.md" --include="*.sh" --include="*.json" --include="*.yaml" --include="*.yml" --include="*.plist" -l 2>/dev/null | wc -l | tr -d ' ')
 
 if [ "$PLACEHOLDER_COUNT" -gt 0 ]; then
-<<<<<<< Updated upstream
-    echo "  Found $PLACEHOLDER_COUNT files with unsubstituted {{WORKSPACE_DIR}}"
+    echo "  Found $PLACEHOLDER_COUNT files with unsubstituted /Users/avlakriv/IWE"
     if $DRY_RUN; then
-        echo "  [DRY RUN] Would re-substitute {{WORKSPACE_DIR}} → $WORKSPACE_DIR in $PLACEHOLDER_COUNT files"
+        echo "  [DRY RUN] Would re-substitute /Users/avlakriv/IWE → $WORKSPACE_DIR in $PLACEHOLDER_COUNT files"
     else
         find "$EXOCORTEX_DIR" -type f \( -name "*.md" -o -name "*.json" -o -name "*.sh" -o -name "*.plist" -o -name "*.yaml" -o -name "*.yml" \) | while read file; do
-            sed_inplace "s|{{WORKSPACE_DIR}}|$WORKSPACE_DIR|g" "$file"
+            sed_inplace "s|/Users/avlakriv/IWE|$WORKSPACE_DIR|g" "$file"
         done
-        echo "  Re-substituted {{WORKSPACE_DIR}} → $WORKSPACE_DIR"
-=======
-    echo "  Found $PLACEHOLDER_COUNT files with unsubstituted /Users/avlakriv/IWE"
-    find "$EXOCORTEX_DIR" -type f \( -name "*.md" -o -name "*.json" -o -name "*.sh" -o -name "*.plist" -o -name "*.yaml" -o -name "*.yml" \) | while read file; do
-        sed -i '' "s|/Users/avlakriv/IWE|$WORKSPACE_DIR|g" "$file"
-    done
-    echo "  Re-substituted /Users/avlakriv/IWE → $WORKSPACE_DIR"
->>>>>>> Stashed changes
+        echo "  Re-substituted /Users/avlakriv/IWE → $WORKSPACE_DIR"
 
         # Commit the re-substitution
         if ! git -C "$EXOCORTEX_DIR" diff --quiet; then
