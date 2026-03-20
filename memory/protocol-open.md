@@ -110,6 +110,7 @@ done
 | Подсистема | Статус | Детали |
 |------------|--------|--------|
 | Scheduler | :green_circle: / :yellow_circle: / :red_circle: | [что отработало/упало] |
+| update.sh | :green_circle: / :red_circle: | [drift report: `update.sh --check`] |
 | template-sync | :green_circle: / :red_circle: | [статус] |
 | MCP reindex | :green_circle: / :red_circle: | [статус] |
 
@@ -256,6 +257,7 @@ agent: Стратег
 | Подсистема | Статус | Детали |
 |------------|--------|--------|
 | Scheduler | :green_circle: / :yellow_circle: / :red_circle: | [что отработало/упало] |
+| update.sh | :green_circle: / :red_circle: | [drift report: `update.sh --check`] |
 | template-sync | :green_circle: / :red_circle: | [статус] |
 | MCP reindex | :green_circle: / :red_circle: | [статус] |
 | ... | ... | ... |
