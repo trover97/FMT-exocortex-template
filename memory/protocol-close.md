@@ -145,7 +145,7 @@ done
 
 **2c.** Обновить `DS-strategy/docs/WP-REGISTRY.md`: статусы + даты.
 
-**2d.** Обновить `DS-strategy/inbox/open-sessions.log`: удалить строки закрытых сессий.
+**2d.** Обновить `DS-agent-workspace/scheduler/open-sessions.log`: удалить строки закрытых сессий.
 
 **2e.** Governance-синхронизация: новые репо/сервисы за день? → REPOSITORY-REGISTRY, navigation.md, MAP.002↔PROCESSES.md.
 
