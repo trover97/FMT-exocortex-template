@@ -118,7 +118,10 @@ pre_archive_dayplan() {
 
     if [ "$moved" -gt 0 ]; then
         git -C "$strategy_dir" pull --rebase 2>/dev/null || true
-        git -C "$strategy_dir" add current/ archive/day-plans/ 2>/dev/null || true
+        # ВАЖНО: добавляем ТОЛЬКО перемещённые файлы, не всю директорию.
+        # `git add current/` может подхватить грязные unstaged файлы (баг 21 мар 2026).
+        git -C "$strategy_dir" add -- archive/day-plans/ 2>/dev/null || true
+        git -C "$strategy_dir" add -u -- current/ 2>/dev/null || true
         git -C "$strategy_dir" commit -m "chore: archive $moved old DayPlan(s)" 2>/dev/null || true
         git -C "$strategy_dir" push 2>/dev/null || true
         log "pre-archive: committed and pushed ($moved file(s))"
