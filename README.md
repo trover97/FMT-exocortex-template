@@ -350,6 +350,9 @@ A: Да. Ядро IWE — markdown-файлы. Работает с Claude Code, 
 **Q: Работает ли на Linux/Windows?**
 A: Да. Ядро работает на любой ОС. Автоматизация Стратега: macOS — launchd, Linux — cron, Windows — WSL. Подробнее: [SETUP-GUIDE.md](docs/SETUP-GUIDE.md).
 
+**Q: Что если компьютер выключен — автоматика остановится?**
+A: Нет. Cloud Scheduler (GitHub Actions) выполняет backup и health check в облаке — даже при выключенном компьютере. Настройка: `bash setup/optional/setup-cloud-scheduler.sh`. Подробнее: [setup/optional/README.md](setup/optional/README.md).
+
 **Q: Что такое Pack?**
 A: Формализованная область знаний — единственный source-of-truth для доменного знания. Подробнее: [LEARNING-PATH.md](docs/LEARNING-PATH.md).
 

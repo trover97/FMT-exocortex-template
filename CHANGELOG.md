@@ -5,6 +5,78 @@ All notable changes to DS-exocortex will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [Semantic Versioning](https://semver.org/).
 
+## [0.13.5] — 2026-03-22
+
+### Changed
+- **protocol-close.md** — формула мультипликатора: partial РП считаются (% × бюджет), мелкие РП = 0.25h (не 0). Недельный мультипликатор = Σ бюджетов ВСЕХ отработанных РП / WakaTime. Убран плановый бюджет из формулы
+- **hard-distinctions** — HD #42: Тир ≠ Квалификация (DP.D.042)
+
+## [0.13.4] — 2026-03-22
+
+### Added
+- **Priority Gate** — новый Pre-action Gate в CLAUDE.md: при создании РП ≥3h обязательный вопрос «К какому результату месяца?» (R{N} / поддержка / off-plan)
+- **wp-new SKILL** — 5-е место записи: маппинг РП → Результат в `Strategy.md`. Порог ≥3h
+- **Strategy template** — секции «Результаты месяца» и «РП → Результаты» с пояснениями допустимых значений
+
+## [0.13.3] — 2026-03-21
+
+### Fixed
+- **MCP подключение** — `setup.sh` использовал нерабочий `claude mcp add --transport http` → заменён на инструкцию через claude.ai/settings/connectors. Обновлены: SETUP-GUIDE §1.3b, IWE-HELP, LEARNING-PATH, validate-template.yml, update.sh (6 файлов)
+
+## [0.13.2] — 2026-03-21
+
+### Changed
+- **cloud-scheduler.yml** — расширенный IWE Health Check: мульти-репо коммиты (24ч + 7д), проверка свежести backup (>48ч), статус бота (health endpoint), WP-статистика, светофор (🟢/🟡/🔴). Настройка через GitHub Variables: `HEALTH_CHECK_REPOS`, `BOT_HEALTH_URL`
+- **LEARNING-PATH §2.6** — практический гайд настройки расширенного Health Check (4 шага)
+
+### Fixed
+- **cloud-scheduler.yml** — защита от пустого `STRATEGY_REPO` при `basename`, точный grep для WP-статистики (`| in_progress` вместо `in_progress`)
+
+## [0.13.1] — 2026-03-21
+
+### Fixed
+- **inbox-check.md** — `[processed]` → `[analyzed]`: метка при анализе captures, не при записи в Pack. Корневая причина потери 76% captures
+- **session-close.md** — добавлен шаг 8a: пометка captures `[processed]` только после подтверждённой записи в Pack
+- **extractor.sh** — учёт `[analyzed]` в подсчёте pending captures
+- **session-prep.md** — архивация `[processed]` captures в `archive/captures/` вместо удаления
+
+## [0.13.0] — 2026-03-20
+
+### Added
+- **generate-post-image.py** (S48) — генерация обложек для постов через OpenAI GPT Image 1 API. SOTA-промпт: полный текст статьи → визуальная метафора. Настроение по аудитории (wide/community/advanced). ~$0.07/картинка
+- **COVER-IMAGES.md** — подробная инструкция: API key, промпты, параметры, стоимость, интеграция с публикаторами
+
+## [0.12.0] — 2026-03-20
+
+### Added
+- **cloud-scheduler.yml** — GitHub Actions workflow для облачной автоматики IWE. Базовый уровень (без LLM, $0/мес): backup memory → exocortex, health check ночной автоматики, опциональные Telegram-уведомления. DP.SC.019, S61
+- **setup-cloud-scheduler.sh** — скрипт настройки: проверка gh CLI, установка GitHub Secrets, тестовый запуск workflow
+- **LEARNING-PATH §2.6** — Cloud Scheduler добавлен в таблицу опциональных сервисов
+- **README FAQ** — вопрос про работу IWE при выключенном Mac
+
+### Changed
+- **CLAUDE.md** — 3-слойная структура: L1 (§1-§7 платформа), L2 (§8 staging), L3 (§9 авторское). `update.sh` обновляет только L1. UC Gate добавлен в Pre-action Gates
+- **cloud-scheduler Telegram** — HTML-формат вместо markdown (корректное отображение bold)
+
+## [0.11.1] — 2026-03-20
+
+### Changed
+- **Haiku R23 верификатор в Quick Close** — закрытие сессии теперь запускает sub-agent Haiku R23 с context isolation (VR.SOTA.002). Шаг 7 в алгоритме Quick Close. Исключения: сессия ≤15 мин, сессия без изменений файлов
+- **roles/verifier/README.md** — таблица «Когда вызывается» уточнена: Quick Close (шаг 7) + Day Close (шаг 10) + Session Close (Verification Gate)
+- **CLAUDE.md правило 6** — обновлено: Quick Close + Day Close через Haiku R23
+
+## [0.11.0] — 2026-03-20
+
+### Changed
+- **update.sh v2.0.0** — полностью переписан: curl + манифест вместо git merge. Работает с template repos (created via "Use this template"), которые не имеют общей git-истории с upstream. Self-update (bootstrap): скрипт обновляет сам себя перед работой
+- **Превью перед обновлением** — показывает новые файлы, обновлённые, не затрагиваемые. Пользователь решает: применить или отменить
+- **setup-calendar.sh** — уточнён текст предупреждения Google (название «IWE MIM», пояснение про unverified app)
+
+### Added
+- **[update-manifest.json](update-manifest.json)** — манифест всех платформенных файлов (100+ записей) с описаниями. Используется update.sh для доставки обновлений
+- **[DP.SC.019](../PACK-digital-platform/pack/digital-platform/08-use-cases/DP.SC.019-template-update.md)** — сценарий «Обновление экзокортекса» + сервис S50 Template Update в MAP.002
+- **Инструкция «настрой календарь»** в CLAUDE.md — при запросе пользователя Claude запускает `setup-calendar.sh`
+
 ## [0.10.0] — 2026-03-19
 
 ### Changed

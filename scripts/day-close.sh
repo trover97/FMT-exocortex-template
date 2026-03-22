@@ -21,7 +21,7 @@ MEMORY_SRC="$HOME/.claude/projects/-Users-$(whoami)-IWE/memory"
 EXOCORTEX_DST="$DS_STRATEGY/exocortex"
 SELECTIVE_REINDEX="$WORKSPACE_DIR/DS-MCP/knowledge-mcp/scripts/selective-reindex.sh"
 LINEAR_SYNC="$WORKSPACE_DIR/DS-IT-systems/DS-ai-systems/synchronizer/scripts/linear-sync.sh"
-LOG_FILE="$DS_STRATEGY/inbox/day-close.log"
+LOG_FILE="$WORKSPACE_DIR/DS-agent-workspace/scheduler/day-close.log"
 # === /КОНФИГУРАЦИЯ ===
 
 # Цвета
