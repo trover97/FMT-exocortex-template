@@ -3,25 +3,12 @@
 > **Триггер:** Автоматический — Пн 00:00 (полночь Вс→Пн, launchd).
 > Создаёт WeekReport для клуба. Служит входом для session-prep (Пн 4:00).
 
-Источник сценария: {{WORKSPACE_DIR}}/PACK-digital-platform/pack/digital-platform/02-domain-entities/DP.ROLE.012-strategist/scenarios/scheduled/03-week-review.md
+Источник сценария: /Users/avlakriv/IWE/PACK-digital-platform/pack/digital-platform/02-domain-entities/DP.ROLE.012-strategist/scenarios/scheduled/03-week-review.md
 
 ## Контекст
 
-<<<<<<< Updated upstream
-- **WeekPlan:** {{WORKSPACE_DIR}}/DS-strategy/current/WeekPlan W*.md
-- **Шаблон:** {{WORKSPACE_DIR}}/PACK-digital-platform/pack/digital-platform/02-domain-entities/DP.ROLE.012-strategist/templates/reviews/weekly-review.md
-=======
 - **WeekPlan:** /Users/avlakriv/IWE/DS-strategy/current/WeekPlan W*.md
-- **Шаблон:** см. секцию «Шаблон WeekReport» ниже
-
-### 0. WakaTime — время работы за неделю
-
-> Данные автоматически подставляются из WakaTime API.
-> Включи секцию WakaTime в WeekReport после метрик коммитов.
-> Если данных нет — напиши: «WakaTime: нет данных за неделю».
-
-{{WAKATIME_WEEK}}
->>>>>>> Stashed changes
+- **Шаблон:** /Users/avlakriv/IWE/PACK-digital-platform/pack/digital-platform/02-domain-entities/DP.ROLE.012-strategist/templates/reviews/weekly-review.md
 
 ## Алгоритм
 
@@ -77,21 +64,11 @@ git -C /Users/avlakriv/IWE/<repo> log --since="last monday 00:00" --until="today
 
 ### 6. Создать пост для клуба (авто-публикация)
 
-<<<<<<< Updated upstream
 > Пост итогов недели публикуется автоматически в Пн 07:14 МСК. Стратег создаёт его сразу со `status: ready`.
 
 1. Переключись на **роль Автора (R4)** и на основе WeekReport сформируй пост для клуба.
 
-   **Обязательно прочитай** `{{WORKSPACE_DIR}}/DS-Knowledge-Index/CLAUDE.md` — полные инструкции роли Автора:
-=======
-> Шаг выполняется только если у пользователя настроен Knowledge Index — surface downstream репо для публикаций.
-> Проверь: существует ли директория `/Users/avlakriv/IWE/DS-Knowledge-Index-trover97/`?
-> Если нет — пропусти шаг 6 полностью.
-
-1. Переключись на **роль Автора (R4)** и на основе WeekReport сформируй пост для клуба.
-
-   **Обязательно прочитай** `/Users/avlakriv/IWE/DS-Knowledge-Index-trover97/CLAUDE.md` — полные инструкции роли Автора:
->>>>>>> Stashed changes
+   **Обязательно прочитай** `/Users/avlakriv/IWE/DS-Knowledge-Index/CLAUDE.md` — полные инструкции роли Автора:
    - § 2 — стандарт названий для итогов недели
    - § 3 — формат поста: аудитория `community`, структура для тега `итоги-недели` (4 уровня влияния, голос от первого лица, 400-700 слов)
 
@@ -107,11 +84,7 @@ git -C /Users/avlakriv/IWE/<repo> log --since="last monday 00:00" --until="today
 
    Выбери лучшее название сам (в автоматическом режиме нет пользователя для выбора).
 
-<<<<<<< Updated upstream
-2. Создай файл `{{WORKSPACE_DIR}}/DS-Knowledge-Index/docs/{YYYY}/{YYYY-MM-DD}-week-review-w{N}.md`
-=======
-2. Создай файл `/Users/avlakriv/IWE/DS-Knowledge-Index-trover97/docs/{YYYY}/{YYYY-MM-DD}-week-review-w{N}.md`
->>>>>>> Stashed changes
+2. Создай файл `/Users/avlakriv/IWE/DS-Knowledge-Index/docs/{YYYY}/{YYYY-MM-DD}-week-review-w{N}.md`
 
 3. Frontmatter:
 
@@ -129,13 +102,8 @@ content_plan: null
 ---
 ```
 
-<<<<<<< Updated upstream
-4. Обнови `{{WORKSPACE_DIR}}/DS-Knowledge-Index/docs/README.md` — добавь строку в начало текущего месяца
+4. Обнови `/Users/avlakriv/IWE/DS-Knowledge-Index/docs/README.md` — добавь строку в начало текущего месяца
 5. Закоммить и запушь `DS-Knowledge-Index` (git add docs/ && git commit && git push)
-=======
-4. Обнови `/Users/avlakriv/IWE/DS-Knowledge-Index-trover97/docs/README.md` — добавь строку в начало текущего месяца
-5. Закоммить и запушь Knowledge Index (git add docs/ && git commit && git push)
->>>>>>> Stashed changes
 
 **Шаблон WeekReport:**
 

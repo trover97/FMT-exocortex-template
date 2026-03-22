@@ -1,15 +1,15 @@
 Выполни сценарий «Подготовка к сессии стратегирования» для роли Стратег (R1).
 
-Источник сценария: {{WORKSPACE_DIR}}/PACK-digital-platform/pack/digital-platform/02-domain-entities/DP.ROLE.012-strategist/scenarios/scheduled/01-strategy-session.md
+Источник сценария: /Users/avlakriv/IWE/PACK-digital-platform/pack/digital-platform/02-domain-entities/DP.ROLE.012-strategist/scenarios/scheduled/01-strategy-session.md
 
 ## Контекст
 
 - **HUB (личные планы):** /Users/avlakriv/IWE/DS-strategy/current/
 - **Документы стратегии:** /Users/avlakriv/IWE/DS-strategy/docs/ (ВСЕ файлы: Strategy.md, Dissatisfactions.md, Session Agenda.md)
-- **Inbox:** /Users/avlakriv/IWE/DS-strategy/inbox/ ([fleeting-notes.md](https://github.com/trover97/DS-strategy/blob/main/inbox/fleeting-notes.md) + свежие файлы за неделю)
+- **Inbox:** /Users/avlakriv/IWE/DS-strategy/inbox/ ([fleeting-notes.md](https://github.com/{{GITHUB_USER}}/DS-strategy/blob/main/inbox/fleeting-notes.md) + свежие файлы за неделю)
 - **SPOKE (планы репо):** /Users/avlakriv/IWE/*/WORKPLAN.md
 - **Стратегические карты:** /Users/avlakriv/IWE/*/MAPSTRATEGIC.md (если есть в репо)
-- **MEMORY:** ~/.claude/projects/-Users-avlakriv-IWE/memory/MEMORY.md
+- **MEMORY:** ~/.claude/projects/{{CLAUDE_PROJECT_SLUG}}/memory/MEMORY.md
 
 ## Именование файлов в current/
 
@@ -75,12 +75,7 @@ DS-strategy/
 #### 4. Сверка со стратегией + агрегация MAPSTRATEGIC (→ блок «Стратегическая сверка»)
 
 - Прочитай `DS-strategy/docs/Strategy.md` — фокусы года, Q1 цели, приоритеты месяца
-<<<<<<< Updated upstream
-- Прочитай `{{WORKSPACE_DIR}}/*/MAPSTRATEGIC.md` (если файл есть в репо)
-=======
 - Прочитай `/Users/avlakriv/IWE/*/MAPSTRATEGIC.md` (если файл есть в репо)
-- **MCP-контекст:** `knowledge-mcp search("текущий фокус обучения", source_type="guides")` → рекомендации по руководствам для плана недели
->>>>>>> Stashed changes
 - **Агрегируй** фазы из MAPSTRATEGIC.md → обнови секцию «Текущие фазы (MAPSTRATEGIC)» в Strategy.md
 - Обнови «Приоритеты месяца» — статусы на основе WeekReport
 - Проверь: соответствуют ли текущие РП стратегическому направлению?

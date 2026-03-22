@@ -139,7 +139,7 @@
 
 **Если все три → предложить:** *«Skill candidate: [название] — [что делает]. Оформить как `.claude/skills/[name]/SKILL.md`?»*
 
-**Куда:** FMT-exocortex-template/.claude/skills/ (первоисточник) → sync → рабочий {{WORKSPACE_DIR}}/.claude/skills/
+**Куда:** FMT-exocortex-template/.claude/skills/ (первоисточник) → sync → рабочий /Users/avlakriv/IWE/.claude/skills/
 
 ## 3. Pre-action Gates
 
