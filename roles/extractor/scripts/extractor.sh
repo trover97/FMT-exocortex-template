@@ -16,7 +16,7 @@ REPO_DIR="$(dirname "$SCRIPT_DIR")"
 WORKSPACE="/Users/avlakriv/IWE"
 PROMPTS_DIR="$REPO_DIR/prompts"
 LOG_DIR="/Users/avlakriv/logs/extractor"
-CLAUDE_PATH="{{CLAUDE_PATH}}"
+CLAUDE_PATH="/Users/avlakriv/.local/bin/claude"
 ENV_FILE="/Users/avlakriv/.config/aist/env"
 
 # AI CLI: переопределение через переменные окружения (см. strategist.sh)
