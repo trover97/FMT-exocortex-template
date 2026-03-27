@@ -5,6 +5,94 @@ All notable changes to FMT-exocortex-template will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [Semantic Versioning](https://semver.org/).
 
+## [0.16.4] — 2026-03-27
+
+### Changed
+- **notify-update.yml** — 3-уровневый фильтр уведомлений: (1) наличие коммитов, (2) наличие changelog с буллет-пунктами, (3) проверка значимости (ключевые слова, значимые файлы, ≥3 пунктов). Незначительные правки (только CLAUDE.md/memory/rules) больше не генерируют уведомления подписчикам
+
+## [0.16.3] — 2026-03-27
+
+### Changed
+- **seed/strategy/docs/Strategy.md** — переструктурирование шаблона: Фокус Q{N} (текущий квартал, details open) первым, затем Годовой план (фазы, roadmap, MAPSTRATEGIC, риски, Q итоги внутри). Убрана отдельная секция Q итоги и Риски
+
+## [0.16.2] — 2026-03-25
+
+### Changed
+- **skill /iwe-rules-review** — 3 вопроса → 4 вопроса (по актуальному DP.M.008: чему научился? какое правило мешало? какого не хватало? какое обходил?)
+
+## [0.16.1] — 2026-03-25
+
+### Changed
+- **skill /archgate** — L2.1 Переносимость данных добавлена, L2.2–L2.7 перенумерованы (7 доменных характеристик). АрхГейт 8.0+ (WP-177)
+
+## [0.16.0] — 2026-03-25
+
+### Changed
+- **WeekReport deprecated** — итоги недели теперь записываются в секцию «Итоги W{N}» внутри WeekPlan. Отдельный файл WeekReport больше не создаётся. АрхГейт 8.9 (62/70)
+- **week-review.md** — пишет секцию в WeekPlan, не создаёт файл
+- **session-prep.md** — читает секцию из WeekPlan, не ищет файл WeekReport
+
+### Added
+- **Кроссплатформенное предотвращение сна** — `strategist.sh` и `scheduler.sh` автоматически блокируют засыпание: macOS `caffeinate -diu` / Linux `systemd-inhibit`. Флаг `-s` не используется — он игнорируется когда Optimized Battery Charging переключает профиль на батарею
+- **SETUP-GUIDE: инструкции wake+sleep** для macOS, Linux, Windows. Включая `pmset -b sleep 0` для ноутбуков и Charge Limit рекомендацию
+- **PLATFORM-COMPAT: sleep prevention** — документация кроссплатформенных ограничений
+- **Agent Workspace (optional, WP-176)** — `setup/optional/setup-agent-workspace.sh` создаёт отдельный репо для данных агентов. SETUP-GUIDE Этап 7 с осознанным описанием когда нужен/не нужен
+- **daily-report.sh conditional** — если DS-agent-workspace/.git существует → отчёты туда, иначе DS-strategy/current/ (обратная совместимость)
+
+### Updated
+- **LEARNING-PATH §11 FAQ** — 3 развёрнутых ответа (Windows+WSL, заметки, бот отвечает не то) + 6 табличных строк (WP-166: feedback_triage кластеры)
+- docs/LEARNING-PATH, USE-CASES, SETUP-GUIDE, onboarding-guide — убран WeekReport
+- roles/strategist/README, seed/strategy/CLAUDE.md — WeekReport помечен deprecated
+- synchronizer/scripts/templates/strategist.sh — ищет WeekPlan вместо WeekReport
+- README.md FAQ — обновлён вопрос про сон/выключение
+- install.sh — кроссплатформенные подсказки при установке
+- session-prep.md, note-review.md — ссылки на QA-отчёт: agent-workspace или DS-strategy
+- collectors.d/README.md — unsatisfied → agent-workspace path
+
+## [0.15.2] — 2026-03-24
+
+### Changed
+- **«Правила IWE» → «Культура работы IWE»** — переименование в skill /iwe-rules-review и шаблоне отчёта (согласование с DP.M.008)
+
+## [0.15.1] — 2026-03-24
+
+### Fixed
+- **Битые ссылки** — исправлено 17 ссылок в 6 файлах: кросс-репо `../../../../PACK-digital-platform/` → абсолютные GitHub URL в onboarding-guide, `LEARNING-PATH.md`/`SETUP-GUIDE.md` → `docs/` в CHANGELOG, лишний `../` в LEARNING-PATH, `Github/` в protocol-work, недостаточная глубина `../` в week-review и setup/optional/README
+
+## [0.15.0] — 2026-03-24
+
+### Changed
+- **Context Compression (WP-172)** — входной overhead снижен с ~27K до ~13K токенов (2x сжатие). АрхГейт 8.9
+- **CLAUDE.md** — сжат до ~90 строк ядра (было ~280). Убраны детали, дублирующие memory/ и .claude/rules/
+- **protocol-open.md** — шаблоны DayPlan/WeekPlan вынесены в skill `/day-open` (lazy loading, ~8K экономия в обычных сессиях)
+
+### Added
+- **skill `/day-open`** — `.claude/skills/day-open/SKILL.md`: шаблоны DayPlan, WeekPlan, compact dashboard. Загружаются только при Day Open
+- **Lesson Hygiene** в protocol-close.md (Day Close §3b) — симметрия: Open пишет уроки → Close чистит. Предотвращает раздувание MEMORY.md. Цель: ≤8 уроков
+- **validate-template.sh** — проверка `.claude/skills/day-open/SKILL.md`
+- **skill `/iwe-rules-review`** — еженедельное ревью культуры работы IWE (DP.M.008 #14). Триггер: Week Close
+- **HD #43** — различение «Правило ≠ Реализация правила» (DP.M.008)
+
+## [0.14.2] — 2026-03-24
+
+### Changed
+- **protocol-open.md § Ритуал (Шаг 1)** — каждый элемент отчёта с новой строки (было: всё в одну строку)
+- **LEARNING-PATH.md § Ритуал** — аналогичное форматирование
+
+## [0.14.1] — 2026-03-24
+
+### Changed
+- **wp-gate-reminder.sh** — при Day Open триггере инжектит реальную дату через `date` (currentDate от Anthropic может врать из-за timezone). На остальные сообщения — стандартный WP Gate reminder
+
+## [0.14.0] — 2026-03-24
+
+### Added
+- **dt-collect.sh plugin-архитектура** — ядро (L3) содержит 11 стандартных коллекторов, `collectors.d/*.sh` — точка расширения для персональных (L4) коллекторов. Plugin loader автоматически source'ит файлы и route'ит JSON по TARGET-секциям
+- **collectors.d/README.md** — документация формата плагинов (COLLECTOR/TARGET headers, формат функций)
+- **6 новых коллекторов в ядре** — multiplier (DayPlan budget), WP-REGISTRY stats, Pack entities, fleeting notes, scheduler reports health
+- **2 новых JSONB-секции** — `2_8_ecosystem`, `2_9_knowledge` (через плагины)
+- **portable_date_offset** — кроссплатформенная обёртка для `date -v` (macOS + Linux)
+
 ## [0.13.5] — 2026-03-22
 
 ### Changed
@@ -119,7 +207,7 @@ Versioning: [Semantic Versioning](https://semver.org/).
 ### Added
 - **Роли верификации (R23-R24)** — skill /verify + [hard-distinctions](memory/hard-distinctions.md) #38-40 (WP-122)
 - **Governance-синхронизация** в [Day Close](memory/protocol-close.md) — проверка REPOSITORY-REGISTRY, navigation.md, MAP.002↔PROCESSES.md (WP-124)
-- **Collapsible sections** в [LEARNING-PATH](LEARNING-PATH.md) и [SETUP-GUIDE](SETUP-GUIDE.md) (details/summary)
+- **Collapsible sections** в [LEARNING-PATH](docs/LEARNING-PATH.md) и [SETUP-GUIDE](docs/SETUP-GUIDE.md) (details/summary)
 - **Онбординг** переработан: пользователь в центре, принципы двусторонние
 
 ## [0.8.5] — 2026-03-17
@@ -141,7 +229,7 @@ Versioning: [Semantic Versioning](https://semver.org/).
 ## [0.8.3] — 2026-03-17
 
 ### Added
-- **[LEARNING-PATH.md](LEARNING-PATH.md) §11** — FAQ: cross-device workflow (ноут + десктоп, кросс-ОС)
+- **[LEARNING-PATH.md](docs/LEARNING-PATH.md) §11** — FAQ: cross-device workflow (ноут + десктоп, кросс-ОС)
 
 ## [0.8.2] — 2026-03-17
 
@@ -150,8 +238,8 @@ Versioning: [Semantic Versioning](https://semver.org/).
 - **[protocol-open.md](memory/protocol-open.md)** — два сценария переключения модели:
   - Сценарий A: вся сессия — Claude рекомендует `/model`, пользователь переключает
   - Сценарий B: отдельная задача внутри сессии — делегирование sub-agent'у (только вниз)
-- **[SETUP-GUIDE.md](SETUP-GUIDE.md) §0.5b** — класс верификации в таблице моделей + описание двух сценариев
-- **[LEARNING-PATH.md](LEARNING-PATH.md) §5.1b** — trivial в таблице классов + два сценария переключения
+- **[SETUP-GUIDE.md](docs/SETUP-GUIDE.md) §0.5b** — класс верификации в таблице моделей + описание двух сценариев
+- **[LEARNING-PATH.md](docs/LEARNING-PATH.md) §5.1b** — trivial в таблице классов + два сценария переключения
 
 ## [0.8.1] — 2026-03-16
 

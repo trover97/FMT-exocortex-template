@@ -16,7 +16,7 @@ Monitors your coding activity via WakaTime and sends a macOS notification when y
 
 ```bash
 # 1. Replace placeholder with your workspace path
-sed "s|{{WORKSPACE_DIR}}|$HOME/IWE|g" setup/optional/pomodoro-alert.plist \
+sed "s|/Users/avlakriv/IWE|$HOME/IWE|g" setup/optional/pomodoro-alert.plist \
   > ~/Library/LaunchAgents/com.exocortex.pomodoro-alert.plist
 
 # 2. Load the agent (starts immediately, runs every 5 min)
@@ -58,7 +58,7 @@ rm ~/Library/LaunchAgents/com.exocortex.pomodoro-alert.plist
 | File | Purpose |
 |------|---------|
 | `pomodoro-alert.py` | Python script (WakaTime API + macOS notification) |
-| `pomodoro-alert.plist` | launchd agent template (replace `{{WORKSPACE_DIR}}`) |
+| `pomodoro-alert.plist` | launchd agent template (replace `/Users/avlakriv/IWE`) |
 
 ---
 
@@ -79,7 +79,7 @@ This file is read by Claude during Day Open (`protocol-open.md § День`). No
 
 IWE автоматика в облаке — работает даже когда Mac выключен. Базовый уровень: backup + health check. $0/мес.
 
-**Сценарий:** [DP.SC.019](../../PACK-digital-platform/pack/digital-platform/08-use-cases/DP.SC.019-autonomous-cloud-runtime.md)
+**Сценарий:** [DP.SC.019](../../../PACK-digital-platform/pack/digital-platform/08-use-cases/DP.SC.019-autonomous-cloud-runtime.md)
 
 ### Что делает
 

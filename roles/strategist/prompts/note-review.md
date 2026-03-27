@@ -1,14 +1,14 @@
 Выполни сценарий «Ежедневный разбор заметок» для роли Стратег (R1).
 
-Источник сценария: {{WORKSPACE_DIR}}/PACK-digital-platform/pack/digital-platform/02-domain-entities/DP.ROLE.012-strategist/scenarios/scheduled/note-review.md
+Источник сценария: /Users/avlakriv/IWE/PACK-digital-platform/pack/digital-platform/02-domain-entities/DP.ROLE.012-strategist/scenarios/scheduled/note-review.md
 
 ## Контекст
 
-- **Заметки:** {{WORKSPACE_DIR}}/DS-strategy/inbox/[fleeting-notes.md](https://github.com/{{GITHUB_USER}}/DS-strategy/blob/main/inbox/fleeting-notes.md)
-- **НЭП:** {{WORKSPACE_DIR}}/DS-strategy/docs/Dissatisfactions.md
-- **Стратегия:** {{WORKSPACE_DIR}}/DS-strategy/docs/Strategy.md
-- **План недели:** {{WORKSPACE_DIR}}/DS-strategy/current/WeekPlan W*.md
-- **Inbox Экстрактора:** {{WORKSPACE_DIR}}/DS-strategy/inbox/captures.md
+- **Заметки:** /Users/avlakriv/IWE/DS-strategy/inbox/[fleeting-notes.md](https://github.com/{{GITHUB_USER}}/DS-strategy/blob/main/inbox/fleeting-notes.md)
+- **НЭП:** /Users/avlakriv/IWE/DS-strategy/docs/Dissatisfactions.md
+- **Стратегия:** /Users/avlakriv/IWE/DS-strategy/docs/Strategy.md
+- **План недели:** /Users/avlakriv/IWE/DS-strategy/current/WeekPlan W*.md
+- **Inbox Экстрактора:** /Users/avlakriv/IWE/DS-strategy/inbox/captures.md
 - **MEMORY:** ~/.claude/projects/{{CLAUDE_PROJECT_SLUG}}/memory/MEMORY.md
 
 ## Предусловие
@@ -48,7 +48,7 @@
 - `DS-strategy/current/WeekPlan W*.md` — РП и приоритеты недели
 - `DS-strategy/docs/Strategy.md` — фокусы года, приоритеты месяца
 - MEMORY.md — статусы РП
-- `DS-strategy/current/unsatisfied-questions.md` — **структурированный отчёт** из feedback_triage DB (авто-классификация ботом). Замечания (✏️) и urgent (high/critical) — в начале файла. Real-time алерты уже отправлены ботом → Note-Review только проверяет кластеры (≥3 в одном кластере → пометить)
+- QA-отчёт бота: `DS-agent-workspace/scheduler/feedback-triage/` (последний по дате) — **структурированный отчёт** из feedback_triage DB (авто-классификация ботом). Замечания (✏️) и urgent (high/critical) — в начале файла. Real-time алерты уже отправлены ботом → Note-Review только проверяет кластеры (≥3 в одном кластере → пометить)
 
 #### 3. Классифицировать каждую заметку
 
@@ -75,7 +75,7 @@
 - **Личные данные → personal/:** Контакт/телефон → `personal/contacts.md`. Аккаунт/логин/URL → `personal/accounts.md`. Токен/ключ/пароль → `personal/secrets.md`. Прочие справочные данные → `personal/reference.md`
 
 **Проверка актуальности (обязательно перед классификацией):**
-- Сверь заметку с коммитами за сегодня (`git log --since="00:00" --all --oneline` по всем {{WORKSPACE_DIR}}/ репо) и текущим WeekPlan
+- Сверь заметку с коммитами за сегодня (`git log --since="00:00" --all --oneline` по всем /Users/avlakriv/IWE/ репо) и текущим WeekPlan
 - Если задача из заметки **уже сделана** (есть коммит или РП done) → Шум (зачеркнуть), не тянуть в план
 - Если проблема из заметки **уже решена** → Шум
 - Если заметка ссылается на ситуацию, которая **изменилась** за день → оценить с учётом нового контекста

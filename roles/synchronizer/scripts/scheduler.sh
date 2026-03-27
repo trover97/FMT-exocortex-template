@@ -10,6 +10,17 @@
 
 set -euo pipefail
 
+# Предотвращаем сон пока скрипт работает
+# macOS: caffeinate -diu (idle+display+user, работает на батарее; -s НЕ используем — игнорируется при OBC→BATT)
+# Linux: systemd-inhibit (если доступен)
+if [[ "$(uname)" == "Darwin" ]]; then
+    caffeinate -diu -w $$ &
+elif command -v systemd-inhibit &>/dev/null; then
+    systemd-inhibit --what=idle:sleep --who=scheduler --why="agent dispatch" --mode=block sleep infinity &
+    _INHIBIT_PID=$!
+    trap 'kill $_INHIBIT_PID 2>/dev/null' EXIT
+fi
+
 # Cross-platform date offset: portable_date_offset <days_back> <format>
 portable_date_offset() {
     local days="$1"

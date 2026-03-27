@@ -262,7 +262,12 @@ if [ "$EXOCORTEX_REPO" != "$CURRENT_DIR_NAME" ]; then
     else
         # Replace references in all text files
         find "$TEMPLATE_DIR" -type f \( -name "*.md" -o -name "*.json" -o -name "*.sh" -o -name "*.plist" -o -name "*.yaml" -o -name "*.yml" \) | while read file; do
-            sed_inplace "s|$CURRENT_DIR_NAME|$EXOCORTEX_REPO|g" "$file"
+            # Skip lines marked UPSTREAM-CONST (e.g., upstream repo URL in update.sh)
+            if grep -q 'UPSTREAM-CONST' "$file" 2>/dev/null; then
+                sed_inplace "/UPSTREAM-CONST/!s|$CURRENT_DIR_NAME|$EXOCORTEX_REPO|g" "$file"
+            else
+                sed_inplace "s|$CURRENT_DIR_NAME|$EXOCORTEX_REPO|g" "$file"
+            fi
         done
 
         # Rename GitHub repo (if gh is available and not core mode)

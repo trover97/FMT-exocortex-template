@@ -42,6 +42,7 @@
 | **4** | WakaTime (трекинг времени) | 10 мин | можно позже |
 | **5** | Google Calendar | 10 мин | можно позже |
 | **6** | Видеоинтеграция | 5 мин | можно позже |
+| **7** | Agent Workspace (данные агентов) | 10 мин | когда >2 агента |
 
 > **Минимум для старта:** Этапы 0 → 1 → 2. Всё остальное подключается в любой момент — скажи Claude *«настрой календарь»* или *«подключи видеозаписи»*.
 
@@ -505,28 +506,97 @@ video:
 
 </details>
 <details>
-<summary><b>Автоматическое пробуждение Mac (рекомендуется)</b></summary>
+<summary><b>Этап 7: Agent Workspace — отдельное хранилище данных агентов (10 мин, опционально)</b></summary>
 
-По умолчанию Стратег запускается по расписанию launchd. Но если Mac спит (крышка закрыта ночью), launchd ждёт пробуждения. Это значит: открываешь крышку в 8:00 → план появляется через 15-20 мин.
+### Прочитай перед решением
 
-Чтобы план был готов **до** пробуждения, настрой автоматический wake:
+Это **осознанный выбор**, а не обязательный шаг. Два вопроса помогут решить:
+
+**1. У тебя есть автономные агенты?**
+
+Если ты только начал работу с IWE и используешь только Claude Code в интерактивном режиме — **тебе это НЕ нужно**. Все отчёты планировщика будут храниться в `DS-strategy/current/` и `DS-strategy/archive/` — этого достаточно.
+
+**2. Агенты генерируют >10 файлов в неделю?**
+
+Когда Scheduler, Scout, Extractor и другие агенты работают ежедневно, они создают десятки файлов: отчёты планировщика, QA-отчёты бота, находки, черновики планов. Эти автокоммиты засоряют git history DS-strategy, где должны быть только **человеческие решения** (планы, утверждённые captures).
+
+### Что даёт Agent Workspace
+
+| Без Agent Workspace | С Agent Workspace |
+|---------------------|------------------|
+| Всё в DS-strategy | Машинный output отдельно |
+| Git history перемешана | Чистая история решений |
+| 1 репозиторий | 2 репозитория |
+| Проще начать | Масштабируется |
+
+### Настройка
 
 ```bash
-# Проверить текущее расписание
-pmset -g sched
-
-# Установить пробуждение в 3:55 ежедневно (за 5 мин до Стратега)
-# Требует пароль администратора. Mac должен быть подключён к питанию.
-sudo pmset repeat wakeorpoweron MTWRFSU 03:55:00
+bash setup/optional/setup-agent-workspace.sh
 ```
 
-> **Как это работает:** Mac просыпается в 3:55, launchd запускает scheduler в 4:00, план готов к ~4:20. Ты встаёшь — план уже есть.
+Скрипт создаст приватный GitHub-репо `DS-agent-workspace` со структурой для каждого типа агента. После создания скрипты планировщика (`daily-report.sh` и др.) автоматически начнут писать туда — проверка по наличию `DS-agent-workspace/.git`.
+
+### Когда подключать
+
+**Рекомендуемый путь:**
+1. Начни без Agent Workspace (Этапы 0-2)
+2. Подключи Scheduler (launchd) — отчёты пойдут в DS-strategy
+3. Когда автокоммитов станет >5/день → создай Agent Workspace
+
+</details>
+<details>
+<summary><b>Автоматическое пробуждение и предотвращение сна</b></summary>
+
+Агенты запускаются по расписанию. Если ноутбук спит — задачи ждут пробуждения. Настрой автоматический wake, чтобы план был готов до твоего пробуждения.
+
+**macOS:**
+
+```bash
+# Пробуждение в 3:55 ежедневно (за 5 мин до Стратега)
+sudo pmset repeat wakeorpoweron MTWRFSU 03:55:00
+
+# ВАЖНО: если ноутбук на зарядке, Optimized Battery Charging может
+# переключить профиль питания на «батарея». На батарейном профиле
+# Mac засыпает даже при подключённом кабеле. Решение:
+sudo pmset -b sleep 0      # не засыпать на батарейном профиле
+sudo pmset -b standby 0    # не уходить в deep standby
+
+# Проверить: pmset -g custom (sleep=0 в обоих профилях)
+# Отменить wake: sudo pmset repeat cancel
+# Вернуть sleep: sudo pmset -b sleep 1 && sudo pmset -b standby 1
+```
+
+> **Как это работает:** Mac просыпается в 3:55, scheduler запускается в 4:00, план готов к ~4:20. Скрипты автоматически держат Mac бодрым через `caffeinate -diu` (работает и на батарейном профиле).
 >
-> **Без питания:** `wakeorpoweron` работает только при подключённом питании. Если Mac на батарее — план создастся при открытии крышки (задержка ~15-20 мин).
->
-> **Отменить:** `sudo pmset repeat cancel`
->
-> **Linux:** Используй `rtcwake` или systemd timer с `WakeSystem=true`.
+> **Charge Limit (рекомендуется):** вместо Optimized Battery Charging включи фиксированный лимит (System Settings → Battery → Charge Limit → 80%). Защищает батарею без непредсказуемых переключений профиля.
+
+**Linux:**
+
+```bash
+# Пробуждение через rtcwake (одноразовое, обычно в cron)
+sudo rtcwake -m no -t $(date -d "tomorrow 03:55" +%s)
+
+# Или systemd timer (постоянное расписание)
+# /etc/systemd/system/exocortex-wake.timer
+# [Timer]
+# OnCalendar=*-*-* 03:55:00
+# WakeSystem=true
+# Persistent=true
+
+# Предотвращение сна (скрипты делают это автоматически через systemd-inhibit)
+# Ручная проверка: systemd-inhibit --list
+```
+
+**Windows (WSL):**
+
+```powershell
+# Пробуждение через Task Scheduler
+schtasks /create /tn "ExocortexWake" /tr "wsl ~/IWE/DS-IT-systems/DS-ai-systems/synchronizer/scripts/scheduler.sh dispatch" /sc daily /st 04:00
+# Предотвращение сна: powercfg /change standby-timeout-ac 0
+```
+
+> **Общее правило:** скрипты `strategist.sh` и `scheduler.sh` автоматически предотвращают сон на время работы (macOS: `caffeinate -diu`, Linux: `systemd-inhibit`). Настроить нужно только **пробуждение** и **запрет засыпания на уровне ОС** для ноутбуков.
 
 </details>
 <details>
@@ -541,8 +611,8 @@ sudo pmset repeat wakeorpoweron MTWRFSU 03:55:00
 | **Каждые 3 часа** | Экстрактор* | Проверяет inbox (заметки, captures) → предлагает знания в Pack | `DS-strategy/inbox/extraction-reports/` |
 | **Вечер (23:00)** | Стратег | Note-Review классифицирует заметки из Telegram | Целевые документы в DS-strategy |
 | **Ночь (00:00)** | Синхронизатор* | Code-scan — обзор изменений в downstream-репо | `DS-strategy/current/CodeScan YYYY-MM-DD.md` |
-| **Ночь (Вс→Пн)** | Стратег | Week Review — итоги недели | `DS-strategy/current/WeekReport W{N}.md` |
-| **Утро (06:00)** | Синхронизатор* | Daily report — сводка ночных задач | `DS-strategy/current/SchedulerReport YYYY-MM-DD.md` |
+| **Ночь (Вс→Пн)** | Стратег | Week Review — итоги недели | Секция «Итоги W{N}» в `DS-strategy/current/WeekPlan W{N}.md` |
+| **Утро (06:00)** | Синхронизатор* | Daily report — сводка ночных задач | `DS-agent-workspace/scheduler/reports/` (или `DS-strategy/current/` если без Agent Workspace) |
 
 > *Экстрактор и Синхронизатор работают только если установлены (Этап 1.4).*
 

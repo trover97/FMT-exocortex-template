@@ -40,15 +40,13 @@
 > **Исполнение:** всегда через `/run-protocol close` (пошаговый чеклист, предотвращает пропуск шагов).
 > **Принцип порядка:** «горячий контекст» — механические статусы сразу после commit (пока файлы свежие), содержательные шаги (KE, верификация) — в середине.
 
-0. **Pull** → `cd DS-my-strategy && git pull --rebase`
+0. **Pull** → `cd DS-strategy && git pull --rebase`
 1. **Commit + Push** — все изменения зафиксированы
-<!-- AUTHOR-ONLY: CHANGELOG FMT — только для разработчика платформы -->
-1b. **CHANGELOG FMT** (если были коммиты в FMT-exocortex-template): обновить `FMT-exocortex-template/CHANGELOG.md` **сейчас**, пока контекст изменений свежий. На Day Close контекст потерян.
-<!-- /AUTHOR-ONLY -->
+<!-- YOUR CUSTOM CHECKS HERE -->
 2. **Статусы** (механические, пока файлы «горячие»):
    - **MEMORY.md** — обновить статус РП (одна строка: `in_progress` / `done`)
-   - **DayPlan** — обновить строку РП в `DS-my-strategy/current/DayPlan YYYY-MM-DD.md`. **Правило зачёркивания:** зачеркнуть всё, что отработано на сегодня — даже если РП остаётся in_progress (в WeekPlan он не зачёркивается, пока не done). DayPlan отражает «что сделано сегодня», WeekPlan — «что закрыто на неделе». Day Close = safety net, но DayPlan должен быть актуален между сессиями.
-   - **WP-REGISTRY** (при done) — `DS-my-strategy/docs/WP-REGISTRY.md`: зачеркнуть строку, статус → `~~✅~~ | ~~done~~`. Пропуск = рассинхрон MEMORY vs REGISTRY.
+   - **DayPlan** — обновить строку **своего РП** в `DS-strategy/current/DayPlan YYYY-MM-DD.md`. **Scope:** Quick Close обновляет только РП текущей сессии. Полная актуализация всех строк — на Day Close (шаг 2b). **Правило зачёркивания:** зачеркнуть строку даже если РП остаётся in_progress (в WeekPlan он не зачёркивается, пока не done). DayPlan отражает «что сделано сегодня», WeekPlan — «что закрыто на неделе».
+   - **WP-REGISTRY** (при done) — `DS-strategy/docs/WP-REGISTRY.md`: зачеркнуть строку, статус → `~~✅~~ | ~~done~~`. Пропуск = рассинхрон MEMORY vs REGISTRY.
 3. **KE (Knowledge Extraction)** → прочитай и выполни `DS-IT-systems/DS-ai-systems/extractor/prompts/session-close.md`:
    - Собрать отложенные captures + проверить пропущенные
    - Классифицировать → маршрутизировать → формализовать → валидировать
@@ -70,17 +68,15 @@
    - Если в сессии был **АрхГейт** и после него менялся код → запустить `/verify archgate` вместо `/verify code`
    - Verdict → в секцию «Что проверить» отчёта
 5. **WP Context File:**
-   - in_progress → обновить секцию «Осталось» в `DS-my-strategy/inbox/WP-{N}-{slug}.md`
+   - in_progress → обновить секцию «Осталось» в `DS-strategy/inbox/WP-{N}-{slug}.md`
    - done → пометить (архивация — на Day Close)
-   - Незавершённое → context file. Идея → `<repo>/MAPSTRATEGIC.md`. Зерно → `DS-my-strategy/drafts/draft-list.md`
-6. **Отчёт** (5-7 строк) + закоммитить DS-my-strategy
+   - Незавершённое → context file. Идея → `<repo>/MAPSTRATEGIC.md`. Зерно → `DS-strategy/drafts/draft-list.md`
+6. **Отчёт** (5-7 строк) + закоммитить DS-strategy
 
 ### Чеклист Quick Close
 
 - [ ] Всё закоммичено и запушено
-<!-- AUTHOR-ONLY: CHANGELOG -->
-- [ ] **CHANGELOG FMT:** коммиты в FMT → CHANGELOG обновлён (пока контекст свежий)
-<!-- /AUTHOR-ONLY -->
+<!-- YOUR CUSTOM CHECKS HERE -->
 - [ ] **Статусы:** MEMORY.md + DayPlan + WP-REGISTRY обновлены (сразу после commit)
 - [ ] KE выполнен, captures применены
 - [ ] Verification Gate пройден (WP + code)
@@ -114,10 +110,7 @@
 **Captures:** [N → Pack, N → DS docs/, N → IWE root]. «0» только если ничего не записано.
 **Что проверить:** [что требует внимания человека]
 **Git:** закоммичено + запушено ✅
-<!-- AUTHOR-ONLY: Деплой и ветки конкретных систем автора -->
-**Деплой бота:** залито на `pilot` ✅ / на `new-architecture` не заливалось
-**Ветки бота:** pilot и new-architecture синхронизированы ✅ / расходятся
-<!-- /AUTHOR-ONLY -->
+<!-- YOUR CUSTOM CHECKS HERE -->
 **Осталось:** ничего / [что — Agent→Agent handoff для следующей сессии]
 ```
 
@@ -141,9 +134,9 @@
 #### 1. Сбор данных
 
 ```bash
-for repo in $(ls ~/IWE/); do
-  if [ -d ~/IWE/$repo/.git ]; then
-    commits=$(git -C ~/IWE/$repo log --since="today 00:00" --oneline --no-merges 2>/dev/null)
+for repo in $(ls /Users/avlakriv/IWE/); do
+  if [ -d /Users/avlakriv/IWE/$repo/.git ]; then
+    commits=$(git -C /Users/avlakriv/IWE/$repo log --since="today 00:00" --oneline --no-merges 2>/dev/null)
     [ -n "$commits" ] && echo "=== $repo ===" && echo "$commits"
   fi
 done
@@ -153,19 +146,17 @@ done
 
 #### 2. Governance batch (одним проходом)
 
-**2a.** Обновить `DS-my-strategy/current/Plan W{N}...` (WeekPlan): статусы РП. **Grep по номеру РП** — обновить ВСЕ упоминания.
+**2a.** Обновить `DS-strategy/current/Plan W{N}...` (WeekPlan): статусы РП. **Grep по номеру РП** — обновить ВСЕ упоминания.
 
-**2b.** Обновить `DS-my-strategy/current/DayPlan YYYY-MM-DD.md`: статусы **всех строк** (РП + ad-hoc). Done → зачеркнуть.
+**2b.** Обновить `DS-strategy/current/DayPlan YYYY-MM-DD.md`: статусы **всех строк** (РП + ad-hoc). Done → зачеркнуть.
 
-**2c.** Обновить `DS-my-strategy/docs/WP-REGISTRY.md`: статусы + даты.
+**2c.** Обновить `DS-strategy/docs/WP-REGISTRY.md`: статусы + даты.
 
-**2d.** Обновить `DS-my-strategy/inbox/open-sessions.log`: удалить строки закрытых сессий.
+**2d.** Обновить `DS-strategy/inbox/open-sessions.log`: удалить строки закрытых сессий.
 
 **2e.** Governance-синхронизация: новые репо/сервисы за день? → REPOSITORY-REGISTRY, navigation.md, MAP.002↔PROCESSES.md.
 
-<!-- AUTHOR-ONLY: CHANGELOG FMT -->
-**2f.** ~~CHANGELOG FMT~~ — перенесён в Quick Close (шаг 1b). На Day Close только проверить, что не пропущен.
-<!-- /AUTHOR-ONLY -->
+<!-- YOUR CUSTOM CHECKS HERE -->
 
 #### 3. Архивация
 
@@ -174,17 +165,27 @@ done
 
 > **Правило:** MEMORY.md хранит ТОЛЬКО активные РП (in_progress + pending). Done = удалить.
 
+#### 3b. Lesson Hygiene (гигиена уроков)
+
+> **Симметрия:** Open пишет уроки → Close чистит. Предотвращает раздувание MEMORY.md.
+
+- Просмотреть секцию «Уроки» в MEMORY.md
+- Урок применялся сегодня? → оставить
+- Урок не применялся >1 нед и есть в тематическом файле (`lessons_*.md`)? → удалить из MEMORY.md
+- Новый урок за день? → записать в MEMORY.md (краткая строка) + тематический файл (подробно)
+- Цель: ≤8 уроков в MEMORY.md
+
 #### 4. Автоматические шаги (скрипт `day-close.sh`)
 
 ```bash
 # Запуск одной командой:
-~/IWE/DS-IT-systems/DS-ai-systems/synchronizer/scripts/day-close.sh
+/Users/avlakriv/IWE/DS-IT-systems/DS-ai-systems/synchronizer/scripts/day-close.sh
 ```
 
 Скрипт выполняет:
 - **Linear sync:** `linear-sync.sh` (синхронизация статусов)
 - **Downstream sync:** `update.sh` (reindex + pack-project + template — заменяет отдельный selective-reindex)
-- **Backup:** `memory/ + CLAUDE.md → DS-my-strategy/exocortex/`
+- **Backup:** `memory/ + CLAUDE.md → DS-strategy/exocortex/`
 
 #### 5. Мультипликатор IWE (расчёт)
 
@@ -193,7 +194,7 @@ done
 
 **Алгоритм (день):**
 
-1. **WakaTime** — физическое время за день. Источник: WakaTime API или `wakatime --today`.
+1. **WakaTime** — физическое время за день **по ВСЕМ проектам** (не только текущему). Источник: `fetch-wakatime.sh today` (cumulative_total из WakaTime API).
 2. **Бюджет закрыт** — сумма бюджетных оценок по ВСЕМ РП, над которыми работали сегодня:
    - done → полный бюджет РП (или пропорционально фазам для зонтичных)
    - partial (работали, но не закрыли) → % выполнения × бюджет
@@ -225,21 +226,7 @@ done
 
 **г) Не забыто?** Стратег проверяет:
 - Незакоммиченные изменения (`git status` по всем репо)
-<!-- AUTHOR-ONLY: Проверки специфичных для автора систем -->
-- **Синхронизация веток бота** (pilot vs new-architecture):
-  ```bash
-  cd ~/IWE/DS-IT-systems/aist_bot_newarchitecture
-  git fetch origin
-  DIFF_STAT=$(git diff origin/pilot origin/new-architecture -- ':!.DS_Store' --stat)
-  if [ -z "$DIFF_STAT" ]; then
-    echo "pilot и new-architecture: содержимое идентично ✅"
-  else
-    echo "pilot и new-architecture: РАСХОДЯТСЯ по содержимому ⚠️"
-    echo "$DIFF_STAT"
-  fi
-  ```
-  Сигнализировать ТОЛЬКО если `git diff` показывает разницу в содержимом.
-<!-- /AUTHOR-ONLY -->
+<!-- YOUR CUSTOM CHECKS HERE -->
 - Незаписанные мысли? (спросить пользователя)
 - Обещания кому-то? (спросить пользователя)
 
@@ -295,7 +282,7 @@ done
 *Закрыто: YYYY-MM-DD HH:MM*
 ```
 
-#### 9. Закоммитить DS-my-strategy
+#### 9. Закоммитить DS-strategy
 
 #### 10. Верификация по чеклисту (Day Close)
 
@@ -313,14 +300,13 @@ done
 - [ ] open-sessions.log: строки закрытых сессий удалены
 - [ ] Captures за день применены (все Quick Close → KE пройден)
 - [ ] **Синхронизация downstream:** коммиты в Pack/DS → `update.sh` выполнен (reindex + pack-project + template)
-- [ ] **Linear sync:** статусы соответствуют git
+- [ ] **Linear sync:** статусы соответствуют git. **Пост-sync чек:** сравнить кол-во active РП в REGISTRY (незачёркнутые `🔄`+`⏳`) с кол-вом active issues в Linear (не Done/Canceled). Расхождение → ❌ и исправить до продолжения. Скрипт может упасть молча (exit 1 без вывода) — проверять результат, а не факт запуска.
 - [ ] **Repo CLAUDE.md:** feat-коммиты → новые правила?
 - [ ] **WP context:** done → `mv inbox/ → archive/wp-contexts/`
+- [ ] **Lesson Hygiene:** уроки MEMORY.md ≤8, неактуальные → тематические файлы
 - [ ] **Draft-list:** Pack обогащён → черновик предложен?
 - [ ] **Видео:** обработанные помечены (если video.enabled)
-<!-- AUTHOR-ONLY: CHANGELOG -->
-- [ ] **CHANGELOG FMT:** проверить, что обновлён в Quick Close (не пропущен)
-<!-- /AUTHOR-ONLY -->
+<!-- YOUR CUSTOM CHECKS HERE -->
 - [ ] **Governance:** REPOSITORY-REGISTRY, navigation.md, MAP.002
 - [ ] **Backup:** `day-close.sh` выполнен (backup + reindex + linear)
 - [ ] **Верификация compliance:** /verify запускался сегодня?
@@ -355,7 +341,11 @@ done
 - Перенести in_progress и pending в таблицу новой недели W{N+1}
 - Источник: новый WeekPlan (создаётся в session-prep)
 
-#### 3. Аудит memory-файлов
+#### 3. Ревью операционных правил (DP.M.008 #14)
+
+Запустить `/iwe-rules-review` → отчёт → согласование → обновление DP.M.008 + реализаций.
+
+#### 4. Аудит memory-файлов
 
 - ≤11 файлов? Лишние → объединить или удалить
 - Лимиты: справочники ≤100, протоколы ≤150, реестры ≤200 строк

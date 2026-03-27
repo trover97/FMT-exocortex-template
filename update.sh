@@ -13,7 +13,7 @@
 set -e
 
 VERSION="2.0.0"
-REPO="TserenTserenov/FMT-exocortex-template"
+REPO="TserenTserenov/FMT-exocortex-template" # UPSTREAM-CONST: do not substitute
 BRANCH="main"
 RAW_BASE="https://raw.githubusercontent.com/$REPO/$BRANCH"
 
@@ -45,6 +45,12 @@ else
     sed_inplace() { sed -i '' "$@"; }
 fi
 
+# === Cross-platform hash ===
+hash_file() {
+    shasum -a 256 "$1" 2>/dev/null | cut -d' ' -f1 || \
+    sha256sum "$1" 2>/dev/null | cut -d' ' -f1
+}
+
 # === Detect directories ===
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
@@ -70,8 +76,8 @@ echo ""
 echo "[0] Проверка update.sh..."
 REMOTE_UPDATE="$TMPDIR_UPDATE/update.sh.new"
 if curl -sSfL "$RAW_BASE/update.sh" -o "$REMOTE_UPDATE" 2>/dev/null; then
-    LOCAL_HASH=$(shasum -a 256 "$SCRIPT_DIR/update.sh" 2>/dev/null | cut -d' ' -f1)
-    REMOTE_HASH=$(shasum -a 256 "$REMOTE_UPDATE" 2>/dev/null | cut -d' ' -f1)
+    LOCAL_HASH=$(hash_file "$SCRIPT_DIR/update.sh")
+    REMOTE_HASH=$(hash_file "$REMOTE_UPDATE")
     if [ "$LOCAL_HASH" != "$REMOTE_HASH" ]; then
         echo "  Найдена новая версия update.sh — обновляю..."
         cp "$REMOTE_UPDATE" "$SCRIPT_DIR/update.sh"
@@ -127,8 +133,8 @@ while IFS='|' read -r fpath fdesc; do
         NEW_DESCS+=("$fdesc")
     else
         # Existing file — compare hashes
-        LOCAL_HASH=$(shasum -a 256 "$SCRIPT_DIR/$fpath" 2>/dev/null | cut -d' ' -f1)
-        REMOTE_HASH=$(shasum -a 256 "$REMOTE_FILE" 2>/dev/null | cut -d' ' -f1)
+        LOCAL_HASH=$(hash_file "$SCRIPT_DIR/$fpath")
+        REMOTE_HASH=$(hash_file "$REMOTE_FILE")
         if [ "$LOCAL_HASH" != "$REMOTE_HASH" ]; then
             DIFF_COUNT=$(diff "$SCRIPT_DIR/$fpath" "$REMOTE_FILE" 2>/dev/null | grep -c '^[<>]' || echo "?")
             UPDATED_FILES+=("$fpath")
@@ -327,7 +333,7 @@ for f in "${NEW_FILES[@]}" "${UPDATED_FILES[@]}"; do
 done
 
 # Copy memory files to Claude projects directory
-CLAUDE_PROJECT_SLUG="-$(echo "$WORKSPACE_DIR" | tr '/' '-')"
+CLAUDE_PROJECT_SLUG="$(echo "$WORKSPACE_DIR" | tr '/' '-')"
 CLAUDE_MEMORY_DIR="$HOME/.claude/projects/$CLAUDE_PROJECT_SLUG/memory"
 
 if [ -d "$CLAUDE_MEMORY_DIR" ]; then
