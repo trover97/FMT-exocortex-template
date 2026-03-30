@@ -72,7 +72,7 @@
 
 | Система | DS-репо | Путь к docs/ |
 |---------|--------|-------------|
-| _Мой бот_ | _DS-IT-systems/my-bot_ | _/Users/avlakriv/IWE/DS-IT-systems/my-bot/docs/_ |
+| _Мой бот_ | _your-org/my-bot_ | _/Users/avlakriv/IWE/your-org/my-bot/docs/_ |
 
 <!-- Удали пример и добавь свои DS-репо -->
 

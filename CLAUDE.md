@@ -30,7 +30,7 @@
 2. **Push:** «заливай» / «запуши» → commit + push без доп. вопросов. Push ДО отчёта Закрытия.
 3. **Close:** Триггер Закрытия → протокол Закрытия → выполнить.
 4. **Чеклист-верификация (Haiku R23):** Quick Close и Day Close — sub-agent Haiku R23 (context isolation). Исключения: сессия ≤15 мин или без изменений файлов.
-5. **Pull-before-Commit / Без Obsidian:** см. §9.
+5. **Pull-on-Touch:** `git pull --rebase` при первом изменении в репо за сессию (не перед каждым коммитом). Без Obsidian: см. §9.
 
 ### Протокол Работы (полный → `memory/protocol-work.md`)
 
@@ -42,7 +42,7 @@
 | Момент | Проверка |
 |--------|---------|
 | Начало работы | Какие сервисы (MAP.002) затронуты? |
-| Пользовательский сценарий | **UC Gate:** какое обещание (08-use-cases/) затронуто? |
+| Пользовательский сценарий | **SC Gate:** какое обещание (08-service-clauses/) затронуто? |
 | `git commit` в репо с CLAUDE.md | Прочитать CLAUDE.md репо |
 | Архитектурное решение | **АрхГейт** → `/archgate` |
 | РП ≥3h | **Priority Gate:** к какому R{N} ведёт? |
@@ -91,7 +91,20 @@
 ## 8. Staging (обкатка → шаблон)
 
 > Правила на обкатке. Работают → переносятся в шаблон (L1).
-> **Перенесено в L1 (20 мар):** UC Gate, межсистемные процессы, чеклист-верификация.
+> **Перенесено в L1 (20 мар):** SC Gate, межсистемные процессы, чеклист-верификация.
+
+### Staging-канал (my IWE → FMT-exocortex-template)
+
+
+**Правило добавления:** новое поведение в §9 (авторское) → ОДНОВРЕМЕННО строка в STAGING.md (`status: testing`).
+
+**Промоция (при Week Close):**
+1. Просмотреть STAGING.md → есть `validated`?
+2. Убрать авторские константы → заменить на `{{PLACEHOLDER}}`
+3. Перенести в `FMT-exocortex-template` + commit `feat: promote S-NN from staging`
+4. Обновить STAGING.md: статус → `promoted`
+
+**Отклонение:** специфичное для авторского окружения → статус `rejected` (остаётся навсегда в §9, не промотируется). Не удалять из таблицы — это решение.
 
 ---
 
@@ -99,7 +112,7 @@
 
 ### Блокирующие (авторские)
 
-- **Pull-before-Commit (DS-strategy):** `git pull --rebase` → модификация → `commit` → `push`.
+- **Pull-before-Commit:** перенесён в §2 п.5 (платформенное правило для ВСЕХ репо).
 - **Без Obsidian (DS-strategy):** Просмотр через VS Code.
 
 ### Именование
@@ -111,6 +124,13 @@
 
 > **DS-IT-systems/SystemsSchool_bot** — ⛔ READ-ONLY.
 > **DS-IT-systems/aisystant** — ⛔ READ-ONLY.
+
+### Extensions Gate (БЛОКИРУЮЩЕЕ)
+
+**Кастомизация протоколов/скиллов → ТОЛЬКО в `extensions/*.md`.**
+Прямое редактирование `.claude/skills/` или `memory/protocol-*.md` = ошибка: сотрётся при `update.sh`.
+Авторское → `extensions/`. Платформенное → `FMT-exocortex-template`, затем `update.sh`.
+
 
 ### README.md (FMT-exocortex-template)
 

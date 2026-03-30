@@ -200,7 +200,9 @@ fi
 
 echo "Не затрагиваются:"
 echo "  ✓ memory/MEMORY.md (личная оперативная память)"
-echo "  ✓ CLAUDE.md § «Мои правила» (секция USER-SPACE)"
+echo "  ✓ CLAUDE.md (3-way merge: ваши правки сохраняются)"
+echo "  ✓ extensions/ (ваши расширения протоколов)"
+echo "  ✓ params.yaml (ваши параметры)"
 echo "  ✓ .secrets/, .mcp.json (ключи и конфигурация)"
 echo "  ✓ .claude/settings.local.json (permissions)"
 echo "  ✓ personal/ (ваши файлы)"
@@ -245,20 +247,52 @@ for f in "${NEW_FILES[@]}"; do
 done
 
 for f in "${UPDATED_FILES[@]}"; do
-    # Special handling for CLAUDE.md: preserve USER-SPACE section
+    # Special handling for CLAUDE.md: 3-way merge preserving user customizations
     if [ "$f" = "CLAUDE.md" ] && [ -f "$SCRIPT_DIR/$f" ]; then
-        USER_SECTION=$(sed -n '/^<!-- USER-SPACE/,/^<!-- \/USER-SPACE/p' "$SCRIPT_DIR/$f")
-        cp "$TMPDIR_UPDATE/files/$f" "$SCRIPT_DIR/$f"
-        if [ -n "$USER_SECTION" ]; then
-            # Remote file has empty USER-SPACE template — replace it with user's content
-            # Remove the template USER-SPACE block from downloaded file
-            sed_inplace '/^<!-- USER-SPACE/,/^<!-- \/USER-SPACE/d' "$SCRIPT_DIR/$f"
-            # Append user's preserved section
-            echo "" >> "$SCRIPT_DIR/$f"
-            echo "$USER_SECTION" >> "$SCRIPT_DIR/$f"
-            echo "  ~ $f (USER-SPACE сохранён)"
+        BASE_FILE="$SCRIPT_DIR/.claude.md.base"
+        NEW_FILE="$TMPDIR_UPDATE/files/$f"
+        CURRENT_FILE="$SCRIPT_DIR/$f"
+
+        if [ -f "$BASE_FILE" ] && command -v git >/dev/null 2>&1; then
+            # 3-way merge: base (last update) + current (user's) + new (upstream)
+            # git merge-file modifies the first argument in place
+            MERGE_TMP="$TMPDIR_UPDATE/claude-merge.md"
+            cp "$CURRENT_FILE" "$MERGE_TMP"
+
+            if git merge-file -p "$MERGE_TMP" "$BASE_FILE" "$NEW_FILE" > "$TMPDIR_UPDATE/claude-merged.md" 2>/dev/null; then
+                # Clean merge — no conflicts
+                cp "$TMPDIR_UPDATE/claude-merged.md" "$CURRENT_FILE"
+                cp "$NEW_FILE" "$BASE_FILE"
+                echo "  ~ $f (3-way merge, чисто)"
+            else
+                CONFLICT_COUNT=$(grep -c '^<<<<<<<' "$TMPDIR_UPDATE/claude-merged.md" 2>/dev/null || echo "0")
+                if [ "$CONFLICT_COUNT" -gt 0 ]; then
+                    # Conflicts detected — save merged file with markers
+                    cp "$TMPDIR_UPDATE/claude-merged.md" "$CURRENT_FILE"
+                    cp "$NEW_FILE" "$BASE_FILE"
+                    echo "  ~ $f (3-way merge, $CONFLICT_COUNT конфликтов — разрешите вручную)"
+                    echo "    Конфликты обозначены <<<<<<< / ======= / >>>>>>>"
+                else
+                    # git merge-file returned non-zero but no conflict markers — treat as success
+                    cp "$TMPDIR_UPDATE/claude-merged.md" "$CURRENT_FILE"
+                    cp "$NEW_FILE" "$BASE_FILE"
+                    echo "  ~ $f (3-way merge)"
+                fi
+            fi
         else
-            echo "  ~ $f"
+            # No base file (first update after migration) — fallback to USER-SPACE preserve
+            USER_SECTION=$(sed -n '/^<!-- USER-SPACE/,/^<!-- \/USER-SPACE/p' "$CURRENT_FILE")
+            cp "$NEW_FILE" "$CURRENT_FILE"
+            if [ -n "$USER_SECTION" ]; then
+                sed_inplace '/^<!-- USER-SPACE/,/^<!-- \/USER-SPACE/d' "$CURRENT_FILE"
+                echo "" >> "$CURRENT_FILE"
+                echo "$USER_SECTION" >> "$CURRENT_FILE"
+                echo "  ~ $f (USER-SPACE сохранён, базовый файл создан)"
+            else
+                echo "  ~ $f"
+            fi
+            # Save base for next update
+            cp "$NEW_FILE" "$SCRIPT_DIR/.claude.md.base"
         fi
     else
         cp "$TMPDIR_UPDATE/files/$f" "$SCRIPT_DIR/$f"
@@ -269,44 +303,137 @@ for f in "${UPDATED_FILES[@]}"; do
 done
 
 # === Step 5b: Re-substitute placeholders in new/updated files ===
-# After downloading from upstream, files contain {{PLACEHOLDERS}}
-# Detect current values from existing configured files
+# After downloading from upstream, files contain {{PLACEHOLDERS}}.
+# Read saved configuration from .exocortex.env (created by setup.sh).
 echo ""
 echo "Подстановка переменных..."
 
-# Try to detect WORKSPACE_DIR from existing CLAUDE.md
-DETECTED_WORKSPACE=""
-if [ -f "$WORKSPACE_DIR/CLAUDE.md" ]; then
-    # Look for workspace path patterns (e.g., ~/IWE or /Users/x/IWE)
-    DETECTED_WORKSPACE="$WORKSPACE_DIR"
-fi
+ENV_FILE="$SCRIPT_DIR/.exocortex.env"
 
-PLACEHOLDER_HIT=0
-for f in "${NEW_FILES[@]}" "${UPDATED_FILES[@]}"; do
-    filepath="$SCRIPT_DIR/$f"
-    [ -f "$filepath" ] || continue
+if [ -f "$ENV_FILE" ]; then
+    # Validate: only KEY=VALUE lines allowed (no shell commands)
+    if grep -qE '^\s*(source|eval|exec|\.|`|;|\$\()' "$ENV_FILE" 2>/dev/null; then
+        echo "  ОШИБКА: .exocortex.env содержит недопустимые конструкции. Пропускаю подстановку."
+        echo "  Пересоздайте: bash setup.sh"
+    else
+        # Read variables safely (only simple KEY=VALUE)
+        # Use read -r line + split on first '=' to handle values containing '=' (e.g. URLs, tokens)
+        while IFS= read -r line; do
+            # Skip comments and empty lines
+            case "$line" in \#*|"") continue ;; esac
+            # Split on first '=' only
+            key="${line%%=*}"
+            value="${line#*=}"
+            # Trim whitespace from key
+            key=$(echo "$key" | tr -d '[:space:]')
+            [ -z "$key" ] && continue
+            # Export for use below (secrets: ORY_TOKEN, L4_DATABASE_URL etc. are loaded but not substituted into files)
+            declare "ENV_$key=$value"
+        done < "$ENV_FILE"
 
-    if grep -q '{{WORKSPACE_DIR}}' "$filepath" 2>/dev/null; then
-        if [ -n "$DETECTED_WORKSPACE" ]; then
-            sed_inplace "s|{{WORKSPACE_DIR}}|$DETECTED_WORKSPACE|g" "$filepath"
-            PLACEHOLDER_HIT=$((PLACEHOLDER_HIT + 1))
+        PLACEHOLDER_HIT=0
+        for f in "${NEW_FILES[@]}" "${UPDATED_FILES[@]}"; do
+            filepath="$SCRIPT_DIR/$f"
+            [ -f "$filepath" ] || continue
+
+            if grep -q '{{[A-Z_]*}}' "$filepath" 2>/dev/null; then
+                sed_inplace \
+                    -e "s|{{GITHUB_USER}}|${ENV_GITHUB_USER:-}|g" \
+                    -e "s|{{EXOCORTEX_REPO}}|${ENV_EXOCORTEX_REPO:-}|g" \
+                    -e "s|{{WORKSPACE_DIR}}|${ENV_WORKSPACE_DIR:-}|g" \
+                    -e "s|{{CLAUDE_PATH}}|${ENV_CLAUDE_PATH:-}|g" \
+                    -e "s|{{CLAUDE_PROJECT_SLUG}}|${ENV_CLAUDE_PROJECT_SLUG:-}|g" \
+                    -e "s|{{TIMEZONE_HOUR}}|${ENV_TIMEZONE_HOUR:-}|g" \
+                    -e "s|{{TIMEZONE_DESC}}|${ENV_TIMEZONE_DESC:-}|g" \
+                    -e "s|{{HOME_DIR}}|${ENV_HOME_DIR:-$HOME}|g" \
+                    "$filepath"
+                PLACEHOLDER_HIT=$((PLACEHOLDER_HIT + 1))
+            fi
+
+            # Replace template repo name with user's repo name (skip UPSTREAM-CONST lines)
+            if [ -n "${ENV_EXOCORTEX_REPO:-}" ] && grep -q 'FMT-exocortex-template' "$filepath" 2>/dev/null; then
+                sed_inplace "/UPSTREAM-CONST/!s|FMT-exocortex-template|${ENV_EXOCORTEX_REPO}|g" "$filepath"
+            fi
+        done
+
+        if [ "$PLACEHOLDER_HIT" -gt 0 ]; then
+            echo "  Подставлено переменных в $PLACEHOLDER_HIT файлах."
+        fi
+
+        # === Preserve secrets: ORY_TOKEN, L4_BACKEND, L4_DATABASE_URL ===
+        # These are NOT substituted into template files.
+        # If they exist in .exocortex.env, they must NOT be overwritten by update.sh.
+        # (Already loaded into ENV_ORY_TOKEN etc. via the parser above — no action needed here.)
+
+        # === Migrate ~/.iwe-env if present (Ф8 migration scenario) ===
+        IWE_ENV_GLOBAL="$HOME/.iwe-env"
+        if [ -f "$IWE_ENV_GLOBAL" ]; then
+            MIGRATED_KEYS=0
+            # Check which T3+ keys are missing from .exocortex.env
+            for migrate_key in ORY_TOKEN L4_BACKEND L4_DATABASE_URL; do
+                eval "existing=\${ENV_${migrate_key}:-}"
+                if [ -z "$existing" ]; then
+                    # Extract from ~/.iwe-env
+                    migrated_val=$(grep "^${migrate_key}=" "$IWE_ENV_GLOBAL" 2>/dev/null | head -1)
+                    migrated_val="${migrated_val#*=}"
+                    if [ -n "$migrated_val" ]; then
+                        echo "" >> "$ENV_FILE"
+                        echo "${migrate_key}=${migrated_val}" >> "$ENV_FILE"
+                        MIGRATED_KEYS=$((MIGRATED_KEYS + 1))
+                    fi
+                fi
+            done
+            if [ "$MIGRATED_KEYS" -gt 0 ]; then
+                echo "  ✓ Мигрировано $MIGRATED_KEYS ключей из ~/.iwe-env → .exocortex.env"
+                echo "  ~/.iwe-env больше не нужен. Удалить вручную: rm $IWE_ENV_GLOBAL"
+            fi
         fi
     fi
-    if grep -q '{{HOME_DIR}}' "$filepath" 2>/dev/null; then
-        sed_inplace "s|{{HOME_DIR}}|$HOME|g" "$filepath"
-        PLACEHOLDER_HIT=$((PLACEHOLDER_HIT + 1))
-    fi
-done
+else
+    # No .exocortex.env — try to detect and generate (migration scenario С5)
+    echo "  ⚠ .exocortex.env не найден (установка до Ф0.5?)."
+    echo "  Попытка восстановления конфигурации..."
 
-if [ "$PLACEHOLDER_HIT" -gt 0 ]; then
-    echo "  Подставлено переменных в $PLACEHOLDER_HIT файлах."
+    DETECTED_WORKSPACE="$WORKSPACE_DIR"
+    DETECTED_REPO="$(basename "$SCRIPT_DIR")"
+
+    cat > "$ENV_FILE" <<ENVEOF
+# Exocortex configuration (auto-detected by update.sh — verify and fix values)
+# SECURITY: chmod 600. Listed in .gitignore. Do NOT commit this file.
+GITHUB_USER=your-username
+EXOCORTEX_REPO=$DETECTED_REPO
+WORKSPACE_DIR=$DETECTED_WORKSPACE
+CLAUDE_PATH=$(command -v claude 2>/dev/null || echo 'claude')
+CLAUDE_PROJECT_SLUG=$(echo "$DETECTED_WORKSPACE" | tr '/' '-')
+TIMEZONE_HOUR=4
+TIMEZONE_DESC=4:00 UTC
+HOME_DIR=$HOME
+
+# === Knowledge Gateway (T3+) — fill in if using personal Pack index ===
+ORY_TOKEN=
+L4_BACKEND=
+L4_DATABASE_URL=
+ENVEOF
+    chmod 600 "$ENV_FILE"
+    echo "  Конфигурация восстановлена в $ENV_FILE"
+    echo "  ⚠ ПРОВЕРЬТЕ значения (особенно GITHUB_USER) и перезапустите: bash update.sh"
+
+    # Still substitute what we can (HOME_DIR and WORKSPACE_DIR)
+    for f in "${NEW_FILES[@]}" "${UPDATED_FILES[@]}"; do
+        filepath="$SCRIPT_DIR/$f"
+        [ -f "$filepath" ] || continue
+        sed_inplace \
+            -e "s|{{WORKSPACE_DIR}}|$DETECTED_WORKSPACE|g" \
+            -e "s|{{HOME_DIR}}|$HOME|g" \
+            "$filepath" 2>/dev/null || true
+    done
 fi
 
 # Check remaining placeholders
 REMAINING=$(grep -rl '{{[A-Z_]*}}' "$SCRIPT_DIR" --include="*.md" --include="*.sh" --include="*.json" --include="*.yaml" --include="*.yml" 2>/dev/null | wc -l | tr -d ' ')
 if [ "$REMAINING" -gt 0 ]; then
     echo "  ⚠ $REMAINING файлов содержат незаменённые переменные."
-    echo "  Для полной подстановки: bash setup.sh"
+    echo "  Проверьте .exocortex.env и перезапустите: bash update.sh"
 fi
 
 # === Step 6: Reinstall platform-space ===
@@ -317,17 +444,42 @@ echo "Обновление platform-space..."
 CLAUDE_UPDATED=false
 for f in "${NEW_FILES[@]}" "${UPDATED_FILES[@]}"; do
     if [ "$f" = "CLAUDE.md" ]; then
-        # Preserve USER-SPACE from workspace CLAUDE.md (may differ from repo copy)
-        if [ -f "$WORKSPACE_DIR/CLAUDE.md" ]; then
-            WS_USER_SECTION=$(sed -n '/^<!-- USER-SPACE/,/^<!-- \/USER-SPACE/p' "$WORKSPACE_DIR/CLAUDE.md")
+        # 3-way merge for workspace CLAUDE.md (same logic as repo copy)
+        WS_BASE="$WORKSPACE_DIR/.claude.md.base"
+        WS_CURRENT="$WORKSPACE_DIR/CLAUDE.md"
+        WS_NEW="$SCRIPT_DIR/CLAUDE.md"
+
+        if [ -f "$WS_BASE" ] && [ -f "$WS_CURRENT" ] && command -v git >/dev/null 2>&1; then
+            WS_MERGE_TMP="$TMPDIR_UPDATE/ws-claude-merge.md"
+            cp "$WS_CURRENT" "$WS_MERGE_TMP"
+            if git merge-file -p "$WS_MERGE_TMP" "$WS_BASE" "$WS_NEW" > "$TMPDIR_UPDATE/ws-claude-merged.md" 2>/dev/null; then
+                cp "$TMPDIR_UPDATE/ws-claude-merged.md" "$WS_CURRENT"
+                cp "$WS_NEW" "$WS_BASE"
+                echo "  ✓ $WS_CURRENT обновлён (3-way merge)"
+            else
+                WS_CONFLICTS=$(grep -c '^<<<<<<<' "$TMPDIR_UPDATE/ws-claude-merged.md" 2>/dev/null || echo "0")
+                cp "$TMPDIR_UPDATE/ws-claude-merged.md" "$WS_CURRENT"
+                cp "$WS_NEW" "$WS_BASE"
+                if [ "$WS_CONFLICTS" -gt 0 ]; then
+                    echo "  ✓ $WS_CURRENT обновлён (3-way merge, $WS_CONFLICTS конфликтов)"
+                else
+                    echo "  ✓ $WS_CURRENT обновлён (3-way merge)"
+                fi
+            fi
+        else
+            # Fallback: USER-SPACE preserve (first update or no git)
+            if [ -f "$WS_CURRENT" ]; then
+                WS_USER_SECTION=$(sed -n '/^<!-- USER-SPACE/,/^<!-- \/USER-SPACE/p' "$WS_CURRENT")
+            fi
+            cp "$WS_NEW" "$WS_CURRENT"
+            if [ -n "${WS_USER_SECTION:-}" ]; then
+                sed_inplace '/^<!-- USER-SPACE/,/^<!-- \/USER-SPACE/d' "$WS_CURRENT"
+                echo "" >> "$WS_CURRENT"
+                echo "$WS_USER_SECTION" >> "$WS_CURRENT"
+            fi
+            cp "$WS_NEW" "$WS_BASE"
+            echo "  ✓ $WS_CURRENT обновлён (базовый файл создан)"
         fi
-        cp "$SCRIPT_DIR/CLAUDE.md" "$WORKSPACE_DIR/CLAUDE.md"
-        if [ -n "${WS_USER_SECTION:-}" ]; then
-            sed_inplace '/^<!-- USER-SPACE/,/^<!-- \/USER-SPACE/d' "$WORKSPACE_DIR/CLAUDE.md"
-            echo "" >> "$WORKSPACE_DIR/CLAUDE.md"
-            echo "$WS_USER_SECTION" >> "$WORKSPACE_DIR/CLAUDE.md"
-        fi
-        echo "  ✓ $WORKSPACE_DIR/CLAUDE.md обновлён"
         CLAUDE_UPDATED=true
     fi
 done
@@ -353,6 +505,61 @@ if [ -d "$CLAUDE_MEMORY_DIR" ]; then
         echo "  ✓ $MEM_UPDATED memory-файлов обновлено в $CLAUDE_MEMORY_DIR"
     fi
     echo "  ✓ memory/MEMORY.md — не тронут"
+fi
+
+# Propagate skills, hooks, rules to workspace if changed
+for f in "${NEW_FILES[@]}" "${UPDATED_FILES[@]}"; do
+    case "$f" in .claude/skills/*|.claude/hooks/*|.claude/rules/*|.claude/settings.json)
+        src="$SCRIPT_DIR/$f"
+        dst="$WORKSPACE_DIR/$f"
+        mkdir -p "$(dirname "$dst")"
+        cp "$src" "$dst"
+        echo "  ✓ $f → workspace"
+        ;;
+    esac
+done
+
+# === Step 6b: Auto-fix links in user files (migration) ===
+# If WORKSPACE_DIR or EXOCORTEX_REPO changed (rename/move), update references in user files.
+if [ -f "$ENV_FILE" ] && [ -n "${ENV_WORKSPACE_DIR:-}" ] && [ -n "${ENV_EXOCORTEX_REPO:-}" ]; then
+    LINKS_FIXED=0
+
+    # Fix extensions/ files
+    EXT_DIR="$WORKSPACE_DIR/extensions"
+    if [ -d "$EXT_DIR" ]; then
+        for ext_file in "$EXT_DIR"/*.md; do
+            [ -f "$ext_file" ] || continue
+            CHANGED=false
+
+            # Fix old WORKSPACE_DIR references (absolute paths that differ from current)
+            if grep -q '/IWE\b\|/exocortex\b' "$ext_file" 2>/dev/null; then
+                if ! grep -q "${ENV_WORKSPACE_DIR}" "$ext_file" 2>/dev/null || \
+                   grep -qE '/[A-Za-z0-9_-]+/IWE/' "$ext_file" 2>/dev/null; then
+                    sed_inplace "s|${HOME}/[A-Za-z0-9._-]*/|${ENV_WORKSPACE_DIR}/|g" "$ext_file" 2>/dev/null && CHANGED=true
+                fi
+            fi
+
+            # Fix old repo name references in links
+            if grep -q 'FMT-exocortex-template\|github\.com/[A-Za-z0-9_-]*/[A-Za-z0-9_-]*-exocortex' "$ext_file" 2>/dev/null; then
+                sed_inplace "/UPSTREAM-CONST/!s|FMT-exocortex-template|${ENV_EXOCORTEX_REPO}|g" "$ext_file" 2>/dev/null && CHANGED=true
+            fi
+
+            $CHANGED && LINKS_FIXED=$((LINKS_FIXED + 1))
+        done
+    fi
+
+    # Fix memory/ user files (MEMORY.md only — platform files are replaced above)
+    MEMORY_DIR="$HOME/.claude/projects/${CLAUDE_PROJECT_SLUG}/memory"
+    if [ -d "$MEMORY_DIR" ] && [ -f "$MEMORY_DIR/MEMORY.md" ]; then
+        if grep -q 'FMT-exocortex-template' "$MEMORY_DIR/MEMORY.md" 2>/dev/null; then
+            sed_inplace "/UPSTREAM-CONST/!s|FMT-exocortex-template|${ENV_EXOCORTEX_REPO}|g" "$MEMORY_DIR/MEMORY.md" 2>/dev/null
+            LINKS_FIXED=$((LINKS_FIXED + 1))
+        fi
+    fi
+
+    if [ "$LINKS_FIXED" -gt 0 ]; then
+        echo "  ✓ Авто-фикс ссылок: $LINKS_FIXED файлов обновлено"
+    fi
 fi
 
 # Reinstall roles if changed

@@ -2,7 +2,7 @@
 name: day-open
 description: "Протокол открытия дня (Day Open). Собирает вчерашние коммиты, issues, заметки, календарь, бота QA, Scout, мир — формирует DayPlan и compact dashboard."
 argument-hint: ""
-version: 1.0.0
+version: 1.1.0
 ---
 
 # Day Open (протокол открытия дня)
@@ -11,8 +11,94 @@ version: 1.0.0
 > **Порядок:** сначала DayPlan → потом compact. **Дата:** ПЕРВОЕ действие = `date`.
 > **Режим:** `memory/day-rhythm-config.yaml` → `interactive: false` = одним блоком, решения → «Требует внимания».
 > **Фильтр свежести:** issues, видео, заметки — за 2 дня. Urgent — всегда.
-> **Алгоритм Day Open:** `memory/protocol-open.md § Масштаб: День`.
-> **Шаблоны:** ниже.
+> **Issues — только actionable:** пропускать read-only репо (CLAUDE.md) и upstream без push-доступа (Base, чужие fork).
+> **Шаблоны:** ниже (после алгоритма).
+
+## БЛОКИРУЮЩЕЕ: пошаговое исполнение
+
+Day Open = протокол. Исполнять ТОЛЬКО пошагово через TodoWrite.
+Каждый шаг алгоритма ниже → отдельная задача (pending → in_progress → completed).
+Переход к следующему — ТОЛЬКО после отметки текущего. Шаг невозможен → blocked (не пропускать молча).
+**Почему:** без TodoWrite агент пропускает шаги из-за загрязнения контекста (SOTA.002).
+
+## Алгоритм
+
+<!-- EXTENSION POINT: загрузить extensions/day-open.before.md если существует -->
+
+### 1. Вчера
+Прочитать вчерашний DayPlan (`archive/day-plans/` или `current/`). Взять:
+- Секцию «Итоги» → 1-3 результата
+- Секцию «Завтра начать с:» / carry-over РП → **приоритетный вход** для шага 2
+- Незакрытые вопросы из «Требует внимания»
+
+Fallback: файла нет → пропустить, работать из коммитов.
+
+Коммиты за вчера по всем `/Users/avlakriv/IWE/*/` репо. Сопоставить с DayPlan.
+
+### 1b. GitHub Issues
+`gh issue list` по всем репо (включая вложенным). Фильтр 2 дня. Связь с РП по ключевым словам.
+**Только actionable:** пропускать read-only и upstream без push-доступа.
+
+### 1c. Заметки
+`{{GOVERNANCE_REPO}}/inbox/fleeting-notes.md` → категоризация: → РП / → Backlog / → Контент / → Pack / → Обсудить / → Шум. НЕ удалять.
+
+### 2. План на сегодня
+**Приоритет входов (строгий порядок):**
+1. **Carry-over из Day Close (БЛОКИРУЮЩЕЕ):** ВСЕ РП из секции «Завтра начать с» → в план без обрезки. Это решение пользователя — Day Open не фильтрует и не сокращает этот список
+2. **WeekPlan (ОБЯЗАТЕЛЬНО):** прочитать WeekPlan → ВСЕ in_progress и pending РП → проверить каждый: релевантен сегодня? Есть дата/дедлайн сегодня? Просрочен? → добавить.
+   **Budget Spread** (если `budget_spread.enabled: true` в day-rhythm-config.yaml): для каждого РП с бюджетом ≥ `threshold_h` (колонка «h» в таблице WeekPlan):
+   - `days_left` = оставшиеся рабочие дни пн–пт включая сегодня
+   - `daily_slot` = round(budget_week / days_left, `rounding`)
+   - Нет бюджета в WeekPlan → пропустить, добавить в «Требует внимания»
+   - РП уже в плане (carry-over) → взять max(carry_over_budget, daily_slot)
+   - Иначе → добавить с daily_slot
+   Не ограничиваться «2-4 штуки» — план дня отражает реальную нагрузку
+3. **MEMORY.md → «РП текущей недели»:** сверить — нет ли РП, упущенных в WeekPlan (ad-hoc, reopened)
+4. `day-rhythm-config.yaml → mandatory_daily_wps` — обязательные РП (проверить наличие в плане, если нет → добавить)
+
+**Слот 1 = саморазвитие.**
+Mandatory РП отсутствуют в WeekPlan → «Требует внимания».
+
+### 3. Саморазвитие
+Руководство, где остановился, черновики (`{{GOVERNANCE_REPO}}/drafts/`).
+
+### 4. Стратегирование
+Если strategy_day → DayPlan НЕ создавать, план в WeekPlan. Пропустить шаг 7.
+
+### 4b. Помидорки
+Из `day-rhythm-config.yaml → pomodoro`.
+
+### 4c. Календарь
+Из `day-rhythm-config.yaml → calendar_ids` (если указаны) или все доступные календари → list-events → свободные блоки ≥1h (09:00–19:00). Private — пропустить.
+
+### 5. IWE за ночь (светофор)
+Scheduler report, update.sh, template-sync, MCP reindex, Scout. 🟢/🟡/🔴.
+
+**Проверка обновлений:** `cd /Users/avlakriv/IWE/FMT-exocortex-template && bash update.sh --check 2>&1`. Если доступно обновление → добавить в «Требует внимания»: «Доступно обновление IWE → `/iwe-update`».
+
+### 5b. Бот QA
+Feedback-triage report → дельта, urgent. Фильтр 2 дня. Нет новых → «нет новых за 2 дня».
+
+### 5c. Контент
+Стратегия маркетинга + draft-list. 1-3 темы.
+
+### 5d. Scout
+Scout report. Не проревьюен → «Требует внимания».
+
+### 6. Мир
+`day-rhythm-config.yaml → news`. Feeds/WebSearch. `enabled: false` → пропустить.
+**Ссылки на источники обязательны** (URL).
+
+### 6b. Требует внимания
+Собрать из шагов 1–6. Нет → не выводить.
+
+<!-- EXTENSION POINT: загрузить extensions/day-open.after.md если существует -->
+
+### 7. Запись
+**DayPlan:** `{{GOVERNANCE_REPO}}/current/DayPlan YYYY-MM-DD.md` по шаблону ниже. Предыдущий → `archive/day-plans/`. Коммит.
+**Compact:** вывести в VS Code по шаблону ниже.
+
+---
 
 ## Шаблон DayPlan
 

@@ -20,7 +20,9 @@ DS_STRATEGY="$WORKSPACE_DIR/DS-strategy"
 MEMORY_SRC="$HOME/.claude/projects/-Users-$(whoami)-IWE/memory"
 EXOCORTEX_DST="$DS_STRATEGY/exocortex"
 SELECTIVE_REINDEX="$WORKSPACE_DIR/DS-MCP/knowledge-mcp/scripts/selective-reindex.sh"
-LINEAR_SYNC="$WORKSPACE_DIR/DS-IT-systems/DS-ai-systems/synchronizer/scripts/linear-sync.sh"
+# TODO: укажите путь к скрипту синхронизации, если используете
+# LINEAR_SYNC="$WORKSPACE_DIR/roles/synchronizer/scripts/linear-sync.sh"
+LINEAR_SYNC=""
 LOG_FILE="$WORKSPACE_DIR/DS-agent-workspace/scheduler/day-close.log"
 # === /КОНФИГУРАЦИЯ ===
 

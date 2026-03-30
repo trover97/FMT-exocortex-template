@@ -4,12 +4,12 @@
 
 ## Контекст
 
-- **Заметки:** /Users/avlakriv/IWE/DS-strategy/inbox/[fleeting-notes.md](https://github.com/avlakriv/DS-strategy/blob/main/inbox/fleeting-notes.md)
+- **Заметки:** /Users/avlakriv/IWE/DS-strategy/inbox/[fleeting-notes.md](https://github.com/{{GITHUB_USER}}/DS-strategy/blob/main/inbox/fleeting-notes.md)
 - **НЭП:** /Users/avlakriv/IWE/DS-strategy/docs/Dissatisfactions.md
 - **Стратегия:** /Users/avlakriv/IWE/DS-strategy/docs/Strategy.md
 - **План недели:** /Users/avlakriv/IWE/DS-strategy/current/WeekPlan W*.md
 - **Inbox Экстрактора:** /Users/avlakriv/IWE/DS-strategy/inbox/captures.md
-- **MEMORY:** ~/.claude/projects/-Users-avlakriv-IWE/memory/MEMORY.md
+- **MEMORY:** ~/.claude/projects/{{CLAUDE_PROJECT_SLUG}}/memory/MEMORY.md
 
 ## Предусловие
 
@@ -126,7 +126,7 @@
 | НЭП | `DS-strategy/docs/Dissatisfactions.md` |
 | Задача (на завтра / с дедлайном) | `DS-strategy/current/DayPlan*.md` (ближайший) или `WeekPlan W*.md` |
 | Задача (на неделю) | `DS-strategy/current/WeekPlan W*.md` |
-| Задача (стратегическая) | `DS-strategy/docs/Strategy.md` |
+| Задача (стратегическая) | `DS-strategy/current/WeekPlan W*.md` (секция Inbox Triage → разбирается на Strategy Session) |
 | Личные данные | `DS-strategy/personal/` (contacts / accounts / secrets / reference) |
 
 > Стратег (Day-Plan, 4:00) читает эти документы и ВИДИТ предложения.
