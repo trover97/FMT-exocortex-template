@@ -6,10 +6,10 @@
 
 - **HUB (личные планы):** /Users/avlakriv/IWE/DS-strategy/current/
 - **Документы стратегии:** /Users/avlakriv/IWE/DS-strategy/docs/ (ВСЕ файлы: Strategy.md, Dissatisfactions.md, Session Agenda.md)
-- **Inbox:** /Users/avlakriv/IWE/DS-strategy/inbox/ ([fleeting-notes.md](https://github.com/{{GITHUB_USER}}/DS-strategy/blob/main/inbox/fleeting-notes.md) + свежие файлы за неделю)
+- **Inbox:** /Users/avlakriv/IWE/DS-strategy/inbox/ ([fleeting-notes.md](https://github.com/trover97/DS-strategy/blob/main/inbox/fleeting-notes.md) + свежие файлы за неделю)
 - **SPOKE (планы репо):** /Users/avlakriv/IWE/*/WORKPLAN.md
 - **Стратегические карты:** /Users/avlakriv/IWE/*/MAPSTRATEGIC.md (если есть в репо)
-- **MEMORY:** ~/.claude/projects/{{CLAUDE_PROJECT_SLUG}}/memory/MEMORY.md
+- **MEMORY:** ~/.claude/projects/-Users-avlakriv-IWE/memory/MEMORY.md
 
 ## Именование файлов в current/
 

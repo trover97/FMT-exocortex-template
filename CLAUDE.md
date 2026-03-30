@@ -93,7 +93,7 @@
 > Правила на обкатке. Работают → переносятся в шаблон (L1).
 > **Перенесено в L1 (20 мар):** SC Gate, межсистемные процессы, чеклист-верификация.
 
-### Staging-канал (my IWE → FMT-exocortex-template)
+### Staging-канал (my IWE → DS-exocortex)
 
 
 **Правило добавления:** новое поведение в §9 (авторское) → ОДНОВРЕМЕННО строка в STAGING.md (`status: testing`).
@@ -101,7 +101,7 @@
 **Промоция (при Week Close):**
 1. Просмотреть STAGING.md → есть `validated`?
 2. Убрать авторские константы → заменить на `{{PLACEHOLDER}}`
-3. Перенести в `FMT-exocortex-template` + commit `feat: promote S-NN from staging`
+3. Перенести в `DS-exocortex` + commit `feat: promote S-NN from staging`
 4. Обновить STAGING.md: статус → `promoted`
 
 **Отклонение:** специфичное для авторского окружения → статус `rejected` (остаётся навсегда в §9, не промотируется). Не удалять из таблицы — это решение.
@@ -129,10 +129,10 @@
 
 **Кастомизация протоколов/скиллов → ТОЛЬКО в `extensions/*.md`.**
 Прямое редактирование `.claude/skills/` или `memory/protocol-*.md` = ошибка: сотрётся при `update.sh`.
-Авторское → `extensions/`. Платформенное → `FMT-exocortex-template`, затем `update.sh`.
+Авторское → `extensions/`. Платформенное → `DS-exocortex`, затем `update.sh`.
 
 
-### README.md (FMT-exocortex-template)
+### README.md (DS-exocortex)
 
 > Изменение структуры — по согласованию с владельцем.
 
