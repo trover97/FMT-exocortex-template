@@ -14,9 +14,8 @@
     <!-- Пробуждение в ключевые часы:
          0:00  — week-review (Пн) + code-scan
          3:00  — extractor inbox-check
-         4:00  — strategist morning
          6:00  — extractor + daily-report
-         9:00  — extractor
+         9:00  — strategist morning + extractor (первый дневной dispatch)
          12:00 — extractor
          15:00 — extractor
          18:00 — extractor
@@ -27,7 +26,6 @@
     <array>
         <dict><key>Hour</key><integer>0</integer><key>Minute</key><integer>0</integer></dict>
         <dict><key>Hour</key><integer>3</integer><key>Minute</key><integer>0</integer></dict>
-        <dict><key>Hour</key><integer>4</integer><key>Minute</key><integer>0</integer></dict>
         <dict><key>Hour</key><integer>6</integer><key>Minute</key><integer>0</integer></dict>
         <dict><key>Hour</key><integer>9</integer><key>Minute</key><integer>0</integer></dict>
         <dict><key>Hour</key><integer>12</integer><key>Minute</key><integer>0</integer></dict>
