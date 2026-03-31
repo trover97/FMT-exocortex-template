@@ -12,7 +12,7 @@
     </array>
 
     <!-- Пробуждение в ключевые часы:
-         0:00  — week-review (Пн) + code-scan
+         0:00  — code-scan (week-review теперь запускается в 09:00+)
          3:00  — extractor inbox-check
          6:00  — extractor + daily-report
          9:00  — strategist morning + extractor (первый дневной dispatch)
