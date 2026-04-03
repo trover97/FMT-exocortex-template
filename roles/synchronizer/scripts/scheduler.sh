@@ -184,7 +184,7 @@ dispatch() {
     fi
 
     # --- Стратег: week-review (Пн, до morning) ---
-    if [ "$DOW" = "1" ] && (( 10#$HOUR >= 7 )) && ! ran_this_week "strategist-week-review"; then
+    if [ "$DOW" = "1" ] && ! ran_this_week "strategist-week-review"; then
         log "→ strategist week-review (catch-up: hour=$HOUR)"
         if timeout "$TASK_TIMEOUT_LONG" "$STRATEGIST_SH" week-review >> "$LOG_FILE" 2>&1; then
             mark_done_week "strategist-week-review"
@@ -194,8 +194,8 @@ dispatch() {
         ran=1
     fi
 
-    # --- Стратег: morning (07:00-21:59) ---
-    if (( 10#$HOUR >= 7 && 10#$HOUR < 22 )) && ! ran_today "strategist-morning"; then
+    # --- Стратег: morning (04:00-21:59) ---
+    if (( 10#$HOUR >= 4 && 10#$HOUR < 22 )) && ! ran_today "strategist-morning"; then
         log "→ strategist morning (catch-up: hour=$HOUR)"
         if timeout "$TASK_TIMEOUT_LONG" "$STRATEGIST_SH" morning >> "$LOG_FILE" 2>&1; then
             mark_done "strategist-morning"
@@ -214,7 +214,7 @@ dispatch() {
             log "WARN: strategist note-review failed (will retry next dispatch)"
         fi
         ran=1
-    elif (( 10#$HOUR >= 7 && 10#$HOUR < 12 )); then
+    elif (( 10#$HOUR < 12 )); then
         local yesterday
         yesterday=$(portable_date_offset 1)
         if [ -n "$yesterday" ] && [ ! -f "$STATE_DIR/strategist-note-review-$yesterday" ]; then

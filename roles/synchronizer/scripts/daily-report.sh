@@ -264,7 +264,16 @@ else
     log "Report written: $REPORT_FILE"
 
     cd "$COMMIT_DIR"
+    # Staging Isolation: stash → pull → pop → reset → add only own files
+    # Without stash, pull --rebase fails when Claude sessions leave unstaged changes
+    local stash_count_before stash_count_after
+    stash_count_before=$(git stash list 2>/dev/null | wc -l)
+    git stash -u --quiet 2>/dev/null || true
     git pull --rebase --quiet 2>/dev/null || log "WARN: pull --rebase failed (offline?)"
+    stash_count_after=$(git stash list 2>/dev/null | wc -l)
+    if [ "$stash_count_after" -gt "$stash_count_before" ]; then
+        git stash pop --quiet 2>/dev/null || log "WARN: stash pop failed"
+    fi
     git reset --quiet 2>/dev/null || true
 
     archive_old_reports
