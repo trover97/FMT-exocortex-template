@@ -36,7 +36,7 @@
 ### 2. (Опционально) Установи автоматический inbox-check
 
 ```bash
-cd /Users/avlakriv/IWE/DS-exocortex/roles/extractor
+cd /Users/avlakriv/IWE/FMT-exocortex-template/roles/extractor
 bash install.sh
 ```
 
@@ -46,10 +46,10 @@ bash install.sh
 
 ```bash
 # Inbox-check (без launchd)
-bash /Users/avlakriv/IWE/DS-exocortex/roles/extractor/scripts/extractor.sh inbox-check
+bash /Users/avlakriv/IWE/FMT-exocortex-template/roles/extractor/scripts/extractor.sh inbox-check
 
 # Knowledge Audit
-bash /Users/avlakriv/IWE/DS-exocortex/roles/extractor/scripts/extractor.sh audit
+bash /Users/avlakriv/IWE/FMT-exocortex-template/roles/extractor/scripts/extractor.sh audit
 ```
 
 ## Как работает
