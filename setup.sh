@@ -290,13 +290,6 @@ HOME_DIR=$HOME_DIR
 PLATFORM_LLM_PROXY_URL=https://llm.aisystant.com/v1
 # ANTHROPIC_API_KEY=  # Optional: own key for unlimited usage (Direct MCP mode)
 
-# === MCP (substituted into .mcp.json) ===
-# Platform MCP packages — update version here, run update.sh to apply
-KNOWLEDGE_MCP_PACKAGE=@aisystant/knowledge-mcp
-KNOWLEDGE_MCP_DATABASE_URL=
-DIGITAL_TWIN_MCP_PACKAGE=@aisystant/digital-twin-mcp
-DIGITAL_TWIN_DATABASE_URL=
-
 ENVEOF
     chmod 600 "$ENV_FILE"
     echo "  Configuration saved to $ENV_FILE"
@@ -405,15 +398,14 @@ else
             echo "  WARN: settings.local.json not found in template, skipping."
         fi
 
-        # MCP servers are managed through claude.ai connectors (not local CLI)
-        echo "  MCP серверы подключаются через claude.ai:"
+        # MCP knowledge servers connect through Gateway (OAuth auto-flow)
+        echo "  Знаниевые MCP-серверы подключаются через Gateway (автоматически):"
         echo ""
-        echo "  1. Откройте https://claude.ai/settings/connectors"
-        echo "  2. Добавьте: https://knowledge-mcp.aisystant.workers.dev/mcp"
-        echo "  3. Добавьте: https://digital-twin-mcp.aisystant.workers.dev/mcp"
-        echo "  4. Перезапустите Claude Code"
+        echo "  .mcp.json уже содержит iwe-knowledge → https://mcp.aisystant.com/mcp"
+        echo "  При первом запуске Claude Code откроется браузер для входа через Ory."
+        echo "  Необходима подписка «Бесконечное развитие»."
         echo ""
-        echo "  После подключения проверьте командой /mcp в Claude Code."
+        echo "  После входа проверьте командой /mcp в Claude Code."
     fi
 fi
 
@@ -436,7 +428,7 @@ else
     fi
 fi
 
-# === 4c. Generate .mcp.json in workspace ===
+# === 4c. Copy .mcp.json to workspace ===
 echo "[4c] Configuring .mcp.json..."
 
 MCP_TEMPLATE="$TEMPLATE_DIR/.mcp.json"
@@ -444,70 +436,75 @@ MCP_DEST="$WORKSPACE_DIR/.mcp.json"
 MCP_USER_EXT="$WORKSPACE_DIR/extensions/mcp-user.json"
 
 if $DRY_RUN; then
-    echo "  [DRY RUN] Would generate $MCP_DEST from $MCP_TEMPLATE"
-    echo "    Substituting: KNOWLEDGE_MCP_PACKAGE, KNOWLEDGE_MCP_DATABASE_URL,"
-    echo "                  DIGITAL_TWIN_MCP_PACKAGE, DIGITAL_TWIN_DATABASE_URL, GITHUB_USER"
+    echo "  [DRY RUN] Would copy $MCP_TEMPLATE → $MCP_DEST"
+    echo "    iwe-knowledge → https://mcp.aisystant.com/mcp (OAuth)"
     if [ -f "$MCP_USER_EXT" ] && command -v jq >/dev/null 2>&1; then
         echo "  [DRY RUN] Would merge extensions/mcp-user.json into .mcp.json"
     fi
 elif [ ! -f "$MCP_TEMPLATE" ]; then
     echo "  WARN: $MCP_TEMPLATE not found, skipping."
 else
-    # Read MCP variables from .exocortex.env (already saved above)
-    ENV_FILE="$TEMPLATE_DIR/.exocortex.env"
-    KNOWLEDGE_MCP_PACKAGE=""
-    KNOWLEDGE_MCP_DATABASE_URL=""
-    DIGITAL_TWIN_MCP_PACKAGE=""
-    DIGITAL_TWIN_DATABASE_URL=""
-    MCP_GITHUB_USER="$GITHUB_USER"  # already collected above; re-read from env as fallback
-    if [ -f "$ENV_FILE" ]; then
-        while IFS= read -r line; do
-            case "$line" in \#*|"") continue ;; esac
-            k="${line%%=*}"; v="${line#*=}"
-            k=$(echo "$k" | tr -d '[:space:]')
-            case "$k" in
-                GITHUB_USER)               MCP_GITHUB_USER="$v" ;;
-                KNOWLEDGE_MCP_PACKAGE)     KNOWLEDGE_MCP_PACKAGE="$v" ;;
-                KNOWLEDGE_MCP_DATABASE_URL) KNOWLEDGE_MCP_DATABASE_URL="$v" ;;
-                DIGITAL_TWIN_MCP_PACKAGE)  DIGITAL_TWIN_MCP_PACKAGE="$v" ;;
-                DIGITAL_TWIN_DATABASE_URL) DIGITAL_TWIN_DATABASE_URL="$v" ;;
-            esac
-        done < "$ENV_FILE"
-    fi
-
-    # Copy template .mcp.json to workspace
+    # Copy template .mcp.json to workspace (no placeholders — Gateway URL is static)
     cp "$MCP_TEMPLATE" "$MCP_DEST"
-
-    # Substitute MCP-specific placeholders
-    sed_inplace \
-        -e "s|trover97|${MCP_GITHUB_USER:-}|g" \
-        -e "s|@aisystant/knowledge-mcp|${KNOWLEDGE_MCP_PACKAGE:-@aisystant/knowledge-mcp}|g" \
-        -e "s||${KNOWLEDGE_MCP_DATABASE_URL:-}|g" \
-        -e "s|@aisystant/digital-twin-mcp|${DIGITAL_TWIN_MCP_PACKAGE:-@aisystant/digital-twin-mcp}|g" \
-        -e "s||${DIGITAL_TWIN_DATABASE_URL:-}|g" \
-        "$MCP_DEST"
-
-    echo "  Generated: $MCP_DEST"
+    echo "  ✓ $MCP_DEST → iwe-knowledge (Gateway, OAuth)"
 
     # Merge extensions/mcp-user.json if it exists and has content
     if [ -f "$MCP_USER_EXT" ]; then
         if command -v jq >/dev/null 2>&1; then
-            # Check if mcp-user.json has any servers
             USER_COUNT=$(jq '.mcpServers | length' "$MCP_USER_EXT" 2>/dev/null || echo "0")
             if [ "$USER_COUNT" -gt 0 ]; then
                 MCP_MERGED=$(jq -s '.[0].mcpServers * .[1].mcpServers | {mcpServers: .}' "$MCP_DEST" "$MCP_USER_EXT" 2>/dev/null)
                 if [ -n "$MCP_MERGED" ]; then
                     echo "$MCP_MERGED" > "$MCP_DEST"
-                    echo "  Merged $USER_COUNT server(s) from extensions/mcp-user.json"
+                    echo "  ✓ Merged $USER_COUNT server(s) from extensions/mcp-user.json"
                 fi
-            else
-                echo "  extensions/mcp-user.json is empty — skipping merge"
             fi
         else
             echo "  ○ jq not found — extensions/mcp-user.json merge skipped"
             echo "    Install jq: brew install jq"
         fi
     fi
+fi
+
+# === 4d. IWE environment variables (WP-219, DP.FM.009) ===
+# Lookup-слой для путей к скриптам: протоколы и скиллы ссылаются на
+# $IWE_SCRIPTS / $IWE_ROLES, а не на абсолютные пути. Перемещение скрипта
+# ломает одну переменную, а не N протоколов.
+echo "[4d] Installing IWE environment variables..."
+
+IWE_ENV_FILE="$HOME/.iwe-paths"
+ZSHENV_FILE="$HOME/.zshenv"
+IWE_ENV_MARKER="# IWE environment (WP-219, DP.FM.009): lookup-слой для путей к скриптам"
+
+if $DRY_RUN; then
+    echo "  [DRY RUN] Would write $IWE_ENV_FILE with IWE_WORKSPACE/IWE_TEMPLATE/IWE_SCRIPTS/IWE_ROLES"
+    echo "  [DRY RUN] Would ensure $ZSHENV_FILE sources $IWE_ENV_FILE"
+else
+    cat > "$IWE_ENV_FILE" <<IWEENV_EOF
+# IWE environment variables
+# Generated by setup.sh v$VERSION. Rerun setup.sh or iwe-update to regenerate.
+# Do not edit manually — changes will be lost.
+
+export IWE_WORKSPACE="$WORKSPACE_DIR"
+export IWE_TEMPLATE="\$IWE_WORKSPACE/FMT-exocortex-template"
+export IWE_SCRIPTS="\$IWE_TEMPLATE/scripts"
+export IWE_ROLES="\$IWE_TEMPLATE/roles"
+IWEENV_EOF
+    echo "  ✓ $IWE_ENV_FILE written"
+
+    # Ensure ~/.zshenv sources ~/.iwe-paths (idempotent)
+    if [ -f "$ZSHENV_FILE" ] && grep -qF "$IWE_ENV_MARKER" "$ZSHENV_FILE"; then
+        echo "  ○ $ZSHENV_FILE already sources \$HOME/.iwe-paths"
+    else
+        cat >> "$ZSHENV_FILE" <<'ZSHENV_EOF'
+
+# IWE environment (WP-219, DP.FM.009): lookup-слой для путей к скриптам
+[ -f "$HOME/.iwe-paths" ] && source "$HOME/.iwe-paths"
+ZSHENV_EOF
+        echo "  ✓ $ZSHENV_FILE → sources \$HOME/.iwe-paths"
+    fi
+
+    echo "  ℹ  Restart shell or run: source $ZSHENV_FILE"
 fi
 
 # === 5. Install roles (autodiscovery via role.yaml) ===

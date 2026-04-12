@@ -37,13 +37,13 @@ Pack (предметное) → SPF (корректность) → FPF (перв
    - Форма, процесс, корректность → source=SPF
    - Базовые различения, первые принципы → source=FPF
 
-3. **Ищи через knowledge-mcp:**
-   - `knowledge-mcp search(query="<запрос>", source_type="pack")` -- по всем Pack
-   - `knowledge-mcp search(query="<запрос>", source="SPF")` -- по SPF
-   - `knowledge-mcp search(query="<запрос>", source="FPF")` -- по FPF
+3. **Ищи через Gateway (iwe-knowledge):**
+   - `knowledge_search(query="<запрос>", source_type="pack")` -- по всем Pack
+   - `knowledge_search(query="<запрос>", source="SPF")` -- по SPF
+   - `knowledge_search(query="<запрос>", source="FPF")` -- по FPF
    - Если первый уровень не дал результатов -- спускайся по fallback chain
 
-4. **Если knowledge-mcp недоступен** (нет в `/mcp`):
+4. **Если iwe-knowledge недоступен** (нет в `/mcp`):
    - Pack: читай файлы `PACK-*/pack/` через Glob + Read
    - SPF: читай `SPF/docs/` через Glob + Read
    - FPF: читай `FPF/Readme.md` (обзор) или ищи через Grep по `FPF/`
