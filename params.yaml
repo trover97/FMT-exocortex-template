@@ -1,0 +1,13 @@
+# IWE параметры протоколов
+# update.sh не перезаписывает этот файл — ваши настройки в безопасности.
+# Подробности: extensions/README.md § Параметры
+
+video_check: false
+multiplier_enabled: false
+reflection_enabled: false
+lesson_rotation: false
+auto_verify_code: false
+verify_quick_close: false
+telegram_notifications: false
+extensions_dir: extensions
+author_mode: true
