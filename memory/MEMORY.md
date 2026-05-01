@@ -1,6 +1,6 @@
 # Оперативная память
 
-> **Инструкции:** `/Users/avlakriv/IWE/CLAUDE.md` | **Настройте под свою экосистему**
+> **Инструкции:** `{{WORKSPACE_DIR}}/CLAUDE.md` | **Настройте под свою экосистему**
 
 ## БЛОКИРУЮЩИЕ (проверяй ВСЕГДА)
 
@@ -11,7 +11,7 @@
 ## ВАЖНЫЕ (проверяй на рубежах)
 
 3. **Capture:** На рубеже → «Capture: X → Y» (CLAUDE.md § 2)
-4. **Отчёты:** ВСЕ репо в /Users/avlakriv/IWE/
+4. **Отчёты:** ВСЕ репо в {{WORKSPACE_DIR}}/
 5. **Процессы:** Нельзя реализовывать без PROCESSES.md (CLAUDE.md § 3)
 
 ---
@@ -35,7 +35,5 @@
 | Правила по типам репо | `memory/repo-type-rules.md` |
 | Чеклисты | `memory/checklists.md` |
 | **SOTA-практики** | `memory/sota-reference.md` |
-| Обслуживание CLAUDE.md | `memory/claude-md-maintenance.md` |
-| Урок WP Gate | `memory/wp-gate-lesson.md` |
 | **Системно-специфичное** | **→ repo/CLAUDE.md** |
 | Стратег | `DS-strategist/README.md` |

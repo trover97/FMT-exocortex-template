@@ -1,6 +1,9 @@
+---
+valid_from: 2026-04-13
+originSessionId: 9a0e726a-951e-4408-9e02-94d7eeffbf74
+---
 # Навигация по репозиториям (Слой 3)
 
-> Claude читает этот файл при поиске конкретного файла/репо. Для поиска знаний → `mcp__claude_ai_knowledge-mcp__search`.
 
 ## Ключевые файлы
 
@@ -53,10 +56,6 @@
 
 | MCP | Путь |
 |-----|------|
-| knowledge-mcp (исходники) | `DS-MCP/knowledge-mcp/src/index.ts` |
-| knowledge-mcp (ingest) | `DS-MCP/knowledge-mcp/scripts/ingest.ts` |
-| guides-mcp (исходники) | `DS-MCP/guides-mcp/src/index.ts` |
-| fsm-mcp (исходники) | `DS-MCP/fsm-mcp/src/index.ts` |
 <!-- | Activity Hub | `your-org/activity-hub/` | -->
 | Автономные агенты (код) | `DS-autonomous-agents/` |
 | Данные агентов (workspace) | `DS-agent-workspace/` |

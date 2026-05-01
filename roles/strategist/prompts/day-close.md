@@ -1,26 +1,28 @@
+> **DEPRECATED (WP-98, 2026-03-14).** Day Close перенесён в `memory/protocol-close.md § День` (ОРЗ-фрактал).
+> Этот файл сохранён для справки. При триггере «закрываю день» → читать `protocol-close.md`.
+
 Выполни сценарий Day-Close для роли Стратег (R1).
 
 > **Триггер:** Ручной — по запросу пользователя (`./scripts/strategist.sh day-close`).
 > Отдельный файл отчёта НЕ создаётся. Итоги дня войдут в DayPlan следующего утра.
 
-Источник сценария: /Users/avlakriv/IWE/CLAUDE.md → Протокол Day-Close
 
 ## Контекст
 
-- **WeekPlan:** /Users/avlakriv/IWE/DS-strategy/current/WeekPlan W*.md (последний по дате)
-- **MEMORY:** ~/.claude/projects/-Users-avlakriv-IWE/memory/MEMORY.md
-- **Exocortex backup:** /Users/avlakriv/IWE/DS-strategy/exocortex/
+- **WeekPlan:** {{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/current/WeekPlan W*.md (последний по дате)
+- **MEMORY:** ~/.claude/projects/{{CLAUDE_PROJECT_SLUG}}/memory/MEMORY.md
+- **Exocortex backup:** {{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/exocortex/
 
 ## Алгоритм
 
 ### 1. Сбор коммитов за сегодня
 
 ```bash
-# Для КАЖДОГО репо в /Users/avlakriv/IWE/:
-git -C /Users/avlakriv/IWE/<repo> log --since="today 00:00" --oneline --no-merges
+# Для КАЖДОГО репо в {{WORKSPACE_DIR}}/:
+git -C {{WORKSPACE_DIR}}/<repo> log --since="today 00:00" --oneline --no-merges
 ```
 
-- Пройди по ВСЕМ репозиториям в `/Users/avlakriv/IWE/`
+- Пройди по ВСЕМ репозиториям в `{{WORKSPACE_DIR}}/`
 - Сгруппируй коммиты по репозиториям
 - Сопоставь с РП из недельного плана
 - Определи статус каждого затронутого РП: done / partial / not started
@@ -28,7 +30,7 @@ git -C /Users/avlakriv/IWE/<repo> log --since="today 00:00" --oneline --no-merge
 
 ### 2. Обновить WeekPlan
 
-Найди текущий `WeekPlan W*.md` в `DS-strategy/current/` и обнови:
+Найди текущий `WeekPlan W*.md` в `{{GOVERNANCE_REPO}}/current/` и обнови:
 
 - Пометь завершённые РП как **done**
 - Обнови статусы partial с описанием прогресса
@@ -44,20 +46,20 @@ git -C /Users/avlakriv/IWE/<repo> log --since="today 00:00" --oneline --no-merge
 
 ### 4. Backup экзокортекса
 
-Скопируй актуальные файлы в `/Users/avlakriv/IWE/DS-strategy/exocortex/`:
+Скопируй актуальные файлы в `{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/exocortex/`:
 
 ```bash
 # Корневой CLAUDE.md
-cp /Users/avlakriv/IWE/CLAUDE.md /Users/avlakriv/IWE/DS-strategy/exocortex/CLAUDE.md
+cp {{WORKSPACE_DIR}}/CLAUDE.md {{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/exocortex/CLAUDE.md
 
 # Memory (Слой 3)
-cp ~/.claude/projects/-Users-avlakriv-IWE/memory/MEMORY.md /Users/avlakriv/IWE/DS-strategy/exocortex/MEMORY.md
-cp ~/.claude/projects/-Users-avlakriv-IWE/memory/*.md /Users/avlakriv/IWE/DS-strategy/exocortex/
+cp ~/.claude/projects/{{CLAUDE_PROJECT_SLUG}}/memory/MEMORY.md {{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/exocortex/MEMORY.md
+cp ~/.claude/projects/{{CLAUDE_PROJECT_SLUG}}/memory/*.md {{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/exocortex/
 ```
 
 ### 5. Закоммитить
 
-- Закоммить все изменения в `DS-strategy` (WeekPlan + exocortex backup)
+- Закоммить все изменения в `{{GOVERNANCE_REPO}}` (WeekPlan + exocortex backup)
 - Запуши
 
 ## Правила

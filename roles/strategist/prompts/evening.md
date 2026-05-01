@@ -2,7 +2,7 @@
 
 ## Контекст
 
-- Планы: /Users/avlakriv/IWE/DS-strategy/current/
+- Планы: {{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/current/
 
 ## Алгоритм
 
