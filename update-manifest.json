@@ -95,6 +95,8 @@
     {"path": ".claude/skills/think/SKILL.md", "desc": "Скилл: ADI-цикл рассуждения"},
     {"path": ".claude/skills/verify/SKILL.md", "desc": "Скилл: верификация артефакта"},
     {"path": ".claude/skills/wp-new/SKILL.md", "desc": "Скилл: создание нового РП"},
+    {"path": ".claude/skills/personal-guide-start/SKILL.md", "desc": "Скилл: bootstrap репо personal-guide (MVP, одноразовый)"},
+    {"path": ".claude/skills/personal-guide-render/SKILL.md", "desc": "Скилл: наполнение personal-guide из RCS-профиля (N-кратный)"},
 
     {"path": "scripts/day-close.sh", "desc": "Автоматизация Day Close"},
 
