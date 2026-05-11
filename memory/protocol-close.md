@@ -4,6 +4,12 @@ description: Slim-ядро протокола Close — триггеры, мар
 type: reference
 valid_from: 2026-04-13
 originSessionId: b5655b53-7d87-478a-aad9-437479e81691
+
+horizon: warm
+domains: [protocol]
+status: active
+owner: user
+schema_version: 1
 ---
 # Протокол Close (ОРЗ-фрактал)
 
@@ -21,7 +27,6 @@ originSessionId: b5655b53-7d87-478a-aad9-437479e81691
 
 > **`close` без уточнения** → Quick Close (сессия) по умолчанию.
 
----
 
 ## Quick Close (сессия, inline)
 
@@ -48,6 +53,17 @@ originSessionId: b5655b53-7d87-478a-aad9-437479e81691
    - урок → `memory/lessons_*.md` + строка в MEMORY.md
    - нет нового знания → пропустить молча (анонс не нужен)
    Анонс при маршрутизации: *«Capture: [что] → [куда]»*
+
+2.6. **Session-Close Feeder (WP-247 Ф-MULTI-SOURCE.1, авто >30мин / opt-in для коротких):**
+   Дополняет Шаг 2.5: вызывает R2 в feeder-режиме для автоматического захвата кандидатов из транскрипта сессии + git diff в `captures.md`.
+
+   **Триггер автозапуска:** длительность сессии >30 мин (по timestamps первого и последнего сообщения). Иначе — пропустить (юзер может вызвать вручную: `/ke session-close-feed`).
+
+   **Действие:** `bash {{IWE_RUNTIME}}/roles/extractor/scripts/extractor.sh session-close-feed`. Скрипт пишет ###-блоки с маркером `[feed:session-close YYYY-MM-DD]` в `captures.md`. Идемпотентно (не дублирует за тот же день).
+
+   **Что НЕ делает:** не создаёт extraction-report (это работа inbox-check), не показывает пользователю кандидатов сразу (увидит при следующем `/apply-captures`).
+
+   **Защита от дубля:** если за сессию уже был ручной `/ke` или `/apply-captures` — feeder пропустить (по маркерам в текущем `captures.md`).
 
 3. **MEMORY.md** — обновить статус РП (одна строка: `in_progress` / `done`)
 
@@ -92,8 +108,33 @@ originSessionId: b5655b53-7d87-478a-aad9-437479e81691
 - [ ] KE: «Что узнали» маршрутизировано (или «нет нового знания»)
 - [ ] MEMORY.md: статус РП обновлён
 - [ ] Decision log: прочитать записи сессии в `decisions/decision-log-YYYY-MM.md`, скорректировать если неточно
+- [ ] **Docs Gate (условный):** РП затрагивал поведение онбординга (skills, MCP-сервисы, бот `/start`)? → обновить онбординг-документацию в governance-репо + `/verify` обновлённый файл. Владелец: пользователь. Если не затрагивал → пропустить молча.
 
----
+
+## Week Close (Неделя)
+
+> **Роль:** R1 Стратег. **Бюджет:** ~20-30 мин. **Триггер:** «закрываю неделю» / `/week-close`.
+> Полный алгоритм — `.claude/skills/week-close/SKILL.md`. Здесь — slim-ядро для маршрутизации.
+
+### Шаги Week Close
+
+1. **Бэкап + грязные репо** — `backup-icloud.sh` + `check-dirty-repos.sh` (платформа)
+2. **Memory Validate** — `memory-bleed.sh` (HOT-лимит, orphans, superseded_by)
+3. **ТО памяти (T, SC.024.3)** — проверка здоровья статической нагрузки:
+   - `distinctions.md` строк **> 80** = drift-флаг (нарушение DP.KR.001 §6). Фиксировать в Week Report.
+   - `MEMORY.md` строк **> 200** = флаг превышения лимита. Предложить архивацию.
+   - `memory/*.md` без обращения > 14 дней, > 5 файлов = кандидаты на понижение horizon.
+   - Флаги информативны — пользователь решает действие.
+4. **iwe-drift.sh** — полный drift-отчёт в Week Report (S)
+5. **STAGING.md** — есть `validated`? → предложить промоцию (S+T)
+6. **iwe-rules-review** — какие правила обходились? (S)
+7. **R-вопросник** (`memory/r-questionnaire.md`) → ответы в Week Report
+8. **Архивация done-WP** → `archive/wp-contexts/` (T)
+9. **Запись итогов в WeekPlan** + создание carry-over секции
+
+### Симптом пропуска
+
+STAGING.md заморожен ≥2 недель с `validated` / Week Report без R-ответов / distinctions.md > 80 строк без флага 2+ недели подряд.
 
 ## Deferred (отложены до Day Close)
 
@@ -101,7 +142,6 @@ originSessionId: b5655b53-7d87-478a-aad9-437479e81691
 > KE включён (шаг 2.5) — знание теряется при откладывании на Day Close.
 > Причина (ADR-207): атомарные шаги выполняются всегда > длинный список, из которого половина пропускается.
 
----
 
 ## Exit Protocol (при завершении любой роли)
 
