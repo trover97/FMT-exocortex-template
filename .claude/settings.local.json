@@ -24,9 +24,9 @@
       "Bash(launchctl unload:*)",
       "Bash(launchctl list:*)",
       "Bash(claude:*)",
-      "mcp__knowledge-mcp__search",
-      "mcp__knowledge-mcp__get_document",
-      "mcp__knowledge-mcp__list_sources",
+      "mcp__iwe-knowledge__search",
+      "mcp__iwe-knowledge__get_document",
+      "mcp__iwe-knowledge__list_sources",
       "mcp__ddt__describe_by_path",
       "mcp__ddt__read_digital_twin",
       "mcp__ddt__write_digital_twin"

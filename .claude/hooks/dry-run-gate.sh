@@ -72,17 +72,17 @@ esac
 
 # === MCP-write whitelist (точные совпадения tool_name) ===
 case "$TOOL_NAME" in
-    mcp__claude_ai_IWE__personal_write|\
-    mcp__claude_ai_IWE__personal_delete|\
-    mcp__claude_ai_IWE__personal_create_pack|\
-    mcp__claude_ai_IWE__personal_propose_capture|\
-    mcp__claude_ai_IWE__personal_reindex_source|\
-    mcp__claude_ai_IWE__personal_scaffold_notes|\
-    mcp__claude_ai_IWE__dt_write_digital_twin|\
-    mcp__claude_ai_IWE__create_repository|\
-    mcp__claude_ai_IWE__github_connect|\
-    mcp__claude_ai_IWE__github_disconnect|\
-    mcp__claude_ai_IWE__knowledge_feedback|\
+    mcp__iwe-knowledge__personal_write|\
+    mcp__iwe-knowledge__personal_delete|\
+    mcp__iwe-knowledge__personal_create_pack|\
+    mcp__iwe-knowledge__personal_propose_capture|\
+    mcp__iwe-knowledge__personal_reindex_source|\
+    mcp__iwe-knowledge__personal_scaffold_notes|\
+    mcp__iwe-knowledge__dt_write_digital_twin|\
+    mcp__iwe-knowledge__create_repository|\
+    mcp__iwe-knowledge__github_connect|\
+    mcp__iwe-knowledge__github_disconnect|\
+    mcp__iwe-knowledge__knowledge_feedback|\
     mcp__claude_ai_Gmail__create_draft|\
     mcp__claude_ai_Gmail__create_label|\
     mcp__claude_ai_Gmail__label_message|\
