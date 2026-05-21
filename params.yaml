@@ -10,4 +10,4 @@ auto_verify_code: false
 verify_quick_close: false
 telegram_notifications: false
 extensions_dir: extensions
-author_mode: true
+author_mode: false
