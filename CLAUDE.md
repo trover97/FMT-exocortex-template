@@ -268,8 +268,20 @@ schema_version: 1
 - Формат: свободный текст или маркированный список. Без заголовков с кодом.
 
 **Пример нарушения:** «Исправлен `activity_domain` фильтр в `load_rcs_metrics` — заменён на `SELF_DEV_EVENT_TYPES`.»
-**Правильно:** «Раньше система считала рабочие дни вместе с учебными — теперь считает только те дни, когда человек реально занимался саморазвитием.»
+**Правильно:** «Раньше система считала рабочие дни вместе с учебными — теперь считает только те дни, человек реально занимался саморазвитием.»
+
+### Календарный конвейер (WP-357)
+
+> Single source-of-truth для датозависимых процессов IWE. Полная спецификация → `DS-strategy/docs/calendar-pipeline.md`.
+
+**Каталог:** `DS-strategy/exocortex/process-catalog.yaml` (9 процессов: 5 A-класс + 4 B-класс).
+**Ledger (generated):** `DS-strategy/current/date-ledger.yaml` (регенерируется при каждом Day Open).
+**Watchdog:** in-band (Day Open hook) + out-of-band (launchd, каждый час). Telegram-дайджест при пропусках (cooldown 12h).
+**Установка:** `bash DS-strategy/scripts/install-launchd.sh` (10 plist, требует ручного запуска пилота).
+**Smoke-test:** `bash DS-strategy/scripts/calendar-pipeline-smoke.sh`.
+
+Добавление нового процесса = добавить запись в process-catalog.yaml + плист в exocortex/launchd/ + entry в install-launchd.sh PLISTS. Не редактировать date-ledger.yaml вручную (derived).
 
 ---
 
-*Последнее обновление: 2026-05-14*
+*Последнее обновление: 2026-05-26*
