@@ -21,6 +21,7 @@ set -eu
 
 WORKSPACE_DIR=""
 GOVERNANCE_REPO=""
+TEMPLATE_DIR=""        # явный путь к FMT-репо (любое имя/расположение)
 DRY_RUN=false
 QUIET=false
 
@@ -28,6 +29,7 @@ while [ $# -gt 0 ]; do
     case "$1" in
         --workspace)  WORKSPACE_DIR="$2"; shift 2 ;;
         --governance) GOVERNANCE_REPO="$2"; shift 2 ;;
+        --template)   TEMPLATE_DIR="$2"; shift 2 ;;
         --dry-run)    DRY_RUN=true; shift ;;
         --quiet|-q)   QUIET=true; shift ;;
         --help|-h)
@@ -48,6 +50,9 @@ fi
 
 WORKSPACE_DIR="${WORKSPACE_DIR/#\~/$HOME}"
 GOVERNANCE_REPO="${GOVERNANCE_REPO:-DS-strategy}"
+TEMPLATE_DIR="${TEMPLATE_DIR/#\~/$HOME}"
+# Default (обратная совместимость): FMT внутри workspace под каноничным именем.
+TEMPLATE_DIR="${TEMPLATE_DIR:-$WORKSPACE_DIR/FMT-exocortex-template}"
 
 IWE_ENV_FILE="$HOME/.iwe-paths"
 # Offline/Windows ветка: оболочка — git bash, не zsh. Источник переменных —
@@ -69,7 +74,7 @@ cat > "$IWE_ENV_FILE" <<IWEENV_EOF
 
 export IWE_WORKSPACE="$WORKSPACE_DIR"
 export IWE_ROOT="$WORKSPACE_DIR"
-export IWE_TEMPLATE="\$IWE_WORKSPACE/FMT-exocortex-template"
+export IWE_TEMPLATE="$TEMPLATE_DIR"
 export IWE_SCRIPTS="\$IWE_TEMPLATE/scripts"
 export IWE_ROLES="\$IWE_TEMPLATE/roles"
 export IWE_RUNTIME="\$IWE_WORKSPACE/.iwe-runtime"

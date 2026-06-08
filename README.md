@@ -43,6 +43,12 @@ qwen                         # запустить агента из workspace
 └── DS-strategy/                ← governance-репо (твои РП, планы, архив)
 ```
 
+**Workspace — любой путь.** Не обязательно `~/IWE`. На вопрос скрипта укажи свой,
+например `/c/Work/IWE` (git bash-формат пути; `C:\Work\IWE`). `setup-offline.sh`
+пропишет `IWE_ROOT`/`IWE_WORKSPACE` на него в `~/.iwe-paths` (подключается из `~/.bashrc`).
+Папку FMT **переименовывать не нужно** — путь к ней берётся фактический, поэтому
+распакованная из ZIP `FMT-exocortex-template-qwen-windows-offline` работает как есть.
+
 Перенос своих знаний (архив РП, паки, память) — см. [`MIGRATION.md`](MIGRATION.md).
 
 ### Что изменено относительно оригинала

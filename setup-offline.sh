@@ -188,9 +188,9 @@ fi
 echo "[4d] Installing IWE environment variables..."
 if [ -f "$TEMPLATE_DIR/setup/install-iwe-paths.sh" ]; then
   if $DRY_RUN; then
-    bash "$TEMPLATE_DIR/setup/install-iwe-paths.sh" --workspace "$WORKSPACE_DIR" --governance "$GOVERNANCE_REPO" --dry-run 2>&1 | sed 's/^/  /' || true
+    bash "$TEMPLATE_DIR/setup/install-iwe-paths.sh" --workspace "$WORKSPACE_DIR" --governance "$GOVERNANCE_REPO" --template "$TEMPLATE_DIR" --dry-run 2>&1 | sed 's/^/  /' || true
   else
-    bash "$TEMPLATE_DIR/setup/install-iwe-paths.sh" --workspace "$WORKSPACE_DIR" --governance "$GOVERNANCE_REPO" 2>&1 | sed 's/^/  /' || true
+    bash "$TEMPLATE_DIR/setup/install-iwe-paths.sh" --workspace "$WORKSPACE_DIR" --governance "$GOVERNANCE_REPO" --template "$TEMPLATE_DIR" 2>&1 | sed 's/^/  /' || true
     echo "  ℹ  Перезапусти git bash или: source ~/.bashrc"
   fi
 fi
