@@ -18,10 +18,20 @@
 
 ### Установка (один раз после распаковки ZIP)
 
+> **Модель установки.** Оригинальный `setup.sh` (macOS) копирует файлы в
+> родительскую workspace-папку и связывает их симлинками + переменными в `~/.zshenv`.
+> На Windows симлинки в git bash ненадёжны, а оболочка — bash. Поэтому здесь
+> **workspace = сам распакованный каталог**: `qwen` запускается прямо в нём,
+> без копий в родителя. Скрипт выставит `IWE_ROOT`, чтобы хуки нашли корень.
+
 ```bash
-bash setup-offline.sh        # подставит пути в плейсхолдеры, включит git-хуки
-qwen                         # запустить агента в каталоге проекта
+cd <распакованный-каталог>   # это и есть workspace
+bash setup-offline.sh        # подставит пути в плейсхолдеры, выставит IWE_ROOT, включит git-хуки
+source ~/.bashrc             # подхватить IWE_ROOT (или открой новый git bash)
+qwen                         # запустить агента ЗДЕСЬ
 ```
+
+Перенос своих знаний (архив РП, паки, память) — см. [`MIGRATION.md`](MIGRATION.md).
 
 ### Что изменено относительно оригинала
 
@@ -35,6 +45,7 @@ qwen                         # запустить агента в каталог
 | `update.sh` (git pull) | `update.sh` → инструкция обновления через ZIP |
 | MCP, Telegram, Calendar, телеметрия | отключены (offline) |
 | launchd-расписание | ручной запуск — см. [`MANUAL-JOBS.md`](MANUAL-JOBS.md) |
+| `setup.sh` копирует в workspace + симлинки | `setup-offline.sh`: workspace = сам каталог, без симлинков, `IWE_ROOT` в `~/.bashrc` |
 
 Все 5 hook-событий IWE (`UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`, `PreCompact`) поддерживаются Qwen Code и сохранены.
 
