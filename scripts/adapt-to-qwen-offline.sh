@@ -92,7 +92,7 @@ restore() {
   local p="$1"
   if git cat-file -e "$SRC:$p" 2>/dev/null; then
     run "mkdir -p \"\$(dirname \"$p\")\""
-    if $DRY_RUN; then echo "  [dry-run] git show $SRC:$p > $p"; else git show "$SRC:$p" > "$p"; fi
+    if $DRY_RUN; then echo "  [dry-run] git show $SRC:$p > $p"; else git show "$SRC:$p" > "$p"; case "$p" in *.sh) chmod +x "$p" ;; esac; fi
     echo "  ✓ $p"
   else
     echo "  ⚠ $SRC:$p не найден — пропуск"
