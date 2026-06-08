@@ -51,15 +51,32 @@ cp -r СТАРЫЙ/extensions/*       НОВЫЙ/extensions/
 # свою секцию §9 в QWEN.md перенеси вручную (diff)
 ```
 
+## Как Qwen определяет каталог памяти
+
+`<база>/projects/<id>/memory/`, где:
+- **база** = `~/.qwen` (или `QWEN_HOME` / `QWEN_RUNTIME_DIR`, если заданы);
+- **id** = `sanitizeCwd(каталог-запуска-qwen)`: на Windows весь путь в нижний
+  регистр, затем любой символ кроме `[A-Za-z0-9]` → `-`. Путь берётся в
+  Windows-форме (`C:\Work\IWE`), которую видит Node.
+
+Примеры (запуск qwen из workspace):
+- `C:\Work\IWE` → `~/.qwen/projects/c--work-iwe/memory/`
+- `C:\Users\John.Doe\IWE` → `~/.qwen/projects/c--users-john-doe-iwe/memory/`
+
+`setup-offline.sh` вычисляет этот id автоматически (через `cygpath -w` + lower +
+замена), кладёт туда память IWE и симлинкует `workspace/memory` на неё.
+**Проверь после первого запуска** `qwen`: `ls ~/.qwen/projects/` — если фактическое
+имя отличается, скопируй: `cp <вычисленный>/*.md ~/.qwen/projects/<факт>/memory/`.
+
 ## Авто-память (claude → qwen)
 
 Если раньше был Claude Code, накопленная память лежит в
-`~/.claude/projects/<slug>/memory/`. Перенеси в qwen-каталог:
+`~/.claude/projects/<slug>/memory/`. Перенеси в qwen-каталог (id см. выше):
 
 ```bash
-# 1) запусти qwen один раз — он создаст ~/.qwen/projects/<проект>/memory/
-# 2) затем:
-cp ~/.claude/projects/*/memory/*.md ~/.qwen/projects/*/memory/
+# 1) запусти qwen один раз — он создаст ~/.qwen/projects/<id>/memory/
+# 2) затем (подставь фактический id из ls ~/.qwen/projects/):
+cp ~/.claude/projects/*/memory/*.md ~/.qwen/projects/<id>/memory/
 ```
 
 ## Дальнейшие обновления формы (git локальный)

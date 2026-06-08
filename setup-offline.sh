@@ -68,11 +68,26 @@ fi
 WORKSPACE_DIR="${WORKSPACE_DIR/#\~/$HOME}"
 
 HOME_DIR="$HOME"
-CLAUDE_PROJECT_SLUG="$(echo "$WORKSPACE_DIR" | tr '/' '-')"
 QWEN_PATH="$(command -v qwen 2>/dev/null || echo 'qwen')"
 ENV_FILE="$WORKSPACE_DIR/.exocortex.env"
 IWE_RUNTIME_PATH="$WORKSPACE_DIR/.iwe-runtime"
-QWEN_MEMORY_DIR="$HOME/.qwen/projects/$CLAUDE_PROJECT_SLUG/memory"
+
+# --- Каталог памяти Qwen Code ---
+# Qwen вычисляет id проекта как sanitizeCwd(cwd):
+#   1) Windows → весь путь в нижний регистр;
+#   2) любой не [A-Za-z0-9] символ → '-'.
+# cwd qwen видит как WINDOWS-путь (Node process.cwd() = C:\Work\IWE), поэтому
+# конвертируем git-bash путь через cygpath. Память: <база>/projects/<id>/memory.
+# База = ~/.qwen (или QWEN_HOME / QWEN_RUNTIME_DIR, если заданы).
+if command -v cygpath >/dev/null 2>&1; then
+  QWEN_CWD="$(cygpath -w "$WORKSPACE_DIR" 2>/dev/null || echo "$WORKSPACE_DIR")"
+else
+  QWEN_CWD="$WORKSPACE_DIR"
+fi
+QWEN_PROJECT_ID="$(printf '%s' "$QWEN_CWD" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-zA-Z0-9]/-/g')"
+CLAUDE_PROJECT_SLUG="$QWEN_PROJECT_ID"   # для {{CLAUDE_PROJECT_SLUG}} в шаблоне
+QWEN_BASE_DIR="${QWEN_HOME:-${QWEN_RUNTIME_DIR:-$HOME/.qwen}}"
+QWEN_MEMORY_DIR="$QWEN_BASE_DIR/projects/$QWEN_PROJECT_ID/memory"
 
 echo
 echo "  Workspace:        $WORKSPACE_DIR"
@@ -225,5 +240,11 @@ echo "Дальше:"
 echo "  1. source ~/.bashrc"
 echo "  2. cd \"$WORKSPACE_DIR\"     # workspace, НЕ каталог FMT"
 echo "  3. qwen                       # запустить агента из workspace"
+echo
+echo
+echo "Каталог памяти Qwen (вычислен): $QWEN_MEMORY_DIR"
+echo "  Проверь после первого запуска qwen:  ls ~/.qwen/projects/"
+echo "  Если qwen создал каталог с ДРУГИМ именем — скопируй туда память:"
+echo "    cp \"$QWEN_MEMORY_DIR\"/*.md ~/.qwen/projects/<фактический-id>/memory/"
 echo
 echo "Перенос своих знаний (архив РП, паки, память) — см. $TEMPLATE_DIR/MIGRATION.md"
