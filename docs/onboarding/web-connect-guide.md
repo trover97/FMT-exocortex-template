@@ -76,7 +76,7 @@ IWE работает не только в Claude.ai:
 |--------|---------------|
 | **Cursor** | Settings → Features → MCP → Add New MCP Server → URL: `https://mcp.aisystant.com/mcp` |
 | **ChatGPT** | Business/Enterprise → Workspace Settings → Add MCP connector |
-| **Claude Code (полный IWE)** | [SETUP-GUIDE.md](../SETUP-GUIDE.md) — планирование дня, ИИ-стратег, автоматические отчёты |
+| **Qwen Code (полный IWE)** | [SETUP-GUIDE.md](../SETUP-GUIDE.md) — планирование дня, ИИ-стратег, автоматические отчёты |
 
 ---
 

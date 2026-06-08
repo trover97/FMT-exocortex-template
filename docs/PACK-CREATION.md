@@ -38,7 +38,7 @@ Pack создаётся для **домена**, не для темы.
 
 ## Быстрый старт: `/pack-new`
 
-Написать в Claude Code:
+Написать в Qwen Code:
 
 ```
 /pack-new
@@ -65,7 +65,7 @@ Pack создаётся для **домена**, не для темы.
 PACK-{slug}/
 ├── README.md                      # Название + одна строка о домене
 ├── REPO-TYPE.md                   # Тип: Pack, upstream: FPF + SPF
-├── CLAUDE.md                      # Инструкции для агента
+├── QWEN.md                      # Инструкции для агента
 ├── 00-pack-manifest.md            # Метаданные + entity index
 ├── ontology.md                    # Термины домена (Ubiquitous Language)
 ├── 01-domain-contract/
@@ -155,4 +155,4 @@ DS-{проект}/docs/how-we-do-X.md  ← как этот метод реали
 | [SPF/pack-template/](https://github.com/TserenTserenov/SPF/tree/main/pack-template) | Шаблоны для каждого файла Pack |
 | [LEARNING-PATH.md §6](LEARNING-PATH.md) | Принципы и фреймворки: FPF, SPF, Pack |
 | [principles-vs-skills.md](principles-vs-skills.md) | Зачем Pack важнее навыков |
-| `/fpf` в Claude Code | Проверить корректность сущностей по FPF |
+| `/fpf` в Qwen Code | Проверить корректность сущностей по FPF |

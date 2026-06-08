@@ -27,7 +27,7 @@
 - **Стратегия:** {{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/docs/Strategy.md
 - **План недели:** {{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/current/WeekPlan W*.md
 - **Inbox Экстрактора:** {{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/inbox/captures.md
-- **MEMORY:** ~/.claude/projects/{{CLAUDE_PROJECT_SLUG}}/memory/MEMORY.md
+- **MEMORY:** ~/.qwen/projects/{{CLAUDE_PROJECT_SLUG}}/memory/MEMORY.md
 
 ## Предусловие
 

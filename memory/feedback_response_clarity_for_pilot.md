@@ -139,7 +139,7 @@ metadata:
 - [feedback_explanations_no_codes.md](feedback_explanations_no_codes.md) — цифры правил только в скобках, основная фраза = понятное объяснение
 - [feedback_russian_clear.md](feedback_russian_clear.md) — таблица конкретных переводов (smoke-test → прогон работоспособности, rollback → откат, deploy → выкатить и др.); применяется совместно с правилом A2 как источник готовых русских описаний
 - [feedback_response_language_russian.md](feedback_response_language_russian.md) — итоговые сводки только на русском, без английского
-- [CLAUDE.md §9 «Режим «на пальцах» (S-37)»](../../../IWE/CLAUDE.md) — триггеры, детектор канала, базовое правило режима
+- [QWEN.md §9 «Режим «на пальцах» (S-37)»](../../../IWE/QWEN.md) — триггеры, детектор канала, базовое правило режима
 
 ---
 

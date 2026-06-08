@@ -107,8 +107,8 @@ FOUND=0
 CRITICAL_MISSING=0
 OPTIONAL_MISSING=0
 
-# CLAUDE.md — обязателен
-emit_inventory_row "CLAUDE.md" 1 ""
+# QWEN.md — обязателен
+emit_inventory_row "QWEN.md" 1 ""
 
 # MEMORY.md — обязателен; может быть симлинком на auto-memory
 # В этой инсталляции MEMORY.md живёт в memory/ — проверяем оба варианта
@@ -125,16 +125,16 @@ else
     printf "| \`%s\` | %s | %s |\n" "MEMORY.md" "❌" "не найден ни в корне, ни в memory/"
 fi
 
-# .claude/sync-manifest.yaml — обязателен (источник для iwe-drift)
-emit_inventory_row ".claude/sync-manifest.yaml" 1 ""
+# .qwen/sync-manifest.yaml — обязателен (источник для iwe-drift)
+emit_inventory_row ".qwen/sync-manifest.yaml" 1 ""
 
 # Правила
-emit_inventory_row ".claude/rules/distinctions.md" 1 ""
-emit_inventory_row ".claude/rules/formatting.md" 1 ""
+emit_inventory_row ".qwen/rules/distinctions.md" 1 ""
+emit_inventory_row ".qwen/rules/formatting.md" 1 ""
 
 # Скиллы (минимум day-open / day-close)
-emit_inventory_row ".claude/skills/day-open/SKILL.md" 1 ""
-emit_inventory_row ".claude/skills/day-close/SKILL.md" 1 ""
+emit_inventory_row ".qwen/skills/day-open/SKILL.md" 1 ""
+emit_inventory_row ".qwen/skills/day-close/SKILL.md" 1 ""
 
 # Протоколы
 emit_inventory_row "memory/protocol-open.md" 1 ""
@@ -314,7 +314,7 @@ echo ""
 # ---------- Раздел 4: User customizations (L3) ----------
 #
 # L3 живёт в 3-х местах: extensions/, params.yaml (отличия от skeleton),
-# AUTHOR-ONLY зоны в .claude/rules/distinctions.md.
+# AUTHOR-ONLY зоны в .qwen/rules/distinctions.md.
 # Цель — показать, что после restore личные кастомизации на месте.
 # Это **информационная** секция: отсутствие L3 ≠ failure (новый пилот ещё
 # ничего не настроил). Verdict выносит Аудитор содержательно.
@@ -380,7 +380,7 @@ echo ""
 # 4c. AUTHOR-ONLY зоны в distinctions.md
 echo "### AUTHOR-ONLY зоны"
 echo ""
-DIST_FILE="$IWE_ROOT/.claude/rules/distinctions.md"
+DIST_FILE="$IWE_ROOT/.qwen/rules/distinctions.md"
 if [ ! -f "$DIST_FILE" ]; then
     echo "_distinctions.md не найден_"
 else
@@ -527,7 +527,7 @@ else
 $HOME/.config
 $HOME/.iwe-runtime
 $IWE_ROOT/.iwe-runtime
-$IWE_ROOT/.claude
+$IWE_ROOT/.qwen
 "
 
     echo "| Локация | Утечек | Пример |"

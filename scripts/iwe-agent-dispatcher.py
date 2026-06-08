@@ -4,7 +4,7 @@
 """
 iwe-agent-dispatcher.py — диспетчер Agent Inbox IWE (WP-324 Ф8).
 
-Канал: headless `claude -p` (Claude Code CLI в неинтерактивном режиме).
+Канал: headless `claude -p` (Qwen Code CLI в неинтерактивном режиме).
 Не зависит от RemoteTrigger v1→v2 translation bug (см. bugs/bug-2026-05-17).
 
 Цикл:
@@ -737,7 +737,7 @@ def _build_session_prompt(session_id: str, tg_chat_id: int,
 
     latest = next(t for t in turns if t["n"] == new_turn_n)
 
-    return f"""Ты — Claude Code в External Working Session (DP.SC.162).
+    return f"""Ты — Qwen Code в External Working Session (DP.SC.162).
 Пилот работает удалённо через Telegram. session_id={session_id}, tg_chat_id={tg_chat_id}.
 
 ## История диалога

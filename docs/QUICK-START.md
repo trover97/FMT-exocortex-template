@@ -1,8 +1,8 @@
 # Быстрый старт: от нуля до первой сессии за 15 минут
 
-> **Для кого:** у тебя уже установлены Git, Node.js, GitHub CLI и Claude Code CLI.
+> **Для кого:** у тебя уже установлены Git, Node.js, GitHub CLI и Qwen Code CLI.
 > Если чего-то нет -- сначала пройди [Этап 0 из SETUP-GUIDE](SETUP-GUIDE.md).
-> Не на macOS или не Claude Code? → **[PORTABILITY.md](PORTABILITY.md)**
+> Не на macOS или не Qwen Code? → **[PORTABILITY.md](PORTABILITY.md)**
 
 ---
 
@@ -32,20 +32,20 @@ bash setup.sh
 
 **Проверка:**
 ```bash
-ls ~/IWE/CLAUDE.md && echo "OK: CLAUDE.md на месте"
+ls ~/IWE/QWEN.md && echo "OK: QWEN.md на месте"
 ls ~/IWE/DS-strategy/ && echo "OK: DS-strategy создан"
 ```
 
 ---
 
-## 2. Открой Claude Code (1 мин)
+## 2. Открой Qwen Code (1 мин)
 
 **Главный вариант — VS Code:**
 
 1. Установи [VS Code](https://code.visualstudio.com), если ещё нет
-2. В VS Code: нажми `Cmd+Shift+X` (macOS) или `Ctrl+Shift+X` (Windows) → найди расширение **Claude Code** от Anthropic → установи
+2. В VS Code: нажми `Cmd+Shift+X` (macOS) или `Ctrl+Shift+X` (Windows) → найди расширение **Qwen Code** от Anthropic → установи
 3. `File → Open Folder` → выбери папку `~/IWE`
-4. Нажми `Cmd+Shift+P` (macOS) или `Ctrl+Shift+P` (Windows) → введи **Claude Code: Open** → Enter
+4. Нажми `Cmd+Shift+P` (macOS) или `Ctrl+Shift+P` (Windows) → введи **Qwen Code: Open** → Enter
 
 В правой части экрана появится панель чата с Claude — это и есть твоё рабочее окно.
 
@@ -63,7 +63,7 @@ claude
 
 1. Запусти VS Code
 2. `File → Open Folder` → выбери папку `~/IWE` (на macOS и Linux тильда `~` означает домашнюю папку; на Windows введи `C:\Users\твоё-имя\IWE`)
-3. Если панель Claude Code не видна — нажми `Cmd+Shift+P` → **Claude Code: Open** → Enter
+3. Если панель Qwen Code не видна — нажми `Cmd+Shift+P` → **Qwen Code: Open** → Enter
 4. Внизу или справа появится панель чата — это поле ввода для общения с Claude
 
 В поле ввода чата напиши:
@@ -74,7 +74,7 @@ claude
 
 Если Claude попросит разрешения на чтение файлов — нажми **Allow** (разрешить). Это нормально: ему нужно прочитать настройки и заметки в папке `~/IWE`.
 
-Claude прочитает CLAUDE.md и memory/, затем проведёт через 4 шага:
+Claude прочитает QWEN.md и memory/, затем проведёт через 4 шага:
 
 1. **Цели** -- кем хочешь быть через год? Чему научиться?
 2. **Неудовлетворённости** -- что мешает? Где разрыв?

@@ -16,7 +16,7 @@
 
 ```bash
 # Проверить наличие skill
-SKILL="${IWE_WORKSPACE:-$HOME/IWE}/.claude/skills/day-close/SKILL.md"
+SKILL="${IWE_WORKSPACE:-$HOME/IWE}/.qwen/skills/day-close/SKILL.md"
 if [ -f "$SKILL" ]; then
   # Делегировать выполнение skill /day-close
   # Skill сам обновляет WeekPlan, делает backup, выводит итоги
@@ -55,6 +55,6 @@ Git: закоммичен и запушен ✅
 
 ## Источники
 
-- **Skill (primary):** `{{WORKSPACE_DIR}}/.claude/skills/day-close/SKILL.md`
+- **Skill (primary):** `{{WORKSPACE_DIR}}/.qwen/skills/day-close/SKILL.md`
 - **WeekPlan:** `{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/current/WeekPlan W*.md`
 - **WP-Registry:** `{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/docs/WP-REGISTRY.md`

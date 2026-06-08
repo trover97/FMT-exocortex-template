@@ -6,7 +6,7 @@
 #
 # Поток:
 #   1. validate-skill.sh (gate: SKILL.md v2 обязателен)
-#   2. Копирует <skill>/ → FMT/.claude/skills/<skill>/
+#   2. Копирует <skill>/ → FMT/.qwen/skills/<skill>/
 #   3. Подстановки путей (HOME/IWE → env vars)
 #   4. Устанавливает layer: L1 в FMT-копии SKILL.md
 #   5. Регенерирует skills-catalog.yaml
@@ -32,7 +32,7 @@ GOV_REPO_AUTHOR="${IWE_GOVERNANCE_REPO:-DS-strategy}"
 GOV_REPO_TMPL="DS-strategy"
 
 skill_name=$(basename "$SRC")
-DEST="$FMT_DIR/.claude/skills/$skill_name"
+DEST="$FMT_DIR/.qwen/skills/$skill_name"
 
 if [[ ! -f "$SRC/SKILL.md" ]]; then
     echo "❌ В папке нет SKILL.md — это не скилл?" >&2
@@ -99,11 +99,11 @@ for f in "$DEST"/*.sh; do
     chmod +x "$f"
 done
 
-echo "✅ Промотирован: FMT/.claude/skills/$skill_name/ (layer: L1)"
+echo "✅ Промотирован: FMT/.qwen/skills/$skill_name/ (layer: L1)"
 
 # ── Шаг 5. Регенерация каталогов (author + FMT) ──────────────────────────────
 # B12a fix (WP-7/PZ-1, 2026-05-29): раньше регенерировался только authoring
-# catalog; FMT/.claude/skills-catalog.yaml оставался stale → новые скиллы
+# catalog; FMT/.qwen/skills-catalog.yaml оставался stale → новые скиллы
 # невидимы при discovery у пилотов.
 CATALOG_SCRIPT="$FMT_DIR/scripts/generate-skills-catalog.sh"
 if [[ -f "$CATALOG_SCRIPT" ]]; then
@@ -111,12 +111,12 @@ if [[ -f "$CATALOG_SCRIPT" ]]; then
     bash "$CATALOG_SCRIPT" 2>&1
     echo "🔄 Регенерация skills-catalog.yaml (FMT)..."
     bash "$CATALOG_SCRIPT" \
-        --skills-dir "$FMT_DIR/.claude/skills" \
-        --output "$FMT_DIR/.claude/skills-catalog.yaml" 2>&1
+        --skills-dir "$FMT_DIR/.qwen/skills" \
+        --output "$FMT_DIR/.qwen/skills-catalog.yaml" 2>&1
     # Нормализация: убрать абсолютный skills_dir (validate-template ловит /Users/<author>/)
-    if [[ -f "$FMT_DIR/.claude/skills-catalog.yaml" ]]; then
-        sed -i.bak "s|^skills_dir: .*|skills_dir: .claude/skills|" "$FMT_DIR/.claude/skills-catalog.yaml"
-        rm -f "$FMT_DIR/.claude/skills-catalog.yaml.bak"
+    if [[ -f "$FMT_DIR/.qwen/skills-catalog.yaml" ]]; then
+        sed -i.bak "s|^skills_dir: .*|skills_dir: .qwen/skills|" "$FMT_DIR/.qwen/skills-catalog.yaml"
+        rm -f "$FMT_DIR/.qwen/skills-catalog.yaml.bak"
     fi
 fi
 
@@ -132,10 +132,10 @@ PROMOTE_COMMON="$FMT_DIR/scripts/promote-common.sh"
 if [[ -f "$PROMOTE_COMMON" ]]; then
     # shellcheck source=./promote-common.sh
     source "$PROMOTE_COMMON"
-    record_promotion ".claude/skills/$skill_name" "skill" "" "" "na"
+    record_promotion ".qwen/skills/$skill_name" "skill" "" "" "na"
 fi
 
 echo ""
 echo "Следующий шаг:"
-echo "  cd $FMT_DIR && git add .claude/skills/$skill_name .claude/skills-catalog.yaml CHANGELOG.md"
+echo "  cd $FMT_DIR && git add .qwen/skills/$skill_name .qwen/skills-catalog.yaml CHANGELOG.md"
 echo "  git commit -m 'feat(WP-348): promote skill $skill_name to platform (L1)'"

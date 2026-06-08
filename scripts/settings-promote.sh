@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # routing: utility  deterministic=true
 # see DP.SC.159, DP.ROLE.059
-# settings-promote.sh — регистрация хука в .claude/settings.json шаблона
+# settings-promote.sh — регистрация хука в .qwen/settings.json шаблона
 #
-# Добавляет запись hook в нужный event с правильным $CLAUDE_PROJECT_DIR/ префиксом.
+# Добавляет запись hook в нужный event с правильным $QWEN_PROJECT_DIR/ префиксом.
 # Идемпотентен: если хук уже зарегистрирован — не дублирует.
 #
 # Использование:
@@ -40,9 +40,9 @@ fi
 
 IWE="${IWE_WORKSPACE:-$HOME/IWE}"
 FMT_DIR="${IWE_TEMPLATE:-$IWE/FMT-exocortex-template}"
-SETTINGS="$FMT_DIR/.claude/settings.json"
-HOOK_PATH="\$CLAUDE_PROJECT_DIR/.claude/hooks/$HOOK_NAME"
-HOOK_FILE="$FMT_DIR/.claude/hooks/$HOOK_NAME"
+SETTINGS="$FMT_DIR/.qwen/settings.json"
+HOOK_PATH="\$QWEN_PROJECT_DIR/.qwen/hooks/$HOOK_NAME"
+HOOK_FILE="$FMT_DIR/.qwen/hooks/$HOOK_NAME"
 
 if [[ ! -f "$SETTINGS" ]]; then
     echo "❌ Не найден: $SETTINGS" >&2
@@ -120,4 +120,4 @@ if [[ -f "$CHANGELOG_SCRIPT" ]]; then bash "$CHANGELOG_SCRIPT"; fi
 
 echo "✅ Зарегистрирован: $HOOK_PATH → $EVENT"
 echo "Следующий шаг:"
-echo "  cd $FMT_DIR && git add .claude/settings.json CHANGELOG.md && git commit -m 'feat: register $HOOK_NAME hook for $EVENT'"
+echo "  cd $FMT_DIR && git add .qwen/settings.json CHANGELOG.md && git commit -m 'feat: register $HOOK_NAME hook for $EVENT'"

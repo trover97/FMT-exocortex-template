@@ -24,7 +24,7 @@ DS_STRATEGY="$WORKSPACE_DIR/$GOVERNANCE_REPO"
 # Slug = $HOME с '/' → '-' (macOS: /Users/x → -Users-x; Linux/WSL: /home/x → -home-x).
 # Переопределить можно через env IWE_MEMORY_SRC (например, для нестандартного $HOME).
 HOME_SLUG=$(echo "$HOME" | tr '/' '-')
-MEMORY_SRC="${IWE_MEMORY_SRC:-$HOME/.claude/projects/${HOME_SLUG}-IWE/memory}"
+MEMORY_SRC="${IWE_MEMORY_SRC:-$HOME/.qwen/projects/${HOME_SLUG}-IWE/memory}"
 EXOCORTEX_DST="$DS_STRATEGY/exocortex"
 # MCP reindex — опциональный компонент (WP-187 iwe-knowledge Gateway заменяет локальный knowledge-mcp).
 # Переопределить путь можно через env IWE_SELECTIVE_REINDEX.
@@ -53,7 +53,7 @@ log() { echo -e "${GREEN}[day-close]${NC} $1"; }
 warn() { echo -e "${YELLOW}[day-close]${NC} $1"; }
 err() { echo -e "${RED}[day-close]${NC} $1" >&2; }
 
-# --- Шаг 1: Backup memory/ + CLAUDE.md → exocortex/ ---
+# --- Шаг 1: Backup memory/ + QWEN.md → exocortex/ ---
 do_backup() {
   log "Шаг 1/3: Backup memory/ → exocortex/"
 
@@ -71,15 +71,15 @@ do_backup() {
   fi
 
   # Mirror *.md/*.yaml/*.yml from auto-memory; --delete prunes files removed upstream.
-  # CLAUDE.md is excluded so the workspace copy below isn't deleted by --delete.
+  # QWEN.md is excluded so the workspace copy below isn't deleted by --delete.
   rsync -a --delete \
-    --exclude='CLAUDE.md' \
+    --exclude='QWEN.md' \
     --include='*.md' --include='*.yaml' --include='*.yml' \
     --exclude='*' \
     "$MEMORY_SRC/" "$EXOCORTEX_DST/"
 
-  if [ -f "$WORKSPACE_DIR/CLAUDE.md" ]; then
-    cp "$WORKSPACE_DIR/CLAUDE.md" "$EXOCORTEX_DST/CLAUDE.md"
+  if [ -f "$WORKSPACE_DIR/QWEN.md" ]; then
+    cp "$WORKSPACE_DIR/QWEN.md" "$EXOCORTEX_DST/QWEN.md"
   fi
 
   if [ -f "$WORKSPACE_DIR/AGENTS.md" ]; then

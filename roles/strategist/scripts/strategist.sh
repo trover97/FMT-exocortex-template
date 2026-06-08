@@ -1,6 +1,6 @@
 #!/bin/bash
 # Strategist (Стратег) Agent Runner
-# Запускает Claude Code с заданным сценарием
+# Запускает Qwen Code с заданным сценарием
 
 set -e
 
@@ -156,14 +156,14 @@ ${prompt}"
 
     cd "$WORKSPACE"
 
-    # Запуск Claude Code с содержимым команды как промпт (с timeout-защитой)
+    # Запуск Qwen Code с содержимым команды как промпт (с timeout-защитой)
     local rc=0
     local model_args=()
     if [ -n "$model_override" ]; then
         model_args=(--model "$model_override")
         log "Model override: $model_override"
     fi
-    # NB: --dangerously-skip-permissions не используется — Claude Code блокирует флаг
+    # NB: --dangerously-skip-permissions не используется — Qwen Code блокирует флаг
     # под root/sudo (Linux cron). --allowedTools задаёт явный whitelist, чего достаточно.
     timeout "$CLAUDE_TIMEOUT" "$CLAUDE_PATH" \
         "${model_args[@]}" \
@@ -234,7 +234,7 @@ acquire_lock() {
 }
 
 # Читаем strategy_day из конфига (L4 Personal)
-RHYTHM_CONFIG="$HOME/.claude/projects/-Users-$(whoami)-IWE/memory/day-rhythm-config.yaml"
+RHYTHM_CONFIG="$HOME/.qwen/projects/-Users-$(whoami)-IWE/memory/day-rhythm-config.yaml"
 STRATEGY_DAY_NAME=$(grep 'strategy_day:' "$RHYTHM_CONFIG" 2>/dev/null | awk '{print $2}' || echo "monday")
 # Конвертируем имя дня в номер (1=Mon..7=Sun)
 case "$STRATEGY_DAY_NAME" in

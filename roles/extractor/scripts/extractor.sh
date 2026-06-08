@@ -1,6 +1,6 @@
 #!/bin/bash
 # Knowledge Extractor Agent Runner
-# Запускает Claude Code с заданным процессом KE
+# Запускает Qwen Code с заданным процессом KE
 #
 # Использование:
 #   extractor.sh inbox-check     # headless: обработка inbox (launchd)

@@ -7,7 +7,7 @@
 # (планы, утверждённые captures).
 #
 # Когда НЕ нужен:
-# - У тебя пока нет автономных агентов (только Claude Code)
+# - У тебя пока нет автономных агентов (только Qwen Code)
 # - Все отчёты помещаются в DS-strategy/archive/
 # - Ты только начинаешь работу с IWE
 #
@@ -19,7 +19,7 @@
 # Что создаёт:
 # 1. Приватный GitHub-репо DS-agent-workspace
 # 2. Структуру папок для каждого типа агента
-# 3. CLAUDE.md с инструкциями
+# 3. QWEN.md с инструкциями
 #
 # Использование:
 #   bash setup/optional/setup-agent-workspace.sh
@@ -125,11 +125,11 @@ source-of-truth: false
 - PACK-* (формализованные знания через Экстрактора)
 REPOTYPE
 
-# CLAUDE.md
-cat > CLAUDE.md << 'CLAUDEMD'
+# QWEN.md
+cat > QWEN.md << 'CLAUDEMD'
 # DS-agent-workspace — инструкции для Claude
 
-> **Общие инструкции:** см. `CLAUDE.md` в корне workspace.
+> **Общие инструкции:** см. `QWEN.md` в корне workspace.
 >
 > Этот файл содержит только специфику данного репозитория.
 

@@ -26,7 +26,7 @@ description: "Операционный файл памяти IWE"
 /tmp/iwe-dry-run-${SESSION_ID}.flag
 ```
 
-- **Имя:** `iwe-dry-run-${SESSION_ID}.flag`. `SESSION_ID` = идентификатор Claude Code сессии (получается из env `CLAUDE_SESSION_ID` или генерируется через `uuidgen`/`date +%s%N` если env пуст).
+- **Имя:** `iwe-dry-run-${SESSION_ID}.flag`. `SESSION_ID` = идентификатор Qwen Code сессии (получается из env `CLAUDE_SESSION_ID` или генерируется через `uuidgen`/`date +%s%N` если env пуст).
 - **Содержимое:** одна строка JSON: `{"created_at": "<ISO8601>", "session_id": "<id>", "initiator": "<skill-name>"}`.
 - **TTL:** 10 минут от mtime. Хук игнорирует файл с mtime > 10 мин назад (защита от sticky-state при kill -9 / краше CLI).
 - **Очистка:** (а) явная — финал шага в `/audit-installation`; (б) Stop-hook (`protocol-stop-gate.sh` — добавить очистку для текущего session-id); (в) TTL — mtime > 10 мин.

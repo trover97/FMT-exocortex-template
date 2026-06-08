@@ -21,7 +21,7 @@ description: "Операционный файл памяти IWE"
 
 | # | Практика | Правило для Claude |
 |---|----------|--------------------|
-| 1 | **Context Engineering** (DP.SOTA.002) | Write/Select/Compress/Isolate. Каждая строка CLAUDE.md = токен. Удаляй лишнее. |
+| 1 | **Context Engineering** (DP.SOTA.002) | Write/Select/Compress/Isolate. Каждая строка QWEN.md = токен. Удаляй лишнее. |
 | 2 | **DDD Strategic** (DP.SOTA.001) | BC = Pack scope. UL = ontology.md. Context Map = typed `related:`. |
 | 3 | **Coupling Model** (DP.SOTA.011) | Оценивай связи по 3 измерениям: knowledge (сколько А знает о B), distance (насколько далеко), volatility (как часто меняется контракт). |
 
@@ -36,7 +36,7 @@ description: "Операционный файл памяти IWE"
 | ID | Практика | Статус | Когда применять |
 |----|----------|--------|----------------|
 | SOTA.001 | DDD Strategic (Khononov) | SOTA | Создание Pack, определение BC, словаря, интеграций |
-| SOTA.002 | Context Engineering | SOTA (фронтир) | Проектирование CLAUDE.md, memory/, agent context |
+| SOTA.002 | Context Engineering | SOTA (фронтир) | Проектирование QWEN.md, memory/, agent context |
 | SOTA.003 | Open API Specs | SOTA (зрелые) | Проектирование MCP, API-контракты между системами |
 | SOTA.004 | GraphRAG + KG | SOTA | Проектирование retrieval, typed `related:`, MCP tools |
 | SOTA.005 | AI-Native Org Design | SOTA (emerging) | Организация агентов, distribution of responsibility |

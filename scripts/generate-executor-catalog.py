@@ -2,7 +2,7 @@
 """
 generate-executor-catalog.py — собрать executor-catalog.yaml из routing: секций SKILL.md.
 
-Читает все SKILL.md из ~/.claude/skills/, извлекает routing: блок,
+Читает все SKILL.md из ~/.qwen/skills/, извлекает routing: блок,
 генерирует executor-catalog.yaml для Маршрутизатора (DP.ROLE.059, WP-350 Ф8).
 
 Запуск:
@@ -21,7 +21,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-SKILLS_DIR = Path.home() / "IWE" / ".claude" / "skills"
+SKILLS_DIR = Path.home() / "IWE" / ".qwen" / "skills"
 DEFAULT_OUTPUT = Path.home() / "IWE" / os.environ.get("IWE_GOVERNANCE_REPO", "DS-strategy") / "scripts" / "executor-catalog.yaml"
 
 VALID_EXECUTORS = {"script", "haiku", "sonnet", "opus", "mcp-direct"}
@@ -89,7 +89,7 @@ def process_skill(skill_dir: Path) -> Optional[dict]:
     return {
         "name": name,
         "type": "skill",
-        "path": f".claude/skills/{skill_dir.name}/SKILL.md",
+        "path": f".qwen/skills/{skill_dir.name}/SKILL.md",
         "slash": extract_triggers(fm_content),
         "description": extract_description(fm_content),
         "routing": routing,
@@ -147,7 +147,7 @@ def build_catalog(skills_dir: Path) -> dict:
     return {
         "schema_version": "1.0",
         "generated_at": now,
-        "source": ".claude/skills/*/SKILL.md",
+        "source": ".qwen/skills/*/SKILL.md",
         "generator": "${IWE_GOVERNANCE_REPO:-DS-strategy}/scripts/generate-executor-catalog.py",
         "wp": "WP-350",
         "total_entries": len(entries),

@@ -1,4 +1,11 @@
 #!/bin/bash
+# === OFFLINE / NO-SCHEDULER GUARD (qwen-windows-offline) ===
+# Эта ветка: Windows + git bash, без планировщика (launchd/cron/systemd).
+# Установка задач по расписанию невозможна. Рабочие скрипты роли запускаются
+# ВРУЧНУЮ — см. MANUAL-JOBS.md в корне репозитория.
+echo "[$(basename "$(dirname "$0")")] Планировщик недоступен (offline/Windows). Запуск задач — вручную, см. MANUAL-JOBS.md" >&2
+exit 0
+# === /GUARD ===
 # Extractor: установка launchd-агента для inbox-check
 # Запускает inbox-check каждые 3 часа.
 # WP-273 Этап 2: plist берётся из $IWE_RUNTIME (Generated runtime, F).

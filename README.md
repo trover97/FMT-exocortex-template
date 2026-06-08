@@ -6,6 +6,42 @@
 
 ---
 
+## ⚙️ Ветка `qwen-windows-offline` — адаптация под Qwen Code / Windows / offline
+
+Эта ветка адаптирует шаблон под среду:
+
+- **Агент:** [Qwen Code](https://github.com/QwenLM/qwen-code) (`qwen`) вместо Claude Code.
+- **ОС:** Windows 10, работа в **git bash** (не PowerShell).
+- **LLM:** локальные модели через OpenAI-совместимый сервер (настраивается в `.qwen/settings.json`).
+- **Сеть:** **без интернета** — облачные функции отключены, обновление через ZIP.
+- **Планировщик:** отсутствует — задачи по расписанию запускаются **вручную**.
+
+### Установка (один раз после распаковки ZIP)
+
+```bash
+bash setup-offline.sh        # подставит пути в плейсхолдеры, включит git-хуки
+qwen                         # запустить агента в каталоге проекта
+```
+
+### Что изменено относительно оригинала
+
+| Было (Claude Code) | Стало (Qwen Code) |
+|--------------------|-------------------|
+| `CLAUDE.md` | `QWEN.md` (+ `AGENTS.md` читается нативно) |
+| `.claude/` | `.qwen/` (settings, hooks, skills, agents, rules) |
+| `$CLAUDE_PROJECT_DIR` | `$QWEN_PROJECT_DIR` |
+| matcher'ы хуков по именам инструментов Claude | matcher'ы под инструменты Qwen (`Edit`, `WriteFile`, `Shell`, ...) |
+| `setup.sh` (macOS, cloud) | `setup-offline.sh` (git bash, offline) |
+| `update.sh` (git pull) | `update.sh` → инструкция обновления через ZIP |
+| MCP, Telegram, Calendar, телеметрия | отключены (offline) |
+| launchd-расписание | ручной запуск — см. [`MANUAL-JOBS.md`](MANUAL-JOBS.md) |
+
+Все 5 hook-событий IWE (`UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`, `PreCompact`) поддерживаются Qwen Code и сохранены.
+
+Подробно о ручном запуске фоновых задач — в [`MANUAL-JOBS.md`](MANUAL-JOBS.md).
+
+---
+
 ## Проблема
 
 ИИ-ассистенты умеют генерировать текст, код и ответы. Но у большинства пользователей одни и те же проблемы:
@@ -144,10 +180,10 @@ claude
 ## FAQ
 
 **Q: Нужна ли подписка Anthropic?**
-A: Для полной установки (Claude Code) — рекомендуется Claude Pro ($20/мес). Для минимальной (`setup.sh --core`) — работает с любым AI CLI. Подробнее: [SETUP-GUIDE.md](docs/SETUP-GUIDE.md).
+A: Для полной установки (Qwen Code) — рекомендуется Claude Pro ($20/мес). Для минимальной (`setup.sh --core`) — работает с любым AI CLI. Подробнее: [SETUP-GUIDE.md](docs/SETUP-GUIDE.md).
 
 **Q: Работает ли с другими ИИ (не Claude)?**
-A: Да. Ядро IWE — markdown-файлы. Работает с Claude Code, Codex (OpenAI), Aider и другими AI CLI. Подробнее: [SETUP-GUIDE.md](docs/SETUP-GUIDE.md).
+A: Да. Ядро IWE — markdown-файлы. Работает с Qwen Code, Codex (OpenAI), Aider и другими AI CLI. Подробнее: [SETUP-GUIDE.md](docs/SETUP-GUIDE.md).
 
 **Q: Работает ли на Linux/Windows?**
 A: Да. Ядро работает на любой ОС. Автоматизация Стратега: macOS — launchd, Linux — cron, Windows — WSL. Подробнее: [SETUP-GUIDE.md](docs/SETUP-GUIDE.md).
@@ -165,10 +201,10 @@ A: Три зоны защиты: локальная, GitHub (приватные 
 A: Obsidian — хранилище заметок. IWE — **рабочая среда** с протоколами, ИИ-агентами и формализацией знаний. Вы можете использовать Obsidian внутри IWE для заметок, но IWE даёт структуру, планирование и накопление компетенций.
 
 **Q: Нужно ли программировать?**
-A: Нет. Шаблон — готовая конфигурация. Установка через setup.sh. Работа — через Claude Code на естественном языке.
+A: Нет. Шаблон — готовая конфигурация. Установка через setup.sh. Работа — через Qwen Code на естественном языке.
 
 **Q: Можно ли без Стратега?**
-A: Да. Claude Code + CLAUDE.md + memory/ работают полностью. Стратег — автоматизация планирования. Без него планируете вручную.
+A: Да. Qwen Code + QWEN.md + memory/ работают полностью. Стратег — автоматизация планирования. Без него планируете вручную.
 
 **Q: Как настроить день стратегирования?**
 A: В `memory/day-rhythm-config.yaml` измените `strategy_day: monday` на нужный день. Подробнее: [LEARNING-PATH.md](docs/LEARNING-PATH.md).

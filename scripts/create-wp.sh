@@ -10,7 +10,7 @@
 #   bash create-wp.sh --title "Название" --budget 5h --priority P3 --no-consent-check
 #
 # Предусловие: consent state file должен существовать:
-#   touch /IWE/.claude/state/wp-consent-{N}
+#   touch /IWE/.qwen/state/wp-consent-{N}
 #
 # Совместимость: bash 3.2+ (macOS), bash 4+ (Linux)
 
@@ -21,7 +21,7 @@ GOV_REPO="${IWE_GOVERNANCE_REPO:-DS-strategy}"
 STRATEGY="$IWE/$GOV_REPO"
 REGISTRY="$STRATEGY/docs/WP-REGISTRY.md"
 INBOX="$STRATEGY/inbox"
-STATE_DIR="$IWE/.claude/state"
+STATE_DIR="$IWE/.qwen/state"
 
 # --- Параметры ---
 TITLE=""

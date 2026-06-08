@@ -1,0 +1,117 @@
+{
+  "permissions": {
+    "defaultMode": "acceptEdits",
+    "allow": [
+      "Edit(/.qwen/skills/**)",
+      "Edit(/.qwen/skills/day-open/**)"
+    ],
+    "additionalDirectories": []
+  },
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "$QWEN_PROJECT_DIR/.qwen/hooks/wp-gate-reminder.sh"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "$QWEN_PROJECT_DIR/.qwen/hooks/close-gate-reminder.sh"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "(Edit|edit|Write.*|write_file|MultiEdit)",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "$QWEN_PROJECT_DIR/.qwen/hooks/extensions-gate.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "(Bash|Shell|run_shell_command)",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "$QWEN_PROJECT_DIR/.qwen/hooks/protocol-artifact-validate.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "(Edit|edit|Write.*|write_file|MultiEdit)",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "$QWEN_PROJECT_DIR/.qwen/hooks/capture-bus.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "(Edit|edit|Write.*|write_file|MultiEdit|NotebookEdit|notebook_edit|Bash|Shell|run_shell_command|mcp__.*)",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "$QWEN_PROJECT_DIR/.qwen/hooks/dry-run-gate.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "(Read.*|read_file|Skill)",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "$QWEN_PROJECT_DIR/.qwen/hooks/protocol-completion-reminder.sh"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "$QWEN_PROJECT_DIR/.qwen/hooks/protocol-stop-gate.sh"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "$QWEN_PROJECT_DIR/.qwen/hooks/capture-bus.sh"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "$QWEN_PROJECT_DIR/.qwen/hooks/precompact-checkpoint.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
