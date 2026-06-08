@@ -63,7 +63,8 @@ qwen                         # запустить агента из workspace
 | `update.sh` (git pull) | `update.sh` → инструкция обновления через ZIP |
 | MCP, Telegram, Calendar, телеметрия | отключены (offline) |
 | launchd-расписание | ручной запуск — см. [`MANUAL-JOBS.md`](MANUAL-JOBS.md) |
-| `setup.sh` (macOS, env в `~/.zshenv`) | `setup-offline.sh` (git bash, env в `~/.bashrc`, симлинк memory с fallback на копию) |
+| `setup.sh` (macOS, env в `~/.zshenv`) | `setup-offline.sh` (git bash, env в `~/.bashrc`) |
+| симлинк `memory` (macOS) | `memory` через симлинк → **junction** (`mklink /J`, без админа) → копия; `scripts/link-memory.sh` |
 
 Все 5 hook-событий IWE (`UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`, `PreCompact`) поддерживаются Qwen Code и сохранены.
 

@@ -64,7 +64,19 @@ cp -r СТАРЫЙ/extensions/*       НОВЫЙ/extensions/
 - `C:\Users\John.Doe\IWE` → `~/.qwen/projects/c--users-john-doe-iwe/memory/`
 
 `setup-offline.sh` вычисляет этот id автоматически (через `cygpath -w` + lower +
-замена), кладёт туда память IWE и симлинкует `workspace/memory` на неё.
+замена), кладёт туда память IWE и связывает `workspace/memory` с ней.
+
+**Как связывается `workspace/memory` (один каталог, а не две копии):**
+1. нативный симлинк (нужен Developer Mode или запуск от админа);
+2. **directory junction** (`mklink /J`) — работает **без админа** на Windows;
+3. копия (последнее средство, требует ручной синхронизации).
+
+Если у тебя уже получилась **копия** (видно по `ls -l`), замени настоящей ссылкой:
+```bash
+bash scripts/link-memory.sh --force
+```
+Скрипт сольёт содержимое копии в каталог qwen (без перезатирания) и поставит junction.
+
 **Проверь после первого запуска** `qwen`: `ls ~/.qwen/projects/` — если фактическое
 имя отличается, скопируй: `cp <вычисленный>/*.md ~/.qwen/projects/<факт>/memory/`.
 

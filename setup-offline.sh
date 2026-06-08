@@ -164,18 +164,13 @@ if ! $DRY_RUN; then
     [ -f "$f" ] && cp "$f" "$QWEN_MEMORY_DIR/"
   done
   echo "  ✓ memory → $QWEN_MEMORY_DIR"
-  if [ ! -e "$WORKSPACE_DIR/memory" ]; then
-    if MSYS=winsymlinks:nativestrict ln -s "$QWEN_MEMORY_DIR" "$WORKSPACE_DIR/memory" 2>/dev/null && [ -L "$WORKSPACE_DIR/memory" ]; then
-      echo "  ✓ симлинк: $WORKSPACE_DIR/memory → $QWEN_MEMORY_DIR"
-    else
-      rm -f "$WORKSPACE_DIR/memory" 2>/dev/null || true
-      cp -r "$QWEN_MEMORY_DIR" "$WORKSPACE_DIR/memory"
-      echo "  ⚠ симлинки недоступны (Windows) → memory СКОПИРОВАН в $WORKSPACE_DIR/memory"
-      echo "    Правки памяти агентом идут в $QWEN_MEMORY_DIR; при расхождении синхронизируй вручную:"
-      echo "      cp $QWEN_MEMORY_DIR/*.md $WORKSPACE_DIR/memory/"
-    fi
+  # Связать workspace/memory с каталогом памяти qwen (симлинк → junction → копия).
+  # Логика вынесена в scripts/link-memory.sh (его же можно запускать вручную).
+  if [ -e "$WORKSPACE_DIR/memory" ] && [ ! -L "$WORKSPACE_DIR/memory" ]; then
+    echo "  ○ $WORKSPACE_DIR/memory уже существует (не ссылка)."
+    echo "    Чтобы заменить настоящей ссылкой: bash \"$TEMPLATE_DIR/scripts/link-memory.sh\" --workspace \"$WORKSPACE_DIR\" --force"
   else
-    echo "  ○ $WORKSPACE_DIR/memory уже существует — пропуск"
+    bash "$TEMPLATE_DIR/scripts/link-memory.sh" --workspace "$WORKSPACE_DIR" 2>&1 | sed 's/^/  /' || true
   fi
 fi
 
