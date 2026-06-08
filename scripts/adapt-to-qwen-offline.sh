@@ -109,7 +109,8 @@ done
 # ---------------------------------------------------------------------------
 echo "[4] Guard'ы offline/no-scheduler..."
 GUARD_MARK="OFFLINE / NO-SCHEDULER GUARD (qwen-windows-offline)"
-read -r -d '' GUARD_BLOCK <<'GB' || true
+GUARD_FILE="$(mktemp)"
+cat > "$GUARD_FILE" <<'GB'
 # === OFFLINE / NO-SCHEDULER GUARD (qwen-windows-offline) ===
 # Эта ветка: Windows + git bash, без планировщика (launchd/cron/systemd).
 # Установка задач по расписанию невозможна. Рабочие скрипты роли запускаются
@@ -118,18 +119,20 @@ echo "[$(basename "$(dirname "$0")")] Планировщик недоступе�
 exit 0
 # === /GUARD ===
 GB
+# Портируемо: awk читает блок из файла (getline), без многострочных -v.
 insert_after_shebang() {
-  local f="$1" mark="$2" block="$3"
+  local f="$1" mark="$2"
   [ -f "$f" ] || { echo "  ○ $f нет — пропуск"; return; }
   grep -qF "$mark" "$f" && { echo "  ○ $f уже с guard"; return; }
   if $DRY_RUN; then echo "  [dry-run] guard → $f"; return; fi
-  awk -v blk="$block" 'NR==1{print; print blk; next} {print}' "$f" > "$f.tmp" && mv "$f.tmp" "$f" && chmod +x "$f"
+  awk -v bf="$GUARD_FILE" 'NR==1{print; while((getline l < bf)>0) print l; close(bf); next} {print}' "$f" > "$f.tmp" \
+    && mv "$f.tmp" "$f" && chmod +x "$f"
   echo "  ✓ guard → $f"
 }
 for f in roles/extractor/install.sh roles/strategist/install.sh roles/synchronizer/install.sh \
          setup/optional/setup-cloud-scheduler.sh setup/optional/setup-calendar.sh \
          scripts/setup-extractor-feeders.sh scripts/server-calendar.sh scripts/server-news.sh; do
-  insert_after_shebang "$f" "$GUARD_MARK" "$GUARD_BLOCK"
+  insert_after_shebang "$f" "$GUARD_MARK"
 done
 
 # agent-trace-uploader: особый offline-guard (после set -uo pipefail)
@@ -147,18 +150,19 @@ fi
 # 5) Вставные блоки README / QWEN.md (переносим из $SRC между маркерами)
 # ---------------------------------------------------------------------------
 echo "[5] Блоки README/QWEN..."
-extract_block() { git show "$SRC:$1" 2>/dev/null | awk -v b="$2" -v e="$3" '$0~b{f=1} f{print} $0~e{f=0}'; }
 insert_block_after() {
   local file="$1" anchor="$2" begin="$3" end="$4" srcfile="$5"
   [ -f "$file" ] || { echo "  ○ $file нет — пропуск"; return; }
   grep -qF "$begin" "$file" && { echo "  ○ $file уже с блоком"; return; }
-  local block; block="$(extract_block "$srcfile" "$begin" "$end")"
-  [ -z "$block" ] && { echo "  ⚠ блок $begin не найден в $SRC:$srcfile"; return; }
-  if $DRY_RUN; then echo "  [dry-run] блок → $file"; return; fi
-  awk -v anc="$anchor" -v blk="$block" '
+  local bf; bf="$(mktemp)"
+  git show "$SRC:$srcfile" 2>/dev/null | awk -v b="$begin" -v e="$end" '$0~b{f=1} f{print} $0~e{f=0}' > "$bf"
+  [ -s "$bf" ] || { echo "  ⚠ блок $begin не найден в $SRC:$srcfile"; rm -f "$bf"; return; }
+  if $DRY_RUN; then echo "  [dry-run] блок → $file"; rm -f "$bf"; return; fi
+  awk -v anc="$anchor" -v bf="$bf" '
     {print}
-    !done && index($0,anc){print ""; print blk; done=1}
+    !done && index($0,anc){print ""; while((getline l < bf)>0) print l; close(bf); done=1}
   ' "$file" > "$file.tmp" && mv "$file.tmp" "$file"
+  rm -f "$bf"
   echo "  ✓ блок → $file"
 }
 # README: вставить после первой строки "---"
