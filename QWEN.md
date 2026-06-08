@@ -1,7 +1,9 @@
 # Инструкции для всех репозиториев
 
+<!-- QWEN-OFFLINE-ENV:BEGIN (адаптер adapt-to-qwen-offline.sh переносит этот блок) -->
 > **🖥️ Среда (ветка `qwen-windows-offline`):** агент Qwen Code (`qwen`), Windows 10 + git bash, локальные LLM через OpenAI-совместимый сервер, **без интернета**, **без планировщика**.
 > Следствия для агента: (1) облачные инструменты (MCP, Telegram, Calendar, веб) недоступны — не предлагать их; (2) задачи «по расписанию» запускаются вручную — см. `MANUAL-JOBS.md`; (3) команды — для git bash, не PowerShell; (4) git локальный, без remote (`push`/`pull` недоступны); (5) обновление шаблона — через ZIP (`update.sh`).
+<!-- QWEN-OFFLINE-ENV:END -->
 
 > **Агент-специфичные инструкции:** Kimi → `AGENTS.md`, Hermes → Aisystant MCP `get_instructions`.
 > **Синхронизация:** `scripts/template-sync.sh` проверяет согласованность ядра правил.

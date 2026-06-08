@@ -6,6 +6,7 @@
 
 ---
 
+<!-- QWEN-OFFLINE:BEGIN (адаптер adapt-to-qwen-offline.sh переносит этот блок) -->
 ## ⚙️ Ветка `qwen-windows-offline` — адаптация под Qwen Code / Windows / offline
 
 Эта ветка адаптирует шаблон под среду:
@@ -69,6 +70,7 @@ qwen                         # запустить агента из workspace
 Все 5 hook-событий IWE (`UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`, `PreCompact`) поддерживаются Qwen Code и сохранены.
 
 Подробно о ручном запуске фоновых задач — в [`MANUAL-JOBS.md`](MANUAL-JOBS.md).
+<!-- QWEN-OFFLINE:END -->
 
 ---
 
