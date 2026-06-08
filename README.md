@@ -18,17 +18,29 @@
 
 ### Установка (один раз после распаковки ZIP)
 
-> **Модель установки.** Оригинальный `setup.sh` (macOS) копирует файлы в
-> родительскую workspace-папку и связывает их симлинками + переменными в `~/.zshenv`.
-> На Windows симлинки в git bash ненадёжны, а оболочка — bash. Поэтому здесь
-> **workspace = сам распакованный каталог**: `qwen` запускается прямо в нём,
-> без копий в родителя. Скрипт выставит `IWE_ROOT`, чтобы хуки нашли корень.
+> **Модель установки — как в оригинальном IWE.** Workspace — это **внешняя папка**
+> (например `~/IWE`), а FMT-репозиторий лежит **внутри** неё
+> (`~/IWE/FMT-exocortex-template/`). Установка разворачивает файлы из FMT в workspace.
+> Отличия от macOS-оригинала: offline, без планировщика, git bash (env в `~/.bashrc`,
+> не `~/.zshenv`), симлинк `memory` с fallback на копию (симлинки в git bash капризны).
+
+Распакуй ZIP так, чтобы получилось `~/IWE/FMT-exocortex-template/`, затем:
 
 ```bash
-cd <распакованный-каталог>   # это и есть workspace
-bash setup-offline.sh        # подставит пути в плейсхолдеры, выставит IWE_ROOT, включит git-хуки
-source ~/.bashrc             # подхватить IWE_ROOT (или открой новый git bash)
-qwen                         # запустить агента ЗДЕСЬ
+cd ~/IWE/FMT-exocortex-template
+bash setup-offline.sh        # развернёт QWEN.md, .qwen/, memory, .iwe-runtime, DS-strategy в ~/IWE
+source ~/.bashrc             # подхватить IWE_* переменные
+cd ~/IWE                     # workspace (НЕ каталог FMT)
+qwen                         # запустить агента из workspace
+```
+
+Раскладка после установки:
+```
+~/IWE/                          ← workspace (IWE_ROOT)
+├── FMT-exocortex-template/     ← этот репо (source, обновляемый)
+├── QWEN.md  .qwen/  .mcp.json  params.yaml  .iwe-runtime/   ← развёрнуто из FMT
+├── memory/                     ← симлинк на ~/.qwen/projects/<proj>/memory (или копия)
+└── DS-strategy/                ← governance-репо (твои РП, планы, архив)
 ```
 
 Перенос своих знаний (архив РП, паки, память) — см. [`MIGRATION.md`](MIGRATION.md).
@@ -45,7 +57,7 @@ qwen                         # запустить агента ЗДЕСЬ
 | `update.sh` (git pull) | `update.sh` → инструкция обновления через ZIP |
 | MCP, Telegram, Calendar, телеметрия | отключены (offline) |
 | launchd-расписание | ручной запуск — см. [`MANUAL-JOBS.md`](MANUAL-JOBS.md) |
-| `setup.sh` копирует в workspace + симлинки | `setup-offline.sh`: workspace = сам каталог, без симлинков, `IWE_ROOT` в `~/.bashrc` |
+| `setup.sh` (macOS, env в `~/.zshenv`) | `setup-offline.sh` (git bash, env в `~/.bashrc`, симлинк memory с fallback на копию) |
 
 Все 5 hook-событий IWE (`UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`, `PreCompact`) поддерживаются Qwen Code и сохранены.
 

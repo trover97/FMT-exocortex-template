@@ -1,82 +1,86 @@
 #!/bin/bash
-# setup-offline.sh — установка IWE-шаблона под Qwen Code на Windows (git bash), offline.
+# setup-offline.sh — установка IWE-шаблона под Qwen Code (Windows / git bash / offline).
 #
-# МОДЕЛЬ УСТАНОВКИ (важно):
-#   Оригинальный setup.sh (macOS) разворачивает файлы из FMT-репо в РОДИТЕЛЬСКУЮ
-#   workspace-папку и связывает их симлинками + переменными в ~/.zshenv.
-#   На Windows симлинки (ln -s в git bash) ненадёжны, а оболочка — bash, не zsh.
-#   Поэтому здесь workspace = САМ распакованный каталог: ты запускаешь `qwen`
-#   прямо в нём. Никаких симлинков и копий в родителя — всё самодостаточно.
-#   Хуки IWE сами резолвят корень через IWE_ROOT (этот скрипт его выставит).
+# СОХРАНЯЕТ ОРИГИНАЛЬНУЮ АРХИТЕКТУРУ IWE:
+#   workspace = ВНЕШНЯЯ папка (например ~/IWE), FMT-репо лежит ВНУТРИ неё
+#   (~/IWE/FMT-exocortex-template/). Установка разворачивает файлы из FMT в
+#   workspace — ровно как оригинальный setup.sh. FMT остаётся чистым upstream'ом.
 #
-# Чем отличается от setup.sh:
-#   - НЕ требует интернета (нет cloud-проверок, MCP/OAuth, gh/curl).
-#   - НЕ ставит планировщик (launchd/cron/systemd) — задачи запускаются вручную.
-#   - git bash (GNU sed), без macOS-конструкций и симлинков.
-#   - Подставляет плейсхолдеры {{...}} прямо в каталоге (in-place).
-#   - Выставляет IWE_ROOT в ~/.bashrc (чтобы хуки нашли корень).
+# Раскладка после установки:
+#   ~/IWE/                              ← workspace (IWE_ROOT / IWE_WORKSPACE)
+#   ├── FMT-exocortex-template/         ← этот репозиторий (source, обновляемый)
+#   ├── QWEN.md                         ← развёрнут из FMT (подставлены пути)
+#   ├── .qwen/                          ← развёрнут из FMT (settings, hooks, skills...)
+#   ├── .iwe-runtime/                   ← сгенерирован build-runtime.sh
+#   ├── .mcp.json, params.yaml          ← развёрнуты из FMT
+#   ├── memory/                         ← симлинк на ~/.qwen/projects/<proj>/memory (или копия)
+#   └── DS-strategy/                    ← governance-репо из seed/strategy
 #
-# Запуск (один раз после распаковки ZIP, ИЗ каталога репозитория):
-#   cd <распакованный-каталог>
+# Отличия от оригинального setup.sh:
+#   - offline: без gh/curl/cloud/OAuth/DataPolicy
+#   - без планировщика (launchd/cron) — роли запускаются вручную (MANUAL-JOBS.md)
+#   - git bash: GNU sed, env-переменные в ~/.bashrc (не ~/.zshenv)
+#   - агент Qwen Code (qwen) вместо Claude Code
+#   - симлинк memory с fallback на копию (симлинки в git bash на Windows капризны)
+#
+# Запуск (ИЗ каталога FMT-репо, после распаковки ZIP в ~/IWE/FMT-exocortex-template):
 #   bash setup-offline.sh
-#   bash setup-offline.sh --yes        # без подтверждений (значения по умолчанию)
-#   bash setup-offline.sh --dry-run    # показать что будет сделано, без изменений
+#   bash setup-offline.sh --yes        # значения по умолчанию, без вопросов
+#   bash setup-offline.sh --dry-run    # показать план без изменений
 #
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+TEMPLATE_DIR="$(cd "$(dirname "$0")" && pwd)"
 AUTO_YES=false
 DRY_RUN=false
 for arg in "$@"; do
   case "$arg" in
     --yes)     AUTO_YES=true ;;
     --dry-run) DRY_RUN=true ;;
-    --help|-h) sed -n '2,33p' "$0"; exit 0 ;;
+    --help|-h) sed -n '2,40p' "$0"; exit 0 ;;
   esac
 done
 
 # --- GNU sed (git bash) ---
 if ! sed --version >/dev/null 2>&1; then
-  echo "ОШИБКА: нужен GNU sed (он есть в git bash). BSD/macOS sed не поддерживается." >&2
+  echo "ОШИБКА: нужен GNU sed (есть в git bash). BSD/macOS sed не поддерживается." >&2
   exit 1
 fi
 sed_inplace() { sed -i "$@"; }
 
 echo "=== IWE offline setup (Qwen Code / Windows / git bash) ==="
-echo "Каталог установки (= workspace = IWE_ROOT): $SCRIPT_DIR"
 echo
 
 # --- Параметры ---
-# workspace = сам каталог (single-dir модель, надёжно на Windows)
-WORKSPACE_DIR="$SCRIPT_DIR"
-HOME_DIR="$HOME"
+DEFAULT_WORKSPACE="$(dirname "$TEMPLATE_DIR")"   # родитель FMT-репо = workspace
 if $AUTO_YES; then
+  WORKSPACE_DIR="$DEFAULT_WORKSPACE"
   GOVERNANCE_REPO="DS-strategy"
-  ECOSYSTEM_REPO="DS-ecosystem-development"
   GITHUB_USER="local"
 else
+  read -rp "Workspace (внешняя папка IWE) [$DEFAULT_WORKSPACE]: " WORKSPACE_DIR
+  WORKSPACE_DIR="${WORKSPACE_DIR:-$DEFAULT_WORKSPACE}"
   read -rp "Governance-репо (личный хаб) [DS-strategy]: " GOVERNANCE_REPO
   GOVERNANCE_REPO="${GOVERNANCE_REPO:-DS-strategy}"
-  read -rp "Ecosystem-репо (командное) [DS-ecosystem-development]: " ECOSYSTEM_REPO
-  ECOSYSTEM_REPO="${ECOSYSTEM_REPO:-DS-ecosystem-development}"
   read -rp "GitHub username (offline — можно 'local') [local]: " GITHUB_USER
   GITHUB_USER="${GITHUB_USER:-local}"
 fi
+WORKSPACE_DIR="${WORKSPACE_DIR/#\~/$HOME}"
 
-STRATEGY_REPO="$GOVERNANCE_REPO"
-IWE_TEMPLATE_PATH="$SCRIPT_DIR"
-IWE_RUNTIME_PATH="$SCRIPT_DIR/.iwe-runtime"
+HOME_DIR="$HOME"
 CLAUDE_PROJECT_SLUG="$(echo "$WORKSPACE_DIR" | tr '/' '-')"
-
-# Путь к qwen CLI (для подстановки {{CLAUDE_PATH}} в скриптах ролей)
 QWEN_PATH="$(command -v qwen 2>/dev/null || echo 'qwen')"
+ENV_FILE="$WORKSPACE_DIR/.exocortex.env"
+IWE_RUNTIME_PATH="$WORKSPACE_DIR/.iwe-runtime"
+QWEN_MEMORY_DIR="$HOME/.qwen/projects/$CLAUDE_PROJECT_SLUG/memory"
 
 echo
-echo "  Workspace / IWE_ROOT: $WORKSPACE_DIR"
-echo "  Home:                 $HOME_DIR"
-echo "  Governance repo:      $GOVERNANCE_REPO"
-echo "  Ecosystem repo:       $ECOSYSTEM_REPO"
-echo "  qwen CLI:             $QWEN_PATH"
+echo "  Workspace:        $WORKSPACE_DIR"
+echo "  FMT (template):   $TEMPLATE_DIR"
+echo "  Home:             $HOME_DIR"
+echo "  Governance repo:  $GOVERNANCE_REPO"
+echo "  qwen CLI:         $QWEN_PATH"
+echo "  Memory dir:       $QWEN_MEMORY_DIR"
 echo
 
 if ! $AUTO_YES && ! $DRY_RUN; then
@@ -84,72 +88,142 @@ if ! $AUTO_YES && ! $DRY_RUN; then
   case "$ans" in y|Y) ;; *) echo "Отменено."; exit 0 ;; esac
 fi
 
-# --- 1. Подстановка плейсхолдеров (in-place) ---
-# {{X}} (иллюстративный пример в доках) намеренно НЕ трогаем.
-MAPPING=(
-  "WORKSPACE_DIR=$WORKSPACE_DIR"
-  "HOME_DIR=$HOME_DIR"
-  "GOVERNANCE_REPO=$GOVERNANCE_REPO"
-  "STRATEGY_REPO=$STRATEGY_REPO"
-  "ECOSYSTEM_REPO=$ECOSYSTEM_REPO"
-  "GITHUB_USER=$GITHUB_USER"
-  "IWE_TEMPLATE=$IWE_TEMPLATE_PATH"
-  "IWE_RUNTIME=$IWE_RUNTIME_PATH"
-  "CLAUDE_PROJECT_SLUG=$CLAUDE_PROJECT_SLUG"
-  "CLAUDE_PATH=$QWEN_PATH"
-)
+run() { if $DRY_RUN; then echo "  [dry-run] $*"; else eval "$@"; fi; }
 
-echo "[1/3] Подстановка плейсхолдеров..."
-# ВАЖНО: после распаковки ZIP каталог НЕ является git-репо (.git отсутствует),
-# поэтому перечисляем файлы через find, а не git ls-files.
-COUNT=0
-while IFS= read -r -d '' f; do
-  grep -q '{{' "$f" 2>/dev/null || continue
-  if $DRY_RUN; then echo "  [dry-run] ${f#$SCRIPT_DIR/}"; COUNT=$((COUNT+1)); continue; fi
-  for pair in "${MAPPING[@]}"; do
-    key="${pair%%=*}"; val="${pair#*=}"; val_escaped="${val//|/\\|}"
-    sed_inplace "s|{{${key}}}|${val_escaped}|g" "$f"
+# --- .exocortex.env (минимальный, offline) ---
+echo "[0] Запись .exocortex.env..."
+if ! $DRY_RUN; then
+  mkdir -p "$WORKSPACE_DIR"
+  cat > "$ENV_FILE" <<ENVEOF
+# IWE offline config (git bash / Qwen Code). Generated by setup-offline.sh.
+HOME_DIR=$HOME_DIR
+WORKSPACE_DIR=$WORKSPACE_DIR
+CLAUDE_PATH=$QWEN_PATH
+CLAUDE_PROJECT_SLUG=$CLAUDE_PROJECT_SLUG
+TIMEZONE_HOUR=4
+TIMEZONE_DESC=offline
+GITHUB_USER=$GITHUB_USER
+GOVERNANCE_REPO=$GOVERNANCE_REPO
+IWE_TEMPLATE=$TEMPLATE_DIR
+IWE_RUNTIME=$IWE_RUNTIME_PATH
+ENVEOF
+  chmod 600 "$ENV_FILE"
+  echo "  ✓ $ENV_FILE"
+fi
+
+# --- [1] Сгенерировать runtime (.iwe-runtime/) ---
+echo "[1] Building generated runtime (.iwe-runtime/)..."
+if [ -f "$TEMPLATE_DIR/setup/build-runtime.sh" ]; then
+  if $DRY_RUN; then
+    bash "$TEMPLATE_DIR/setup/build-runtime.sh" --dry-run --workspace "$WORKSPACE_DIR" --env-file "$ENV_FILE" 2>&1 | sed 's/^/  /' || true
+  else
+    bash "$TEMPLATE_DIR/setup/build-runtime.sh" --workspace "$WORKSPACE_DIR" --env-file "$ENV_FILE" 2>&1 | sed 's/^/  /' || \
+      echo "  ⚠ build-runtime завершился с ошибкой — роли можно собрать позже; основная установка продолжается"
+  fi
+fi
+
+# --- [2] QWEN.md → workspace (с подстановкой) ---
+echo "[2] Installing QWEN.md..."
+if ! $DRY_RUN; then
+  cp "$TEMPLATE_DIR/QWEN.md" "$WORKSPACE_DIR/QWEN.md"
+  sed_inplace \
+    -e "s|{{HOME_DIR}}|$HOME_DIR|g" \
+    -e "s|{{WORKSPACE_DIR}}|$WORKSPACE_DIR|g" \
+    -e "s|{{GOVERNANCE_REPO}}|$GOVERNANCE_REPO|g" \
+    -e "s|{{STRATEGY_REPO}}|$GOVERNANCE_REPO|g" \
+    -e "s|{{GITHUB_USER}}|$GITHUB_USER|g" \
+    -e "s|{{CLAUDE_PROJECT_SLUG}}|$CLAUDE_PROJECT_SLUG|g" \
+    -e "s|{{IWE_TEMPLATE}}|$TEMPLATE_DIR|g" \
+    -e "s|{{IWE_RUNTIME}}|$IWE_RUNTIME_PATH|g" \
+    "$WORKSPACE_DIR/QWEN.md"
+  cp "$WORKSPACE_DIR/QWEN.md" "$WORKSPACE_DIR/.qwen.md.base"
+  echo "  ✓ $WORKSPACE_DIR/QWEN.md (+ .qwen.md.base)"
+fi
+
+# --- [3] memory → ~/.qwen/projects/<proj>/memory + symlink workspace/memory ---
+echo "[3] Installing memory..."
+if ! $DRY_RUN; then
+  mkdir -p "$QWEN_MEMORY_DIR"
+  cp "$TEMPLATE_DIR/memory/"*.md "$QWEN_MEMORY_DIR/" 2>/dev/null || true
+  for f in "$TEMPLATE_DIR/memory/"*.yaml "$TEMPLATE_DIR/memory/"*.yml; do
+    [ -f "$f" ] && cp "$f" "$QWEN_MEMORY_DIR/"
   done
-  COUNT=$((COUNT+1))
-done < <(find "$SCRIPT_DIR" \
-           \( -path '*/.git' -o -path '*/.git/*' \) -prune -o \
-           -type f \( -name '*.sh' -o -name '*.py' -o -name '*.yaml' -o -name '*.yml' -o -name '*.json' -o -name '*.md' \) -print0)
-echo "  Обработано файлов с плейсхолдерами: $COUNT"
+  echo "  ✓ memory → $QWEN_MEMORY_DIR"
+  if [ ! -e "$WORKSPACE_DIR/memory" ]; then
+    if MSYS=winsymlinks:nativestrict ln -s "$QWEN_MEMORY_DIR" "$WORKSPACE_DIR/memory" 2>/dev/null && [ -L "$WORKSPACE_DIR/memory" ]; then
+      echo "  ✓ симлинк: $WORKSPACE_DIR/memory → $QWEN_MEMORY_DIR"
+    else
+      rm -f "$WORKSPACE_DIR/memory" 2>/dev/null || true
+      cp -r "$QWEN_MEMORY_DIR" "$WORKSPACE_DIR/memory"
+      echo "  ⚠ симлинки недоступны (Windows) → memory СКОПИРОВАН в $WORKSPACE_DIR/memory"
+      echo "    Правки памяти агентом идут в $QWEN_MEMORY_DIR; при расхождении синхронизируй вручную:"
+      echo "      cp $QWEN_MEMORY_DIR/*.md $WORKSPACE_DIR/memory/"
+    fi
+  else
+    echo "  ○ $WORKSPACE_DIR/memory уже существует — пропуск"
+  fi
+fi
 
-# --- 2. IWE_ROOT в ~/.bashrc (чтобы хуки нашли корень) ---
-# Хуки используют IWE_ROOT="${IWE_ROOT:-$HOME/IWE}". Если каталог не ~/IWE —
-# пропишем явный экспорт (идемпотентно).
-echo "[2/3] Настройка IWE_ROOT в ~/.bashrc..."
-BASHRC="$HOME/.bashrc"
-EXPORT_LINE="export IWE_ROOT=\"$WORKSPACE_DIR\""
-if $DRY_RUN; then
-  echo "  [dry-run] добавил бы в $BASHRC: $EXPORT_LINE"
-elif [ "$WORKSPACE_DIR" = "$HOME/IWE" ]; then
-  echo "  Каталог = ~/IWE → IWE_ROOT и так корректен (fallback). Пропуск."
+# --- [4] .qwen/ → workspace (settings, hooks, skills, rules, lib, config, detectors, scripts, agents) ---
+echo "[4] Installing .qwen/ → workspace..."
+if ! $DRY_RUN; then
+  mkdir -p "$WORKSPACE_DIR/.qwen"
+  for subdir in skills hooks rules lib config detectors scripts agents; do
+    if [ -d "$TEMPLATE_DIR/.qwen/$subdir" ]; then
+      cp -r "$TEMPLATE_DIR/.qwen/$subdir" "$WORKSPACE_DIR/.qwen/"
+      echo "  ✓ .qwen/$subdir/"
+    fi
+  done
+  [ -f "$TEMPLATE_DIR/.qwen/settings.json" ] && cp "$TEMPLATE_DIR/.qwen/settings.json" "$WORKSPACE_DIR/.qwen/settings.json" && echo "  ✓ .qwen/settings.json"
+  [ -f "$TEMPLATE_DIR/.qwen/settings.local.json" ] && cp "$TEMPLATE_DIR/.qwen/settings.local.json" "$WORKSPACE_DIR/.qwen/settings.local.json" && echo "  ✓ .qwen/settings.local.json"
+fi
+
+# --- [4c] .mcp.json → workspace ---
+echo "[4c] Installing .mcp.json (offline — пустой)..."
+if ! $DRY_RUN; then
+  [ -f "$TEMPLATE_DIR/.mcp.json" ] && cp "$TEMPLATE_DIR/.mcp.json" "$WORKSPACE_DIR/.mcp.json" && echo "  ✓ .mcp.json"
+fi
+
+# --- [4d] IWE env-переменные (~/.bashrc) ---
+echo "[4d] Installing IWE environment variables..."
+if [ -f "$TEMPLATE_DIR/setup/install-iwe-paths.sh" ]; then
+  if $DRY_RUN; then
+    bash "$TEMPLATE_DIR/setup/install-iwe-paths.sh" --workspace "$WORKSPACE_DIR" --governance "$GOVERNANCE_REPO" --dry-run 2>&1 | sed 's/^/  /' || true
+  else
+    bash "$TEMPLATE_DIR/setup/install-iwe-paths.sh" --workspace "$WORKSPACE_DIR" --governance "$GOVERNANCE_REPO" 2>&1 | sed 's/^/  /' || true
+    echo "  ℹ  Перезапусти git bash или: source ~/.bashrc"
+  fi
+fi
+
+# --- [5] Роли: планировщик недоступен ---
+echo "[5] Роли (автоматизация)... пропущено (нет планировщика)."
+echo "  Роли запускаются ВРУЧНУЮ — см. $TEMPLATE_DIR/MANUAL-JOBS.md"
+
+# --- [6] DS-strategy из seed/strategy (локальный git, без gh) ---
+echo "[6] Setting up $GOVERNANCE_REPO..."
+MY_STRATEGY_DIR="$WORKSPACE_DIR/$GOVERNANCE_REPO"
+STRATEGY_TEMPLATE="$TEMPLATE_DIR/seed/strategy"
+if [ -d "$MY_STRATEGY_DIR/.git" ]; then
+  echo "  ○ $GOVERNANCE_REPO уже существует (git) — пропуск"
+elif $DRY_RUN; then
+  echo "  [dry-run] создал бы $MY_STRATEGY_DIR из seed/strategy + git init (локально)"
+elif [ -d "$STRATEGY_TEMPLATE" ]; then
+  cp -r "$STRATEGY_TEMPLATE" "$MY_STRATEGY_DIR"
+  ( cd "$MY_STRATEGY_DIR" && git init -q && git add -A && git -c user.email=local@iwe -c user.name=IWE commit -qm "Initial exocortex: $GOVERNANCE_REPO governance hub" )
+  echo "  ✓ $MY_STRATEGY_DIR (локальный git, без remote)"
 else
-  touch "$BASHRC"
-  # удалить прежнюю строку IWE_ROOT (идемпотентность), затем добавить
-  sed_inplace '/^export IWE_ROOT=/d' "$BASHRC" 2>/dev/null || true
-  printf '%s\n' "$EXPORT_LINE" >> "$BASHRC"
-  echo "  Добавлено в $BASHRC: $EXPORT_LINE"
-  echo "  (применится в новых git bash; сейчас: source ~/.bashrc)"
+  echo "  ⚠ seed/strategy не найден — пропуск"
 fi
 
-# --- 3. git pre-commit гейт платформенной совместимости ---
-echo "[3/3] Включение git-хуков..."
-if [ -d "$SCRIPT_DIR/.githooks" ] && ! $DRY_RUN; then
-  git -C "$SCRIPT_DIR" config core.hooksPath .githooks 2>/dev/null \
-    && echo "  Pre-commit hook включён (.githooks/)" || echo "  (git-репо не инициализирован — пропуск)"
-fi
+# --- [7] Base repos (FPF, SPF): offline — вручную ---
+echo "[7] Base repos (FPF, SPF)... пропущено (offline)."
+echo "  Если нужны — перенеси FPF/ и SPF/ в $WORKSPACE_DIR/ вручную (ZIP)."
 
 echo
 echo "=== Готово ==="
 echo "Дальше:"
-echo "  1. source ~/.bashrc           # подхватить IWE_ROOT (или открой новый git bash)"
-echo "  2. cd \"$WORKSPACE_DIR\""
-echo "  3. qwen                       # запустить агента ЗДЕСЬ (это и есть workspace)"
+echo "  1. source ~/.bashrc"
+echo "  2. cd \"$WORKSPACE_DIR\"     # workspace, НЕ каталог FMT"
+echo "  3. qwen                       # запустить агента из workspace"
 echo
-echo "Заметки:"
-echo "  - Задачи по расписанию запускаются ВРУЧНУЮ → MANUAL-JOBS.md"
-echo "  - Облачное (MCP, Telegram, Calendar, авто-обновление) отключено (offline)."
-echo "  - Свои знания (архив РП, паки) держи в этом же каталоге или соседних — см. MIGRATION.md"
+echo "Перенос своих знаний (архив РП, паки, память) — см. $TEMPLATE_DIR/MIGRATION.md"
