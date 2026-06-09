@@ -52,6 +52,33 @@ qwen                         # запустить агента из workspace
 
 Перенос своих знаний (архив РП, паки, память) — см. [`MIGRATION.md`](MIGRATION.md).
 
+### Обновление установленной версии
+
+> **`setup-offline.sh` — первая установка. `update.sh` — обновление.** Не запускай
+> `setup-offline.sh` повторно для обновления: он сеет шаблонную память поверх твоей.
+> Для обновления используй `update.sh` — он сохраняет память и настройки и делает бэкап.
+
+Без интернета обновление идёт через ZIP-архив ветки:
+
+```bash
+# 1. На машине с сетью: открой ветку qwen-windows-offline форка →
+#    «Code» → «Download ZIP». Перенеси архив и распакуй (например в /tmp/iwe-new).
+
+# 2. Замени папку FMT новой версией (персоналка лежит СНАРУЖИ — в ~/IWE, не в FMT):
+rm -rf ~/IWE/FMT-exocortex-template
+cp -r /tmp/iwe-new/FMT-exocortex-template-qwen-windows-offline ~/IWE/FMT-exocortex-template
+
+# 3. Разъедь обновление в workspace (из обновлённого FMT):
+cd ~/IWE/FMT-exocortex-template
+bash update.sh --check        # превью: что обновится, что сохранится
+bash update.sh                # применить
+```
+
+`update.sh` обновляет код (`.qwen/`, `QWEN.md` через 3-way merge), пересобирает
+`.iwe-runtime/` и **не трогает** `memory/MEMORY.md`, `memory/day-rhythm-config.yaml`,
+`params.yaml`, `.qwen/settings.local.json`, `DS-strategy/`, `extensions/`. Перед записью
+в каталог памяти создаётся бэкап `<memory>.bak-<дата>`.
+
 ### Что изменено относительно оригинала
 
 | Было (Claude Code) | Стало (Qwen Code) |
@@ -61,7 +88,7 @@ qwen                         # запустить агента из workspace
 | `$CLAUDE_PROJECT_DIR` | `$QWEN_PROJECT_DIR` |
 | matcher'ы хуков по именам инструментов Claude | matcher'ы под инструменты Qwen (`Edit`, `WriteFile`, `Shell`, ...) |
 | `setup.sh` (macOS, cloud) | `setup-offline.sh` (git bash, offline) |
-| `update.sh` (git pull) | `update.sh` → инструкция обновления через ZIP |
+| `update.sh` (git pull) | `update.sh` → обновление установки из обновлённого FMT (память/настройки сохраняются, бэкап) |
 | MCP, Telegram, Calendar, телеметрия | отключены (offline) |
 | launchd-расписание | ручной запуск — см. [`MANUAL-JOBS.md`](MANUAL-JOBS.md) |
 | `setup.sh` (macOS, env в `~/.zshenv`) | `setup-offline.sh` (git bash, env в `~/.bashrc`) |
