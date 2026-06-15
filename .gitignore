@@ -13,3 +13,4 @@ DS-exocortex-setup/
 
 # Author-local downstream config for sync-communication-style.py (WP-388)
 scripts/sync-communication-style.yaml
+.DS_Store
