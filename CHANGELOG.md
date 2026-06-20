@@ -17,101 +17,107 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 
 
-## [Unreleased] — обновлено 2026-06-06
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## [Unreleased] — обновлено 2026-06-19
 
 ### Added
 
-- `61c46f3` feat(peer): sync kimi-peer-adapter.sh v3 from DS-my-strategy (selective merge)
-- `42e015f` feat(WP-356): промоция артефактов Day Open pipeline (5 скриптов + 1 хук)
-- `e5c86a0` feat(WP-378): навык /discovery-session + распаковка strategy-session
-- `4f6a0b9` feat(strategy-session): РП393 Ф2c appendix consent-check + dt-guide-prep
-- `bce2037` feat(roles): распаковка R1 — Стратег сужен, добавлен Плановик (DP.ROLE.066)
-- `edda5a3` feat(wp-398): Ф4 — тесты CLI-слоя agent-dashboard.py + фикс normalize_file_path
-- `9ae1746` feat(wp398-f5): командный дашборд --repo + Agent Core инструкция
-- `754a203` feat(wp-383): promote routing hint в peer-conversation skill (L1)
-- `9a04944` feat(wp-7): WP-REGISTRY Naming rule в Agent Core SYNC-CORE
-- `77f5052` feat(wp-7): close-wp.sh + create-wp.sh archive-заготовка
-- `be7b9ce` feat(multi-agent): поддержка Kimi Code и Hermes в точках входа
-- `8d0d8e5` feat(style): правило #5 «— это» + детектор R5-emdash в response-clarity-hook
-- `57f6ee7` feat(wp-395): Ф4 — универсальный дашборд agent-dashboard.py для IWE-шаблона
-- `560c357` feat(template-sync): Status Reporting (WP-395) + staged validator mode
-- `fccd93f` feat(WP-388 Ф8-Ф10): трёхслойная архитектура стиля + enforce
-- `b11ea42` feat(wp-394): Ф4.3-4.5 — промоция паттернов в шаблон + восстановление дрифта
-- `e4a8645` feat(wp-394): Ф4.2 — single-source автоген AGENTS.md из ядра CLAUDE.md
-- `88d9e33` feat(wp-394): Ф3.1+Ф4.6 — IWE instructions tiering + model tiering in peer sessions
-- `7295b6f` feat(roles/strategy): WP-393 Ф5+Ф6 — role-boundaries, калибр, ценность, cycles, OKR
-- `0ac4a91` feat(strategist/prompts): WP-393 Ф3 остатки — ВДВ-структура для 6 промптов
-- `b623b3a` feat(WP-391 Ф5): browser mass-user MVP — CI template + skill index
-- `b51fe40` feat(skills): migrate 5 skills to FMT (WP-387 Ф3)
-- `eafefd3` feat(WP-393 Ф4+Ф2c): обновление шаблонов + appendix
-- `8bb8ade` feat(strategist): WP-393 Ф2 stepwise strategy session (monthly + weekly)
-- `672f36d` feat(style): sync communication-style rules to AGENTS.md and CLAUDE.md
-- `53ea30a` feat(style): sync CLAUDE.md with WP-code format rule and communication-style ref
-- `0f45e0d` feat(communication-style): add WP-code format rule and self-check
-- `cc7c196` feat: auto-sync version badge via CI + local script
-- `03363b7` feat(0.35.3): communication-style-base + sync script + downstream markers
-- `cd1e268` feat(0.35.3): community-facing communication style
-- `ea6625e` feat(0.35.1): promote response-style rules to template (S-37 v2 + AGENTS.md)
-- `996df2a` feat(peer-skill): content-roles §1.5 + frontmatter ad_hoc_roles/discovery_turns
-- `08d6f2e` feat(hardening): stale-bot + TG alert env fallback (peer-session 2026-06-01-25) (#148)
-- `cb45d31` feat: WP-337/З Ф6 — peer-session инфраструктура в шаблоне (v0.35.0)
-- `7e9aa78` feat(triage): post-2026-06-01 backlog cleanup infrastructure
-- `dc18e90` feat(detection): MVP FMT critical/deadline issues alert (peer-session 2026-06-01-18) (#145)
-- `6be164d` feat(hindsight): WP-337/А.13 FMT template — docker-compose, start, launchd, docs
-- `43e8268` feat(WP-377): promote pack-creator + org-dev + spf-guard
-- `f47bf49` feat(WP-348): promote apply-captures defer_until invariant to L1
-- `bc5686f` feat(L1): B-005 reliability обхода Backlog и pending-фаз
-- `fbc5585` feat(L1): promote DP.D.052 v2 формулировок из peer-сессии 2026-05-31-11
+- `1593f13` feat(WP-295): promote rule-engine.sh + generate-rules-registry.py to platform
+- `3a17360` feat(diagnose): promote diagnose-iwe v5.0 to platform (L1)
+- `3491420` feat(day-close): ask pilot for tomorrow priorities and update priorities.yaml
+- `1651574` feat(skills): promote 6 top skills to FMT with advisory fixes (WP-422)
+- `bcdb0ed` feat(skills): promote skill-creator v0.3.2 + C6 audit + pg-start Verification
+- `326c460` feat(WP-422): promote 7 skills with C3-fixed step headings (L1)
+- `d2dd196` feat(WP-422/SP1): promote skill iwe-restore to platform (L1)
+- `a3ecd21` feat(skills): promote agent-fault + apply-captures to L1 (WP-422 Ф7 audit)
+- `157f483` feat(agent-trace): promote uploader+recorder hook fixes to platform
+- `8793f64` feat(skill-creator): add Step 2.5 update mode for existing skills (sync from IWE WP-422 Ф7)
+- `7468c0f` feat(skill): promote bottleneck-pick L3->L1, description+phrases
+- `760be7b` feat(skill-creator): promote to platform L1 (WP-422 Ф6)
+- `d6160b2` feat: promote skill artifactor from staging (L1)
+- `7f19385` feat(skill): promote kimi-peer-writer fix — NameError peer_agent + deprecated utcnow
+- `5e21531` feat(WP-7/SP1): refactor skill-promote.sh — safety, validation, tests
+- `53cd985` feat(day-open): add ТВС labeling step to skill template (§6b2)
+- `36febfd` feat(strategy): модель ТВС в шаблон (стратегирование + ОРЗ)
+- `673474d` feat(WP-388): проекция базы стиля — 4 новых элемента регистра (зеркало L0)
 
 ### Changed
 
-- `ba4f5e6` docs(WP-349): Ф34 — онбординг-доки под канон двух осей
-- `6a634a8` chore: обновление promotion-status (peer-conversation skill)
-- `8b683de` docs(readme): упрощена формулировка про другие агенты
-- `e76758e` docs(portability): audience-based descriptions + Hermes CLI (Вариант В)
-- `0acb88d` chore: sync rules + protocols from template-sync (2026-06-04)
-- `5840624` refactor: externalize downstream paths from sync script to yaml config (WP-388)
-- `b6ddac7` refactor: FMT-копия стиля → проекция Pack SoT + обобщённый sync (WP-388 Ф8)
-- `7c7768f` docs: РП-394 Ф4.3-4.5 — PREFIX/BODY/TAIL + memory-lifecycle + Hermes coordination в шаблон [no-registry-touch]
-- `79defa3` refactor(WP-393): правки Клода — ВДВ в intro блоков, /diagnose-iwe, R{N}-цель, _не задано_
-- `0631439` refactor(session-prep): WP-393 Ф3 remove WORKPLAN anti-pattern
-- `1e3cd92` docs(dispatcher): OUTDATED comment — canonical at workspace scripts/
-- `0a15c8a` docs(skills): Ф4 WP-386 — явный Шаг 1 Extensions checks + WHY-комментарий dry-run sentinel
-- `c54ff45` ci: migrate actions/checkout@v4 → v6, github-script@v7 → v8
-- `76be56b` docs(CHANGELOG): корректировки 0.35.0 по post-deploy verify
-- `22cdd0d` chore(WP-377): R29 Детектор → R47 в hooks/lib/detectors
+- `70d540b` docs: remove PACK-MIM from CHANGELOG [protocol-close]
+- `ed2cca0` docs: add KIMI-SETUP.md — инструкция по подключению Kimi к IWE
+- `d98c62e` chore(skill-creator): bump version to 0.3.0 (sync from IWE)
+- `f820cb9` docs(local-llm): sync ADR-001 venv-Python note from author SoT (WP-404 Ф4)
+- `a512810` chore(day-close): commit dirty changes from 2026-06-15
+- `6c8a4cd` docs(WP-362 Ф8.1): developer/README — тиры T1-T4 → T0-T4 (консистентность с каноном)
+- `6fdb1b0` docs(WP-362): Ф8 — FMT/docs self-contained онбординг
 
 ### Fixed
 
-- `6fd9e77` fix(peer): pidfile fallback uses PPID, remove orphan cleanup
-- `a85cf57` fix(fmt7): pre-commit валидирует только staged-скрипты (#150 collateral)
-- `efadfa0` fix(fmt): триаж 4 issues + сигнальный канал Day Open
-- `136c4b1` fix(day-close): шаг 3c — явное done-форматирование строк WP-REGISTRY
-- `e4e3c96` fix(wp-395): recursive-retry guard в get_agents() — max 1 refresh
-- `0ce1864` fix(wp-393): resolve 3 medium review findings
-- `8168e05` fix(peer-infra): synthesis 4.2 stdout-only — остаточный High из баг-репорта WP-393
-- `830ff9d` fix(peer-infra): адаптер passthrough --permission-mode + SKILL.md stdout-only
-- `cb39a82` fix(day-close): backup AGENTS.md to exocortex alongside CLAUDE.md
-- `fa8878d` fix(communication-style): merge rule 1a into rule 2, fix numbering
-- `190802e` fix(peer): add negative scope guard to kimi-peer-writer SKILL.md Шаг 3.1
-- `103a14f` fix(peer-writer): close-signal detector, explicit mv, Python path fix, pre-commit guard
-- `64376e3` fix(peer-writer): add 180s timeout to report synthesis subprocess
-- `f28a6da` fix(server-news): silent exit when news.enabled=false
-- `8a0a5c6` fix(create-wp): учитывать жирный шрифт **NNN** при парсинге номеров РП
-- `1ead2bc` fix: update version badge to 0.35.3
-- `46a7606` fix(scripts): remove author-specific paths from sync-communication-style template
-- `15ff497` fix(0.35.2): hotfix S-37 — A1-A11 labels in CLAUDE.md + frontmatter cleanup
-- `7e0ebd6` fix(build-runtime): remove leftover conflict markers from PR #50 merge
-- `480b277` fix: chmod +x all .sh files in build-runtime
-- `35c473f` fix(update): add .claude/scripts/ to workspace propagation
-- `f112f0d` fix: iwe-audit portability + release-audit-log.md (closes #24, #142) (#144)
-- `575ae4e` fix(notify): make TEMPLATES_DIR overridable via environment (#49)
-- `934e9c9` fix(verify): add model mapping for verification_class in wp type (#47)
-- `4a00339` fix(dt-collect): replace hardcoded DS-strategy with $GOVERNANCE_DIR (#46)
-- `065e60a` fix(day-close): portability — HOME_SLUG + rsync --delete (#119)
-- `df591ea` fix(dry-run-gate): make sentinel discovery session-agnostic (closes #59) (#60)
-- `bffd92c` fix(skill): quote pack-new description in SKILL.md frontmatter (#137)
+- `7e07287` fix: update manifest to exclude auto-generated translation files
+- `de06083` fix(wp-149): sync lesson-close.sh to use lesson/ path instead of workbook/
+- `24dbd80` fix: update subscription name from Бесконечное развитие to Инженерия интеллекта in template
+- `762a441` fix(setup): T3/T4 MCP auth — write .mcp.json with ict_token Bearer header
+- `290d149` fix(wp-7): sanitize author-specific content in template-sync'd files
+- `850c303` fix(wp-7/wpn1): promote create-wp.sh with GOV_REPO parametrization
+- `0f92b40` fix(skill-creator): SKILL.md v0.3.1 — review fixes Critical+High
+- `b653a38` fix(ke-queue-stats): frontmatter parser + support pending and pending-review statuses
+- `7c7151c` fix(ke-queue-stats): fix COUNT double-output bug and cross-platform stat
+- `c92d968` fix(promote): auto-regenerate update-manifest.json after hook/script promotion
+- `2d20f46` fix(manifest): close 3 gaps that let skill files bypass coverage check
+- `daeaa01` fix(manifest): exclude .backups/, add promoted skill files (artifactor + skill-creator)
+- `4d7c2f3` fix(skill-creator): remove /create-skill alias from triggers and description
+- `9bd0593` fix(update.sh): Windows SSL revocation flag detection via curl --help
+- `b1b45cd` fix(WP-7): strategist runner env fallback + diagnose-iwe YAML sync (#136 #122)
+- `a823c51` fix(WP-7): setup/validate-template.sh delivery, CLAUDE.md conflict hard-fail, manifest coverage
+- `8073146` fix(WP-7): FMT delivery — .claude/styles propagation, manifest sync, smoke Test 6e
+- `cb8a1a6` fix(COL-06): communication-style-base.md — L1 → S1 (авторский слой)
+- `06b9d79` fix(WP-376): A52/A49/A50/A51 — template hygiene и agentigore sample
 
+
+## [0.35.4] — 2026-06-15
+
+### Fixed
+
+- fix(WP-7): FMT delivery blockers от реального pilot update — доставка `setup/validate-template.sh` через `update-manifest.json`, hard-fail `update.sh` при неразрешённых конфликтах `CLAUDE.md`, coverage `scripts/tests/test_skill_promote.py` в манифесте.
 
 ## [0.35.3] — 2026-06-01
 
@@ -1329,7 +1335,7 @@ Commits: 150be24 (I1+I2 sync из DS-ai-systems), 731471f (I3 sweep 11 точе�
 
 ### Added
 - **CI smoke-test** (`.github/workflows/validate-template.yml`): job «Smoke-test protocol hooks on clean user env» — создаёт tmp-окружение с `DS-strategy` + минимальным DayPlan и прогоняет `protocol-artifact-validate.sh`. Падает, если хук блокирует commit на чистом пользователе. Перехватывает L1→L3 утечки, которые пропускает blacklist.
-- **Расширенный blacklist** (два уровня) в `validate-template.yml` + зеркально в локальном `setup/validate-template.sh`: глобальный (запрещено везде: `tserentserenov`, `PACK-MIM`, `aist_bot_newarchitecture`, `DS-Knowledge-Index-Tseren`, `DS-my-strategy`, `engines/tailor`) и protocol-only (запрещено в `.claude/skills|hooks|rules`, `memory`, `CLAUDE.md`, но разрешено в README/docs: `@aist_me_bot`, `digital-twin`, `content-pipeline`, `knowledge-mcp`, `gateway-mcp`, `DS-agent-workspace/scheduler`). Покрытие расширено на `roles/`.
+- **Расширенный blacklist** (два уровня) в `validate-template.yml` + зеркально в локальном `setup/validate-template.sh`: глобальный (запрещено везде: `tserentserenov`, `aist_bot_newarchitecture`, `DS-Knowledge-Index-Tseren`, `DS-my-strategy`, `engines/tailor`) и protocol-only (запрещено в `.claude/skills|hooks|rules`, `memory`, `CLAUDE.md`, но разрешено в README/docs: `@aist_me_bot`, `digital-twin`, `content-pipeline`, `knowledge-mcp`, `gateway-mcp`, `DS-agent-workspace/scheduler`). Покрытие расширено на `roles/`.
 
 ### Fixed
 - CI `validate-template.yml` — зеркалирование exclude-логики локального валидатора для путей (`/Users/...`, `/opt/homebrew`) + shellcheck severity: warning→error (0 pred-existing errors, CI зеленеет).

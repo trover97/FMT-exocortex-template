@@ -2,15 +2,32 @@
 name: iwe-bug-report
 description: Сообщить об ошибке или проблеме платформы IWE. Создаёт GitHub issue в FMT-exocortex-template.
 argument-hint: "[описание проблемы]"
+version: 1.0.0
+layer: L1
+status: active
+triggers:
+  slash: [/iwe-bug-report]
+  phrases: []
 routing:
-  executor: script
-  deterministic: true
-  script_path: "scripts/iwe-bug-report.sh"
+  executor: agent
+  model: sonnet
+  deterministic: false
+agents: none
+interaction: one-shot
+gates_required: []
+gates_enforced: []
+gates_rationale: "операционный скилл; WP Gate применим только при создании нового РП, не для операционных вызовов"
 ---
 
 # Отчёт об ошибке платформы IWE
 
 Проблема: $ARGUMENTS
+
+## When to use
+
+Сообщить об ошибке или проблеме платформы IWE. Создаёт GitHub issue в FMT-exocortex-template.
+
+## Algorithm
 
 ## Шаг 1. Категоризация
 
