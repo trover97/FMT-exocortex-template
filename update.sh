@@ -386,6 +386,23 @@ for f in "${UPDATED_FILES[@]}"; do
             # Save base for next update
             cp "$NEW_FILE" "$SCRIPT_DIR/.claude.md.base"
         fi
+    elif [[ "$f" == .claude/skills/*/SKILL.md ]]; then
+        # USER-SPACE preserve for L1 skill spec files (no install_constants in SCRIPT_DIR — already {{KEY}})
+        CURR_SKILL_FILE="$SCRIPT_DIR/$f"
+        if [ -f "$CURR_SKILL_FILE" ]; then
+            USER_SECTION=$(sed -n '/^<!-- USER-SPACE -->/,/^<!-- \/USER-SPACE -->/p' "$CURR_SKILL_FILE")
+        else
+            USER_SECTION=""
+        fi
+        cp "$TMPDIR_UPDATE/files/$f" "$SCRIPT_DIR/$f"
+        if [ -n "$USER_SECTION" ]; then
+            perl -i -0pe 's/^<!-- USER-SPACE -->.*?^<!-- \/USER-SPACE -->//ms' "$SCRIPT_DIR/$f"
+            perl -i -0pe 's/\n+$/\n/' "$SCRIPT_DIR/$f"
+            printf '\n%s\n' "$USER_SECTION" >> "$SCRIPT_DIR/$f"
+            echo "  ~ $f (USER-SPACE preserved)"
+        else
+            echo "  ~ $f"
+        fi
     else
         cp "$TMPDIR_UPDATE/files/$f" "$SCRIPT_DIR/$f"
         case "$f" in *.sh) chmod +x "$SCRIPT_DIR/$f" ;; esac
@@ -701,13 +718,51 @@ fi
 # Propagate skills, hooks, rules, lib, config, detectors to workspace if changed.
 # lib/config/detectors — runtime dependencies капчер-шины (capture-bus.sh) и детекторов.
 for f in "${NEW_FILES[@]}" "${UPDATED_FILES[@]}"; do
-    case "$f" in .claude/skills/*|.claude/hooks/*|.claude/rules/*|.claude/lib/*|.claude/config/*|.claude/detectors/*|.claude/scripts/*|.claude/agents/*|.claude/styles/*|.claude/settings.json)
-        src="$SCRIPT_DIR/$f"
-        dst="$WORKSPACE_DIR/$f"
-        mkdir -p "$(dirname "$dst")"
-        cp "$src" "$dst"
-        echo "  ✓ $f → workspace"
-        ;;
+    case "$f" in
+        .claude/skills/*/SKILL.md)
+            src="$SCRIPT_DIR/$f"
+            dst="$WORKSPACE_DIR/$f"
+            mkdir -p "$(dirname "$dst")"
+            # 1. Extract USER_SECTION from workspace before overwriting
+            if [ -f "$dst" ]; then
+                USER_SECTION=$(sed -n '/^<!-- USER-SPACE -->/,/^<!-- \/USER-SPACE -->/p' "$dst" 2>/dev/null || true)
+            else
+                USER_SECTION=""
+            fi
+            # 2. Extract install_constants values from workspace frontmatter
+            if [ -f "$dst" ]; then
+                IC_BLOCK=$(awk '/^install_constants:/{found=1} found && /^[a-z][^:]+:/ && !/^install_constants:/{exit} found{print}' "$dst" 2>/dev/null || true)
+            else
+                IC_BLOCK=""
+            fi
+            # 3. Copy src (with {{KEY}} placeholders) → dst
+            cp "$src" "$dst"
+            # 4. Substitute install_constants: {{KEY}} → VALUE
+            if [ -n "$IC_BLOCK" ]; then
+                while IFS=': ' read -r key val; do
+                    key="${key#"${key%%[! ]*}"}"
+                    val="${val#"${val%%[! ]*}"}"
+                    [[ "$key" =~ ^[A-Z_]+$ ]] && [ -n "$val" ] || continue
+                    sed_inplace "s|{{${key}}}|${val}|g" "$dst"
+                done <<< "$IC_BLOCK"
+            fi
+            # 5. Reinject USER_SECTION
+            if [ -n "$USER_SECTION" ]; then
+                perl -i -0pe 's/^<!-- USER-SPACE -->.*?^<!-- \/USER-SPACE -->//ms' "$dst"
+                perl -i -0pe 's/\n+$/\n/' "$dst"
+                printf '\n%s\n' "$USER_SECTION" >> "$dst"
+                echo "  ✓ $f → workspace (USER-SPACE preserved)"
+            else
+                echo "  ✓ $f → workspace"
+            fi
+            ;;
+        .claude/skills/*|.claude/hooks/*|.claude/rules/*|.claude/lib/*|.claude/config/*|.claude/detectors/*|.claude/scripts/*|.claude/agents/*|.claude/styles/*|.claude/settings.json)
+            src="$SCRIPT_DIR/$f"
+            dst="$WORKSPACE_DIR/$f"
+            mkdir -p "$(dirname "$dst")"
+            cp "$src" "$dst"
+            echo "  ✓ $f → workspace"
+            ;;
     esac
 done
 
