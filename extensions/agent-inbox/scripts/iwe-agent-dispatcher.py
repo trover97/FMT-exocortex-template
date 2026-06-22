@@ -4,7 +4,7 @@
 """
 iwe-agent-dispatcher.py — диспетчер Agent Inbox IWE (WP-324 Ф8).
 
-Канал: headless `claude -p` (Claude Code CLI в неинтерактивном режиме).
+Канал: headless `claude -p` (Qwen Code CLI в неинтерактивном режиме).
 Не зависит от RemoteTrigger v1→v2 translation bug (см. bugs/bug-2026-05-17).
 
 Цикл:

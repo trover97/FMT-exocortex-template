@@ -372,7 +372,7 @@ INCEOF
   fi
 
   # gate_log активность (Ф1 проверка)
-  local gate_log="$IWE/.claude/logs/gate_log.jsonl"
+  local gate_log="$IWE/.qwen/logs/gate_log.jsonl"
   if [ -f "$gate_log" ]; then
     local recent
     recent=$(awk -v d="$DATE" '$0 ~ d' "$gate_log" 2>/dev/null | wc -l | tr -d ' ')

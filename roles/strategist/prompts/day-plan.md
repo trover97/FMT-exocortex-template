@@ -117,16 +117,16 @@ git push
 - ❌ **НЕ задавать вопросов** «что от меня нужно?» / «вариант A/B/C?»
 - ❌ **НЕ останавливаться** если файл DayPlan уже существует — заполни PENDING секции (не пересоздавай)
 - ❌ **НЕ просить подтверждения** — все решения по алгоритму
-- ✅ Все решения принимай по skill /day-open (`{{WORKSPACE_DIR}}/.claude/skills/day-open/SKILL.md`)
+- ✅ Все решения принимай по skill /day-open (`{{WORKSPACE_DIR}}/.qwen/skills/day-open/SKILL.md`)
 - ✅ Финал: SUCCESS + git push (Telegram-уведомление отправляет strategist.sh автоматически после завершения)
 
 ## Источники (на сервере tsekh-1)
 
 - HUB: `{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/current/`
 - SPOKES: `{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/docs/WP-REGISTRY.md`
-- MEMORY: `~/.claude/projects/{{CLAUDE_PROJECT_SLUG}}/memory/`
-- Skill: `{{WORKSPACE_DIR}}/.claude/skills/day-open/SKILL.md`
-- Templates: `~/.claude/projects/{{CLAUDE_PROJECT_SLUG}}/memory/templates-dayplan.md`
+- MEMORY: `~/.qwen/projects/{{CLAUDE_PROJECT_SLUG}}/memory/`
+- Skill: `{{WORKSPACE_DIR}}/.qwen/skills/day-open/SKILL.md`
+- Templates: `~/.qwen/projects/{{CLAUDE_PROJECT_SLUG}}/memory/templates-dayplan.md`
 - Scaffold: `{{WORKSPACE_DIR}}/scripts/day-open-scaffold.sh`
 - Extensions: `{{WORKSPACE_DIR}}/extensions/day-open.before.md`, `.after.md`, `.checks.md`
 

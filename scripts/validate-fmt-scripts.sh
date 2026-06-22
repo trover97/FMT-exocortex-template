@@ -8,16 +8,16 @@
 #   bash validate-fmt-scripts.sh [scripts-dir] [--scripts|--settings-json|--all]
 #
 #   --scripts       проверить только скрипты (1, 2, 4) — по умолчанию вместе с --all
-#   --settings-json проверить только .claude/settings.json (проверка 3)
+#   --settings-json проверить только .qwen/settings.json (проверка 3)
 #   --all           полная проверка [умолчание]
 #
 # Что проверяет:
 #   1. *.sh/*.py: абсолютный домашний путь пользователя (/Users/<name> или /home/<name>)
 #   2. *.sh/*.py: голое имя авторского governance-репо без ${VAR:-default} защиты
-#   3. .claude/settings.json: хук-команды на .claude/hooks/X.sh должны иметь префикс
-#      $CLAUDE_PROJECT_DIR/ (иначе ломаются при сдвиге cwd: subagent/worktree/MCP)
+#   3. .qwen/settings.json: хук-команды на .qwen/hooks/X.sh должны иметь префикс
+#      $QWEN_PROJECT_DIR/ (иначе ломаются при сдвиге cwd: subagent/worktree/MCP)
 #   4. *.sh под set -e: ((VAR++)) без || true → silent exit при VAR==0 (B8 gap)
-#   5. .claude/skills/*/SKILL.md: $HOME/IWE/<author-repo>/ и ~/IWE/<author-repo>/
+#   5. .qwen/skills/*/SKILL.md: $HOME/IWE/<author-repo>/ и ~/IWE/<author-repo>/
 #      без env-fallback ${IWE_GOVERNANCE_REPO:-...} (WP-337 З-Ф6, 1 июня 2026)
 
 set -uo pipefail
@@ -116,11 +116,11 @@ if [[ "$MODE" != "settings-json" ]]; then
 fi
 
 if [[ "$MODE" != "scripts" && "$MODE" != "settings-json" ]]; then
-    # Проверка 5: .claude/skills/*/SKILL.md — буквальные хардкоды путей к файлам
+    # Проверка 5: .qwen/skills/*/SKILL.md — буквальные хардкоды путей к файлам
     # Ловит: $HOME/IWE/<author-repo>/scripts/... и ~/IWE/<author-repo>/scripts/...
     # Допустимо: $HOME/IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/scripts/... (env-fallback)
     # Допустимо: голое DS-strategy в комментариях/документации
-    SKILLS_DIR="$FMT_ROOT/.claude/skills"
+    SKILLS_DIR="$FMT_ROOT/.qwen/skills"
     if [[ -d "$SKILLS_DIR" ]]; then
         skills_checked=0
         while IFS= read -r -d '' md_file; do
@@ -162,23 +162,23 @@ if [[ "$MODE" != "scripts" && "$MODE" != "settings-json" ]]; then
 fi
 
 if [[ "$MODE" != "scripts" ]]; then
-    # Проверка 3: .claude/settings.json — хук-команды должны идти с префиксом $CLAUDE_PROJECT_DIR/
-    SETTINGS_JSON="$FMT_ROOT/.claude/settings.json"
+    # Проверка 3: .qwen/settings.json — хук-команды должны идти с префиксом $QWEN_PROJECT_DIR/
+    SETTINGS_JSON="$FMT_ROOT/.qwen/settings.json"
     if [[ -f "$SETTINGS_JSON" ]]; then
         if command -v jq >/dev/null 2>&1; then
-            # Достаём все .hooks.*[].hooks[].command, ищем те, что упоминают .claude/hooks/
+            # Достаём все .hooks.*[].hooks[].command, ищем те, что упоминают .qwen/hooks/
             bad_cmds=$(jq -r '.hooks // {} | to_entries[] | .value[] | .hooks[]? | .command // empty' "$SETTINGS_JSON" \
-                | grep -E '\.claude/hooks/' \
-                | grep -vE '^\$CLAUDE_PROJECT_DIR/' || true)
+                | grep -E '\.qwen/hooks/' \
+                | grep -vE '^\$QWEN_PROJECT_DIR/' || true)
             if [[ -n "$bad_cmds" ]]; then
-                echo "  ❌ .claude/settings.json: хук-команды без префикса \$CLAUDE_PROJECT_DIR/" >&2
+                echo "  ❌ .qwen/settings.json: хук-команды без префикса \$QWEN_PROJECT_DIR/" >&2
                 echo "$bad_cmds" | sed 's/^/     /' >&2
-                echo "     → Замени на \$CLAUDE_PROJECT_DIR/.claude/hooks/<имя>.sh" >&2
+                echo "     → Замени на \$QWEN_PROJECT_DIR/.qwen/hooks/<имя>.sh" >&2
                 echo "     → Док: https://code.claude.com/docs/en/hooks#reference-scripts-by-path" >&2
                 errors=$((errors + 1))
             fi
         else
-            echo "  ⚠ jq не найден, пропускаю проверку .claude/settings.json" >&2
+            echo "  ⚠ jq не найден, пропускаю проверку .qwen/settings.json" >&2
         fi
     fi
 fi

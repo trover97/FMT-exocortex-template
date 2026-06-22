@@ -2,7 +2,7 @@ name: IWE Cloud Scheduler (базовый)
 
 # Облачный планировщик IWE — базовый уровень (без LLM).
 # Выполняет задачи, которые не требуют Claude API:
-# - Backup memory/ и CLAUDE.md в exocortex/
+# - Backup memory/ и QWEN.md в exocortex/
 # - Health check ночной автоматики
 #
 # Для пользователей шаблона FMT-exocortex-template.
@@ -71,10 +71,10 @@ jobs:
             echo "✓ Memory files backed up"
           fi
 
-          # Копируем CLAUDE.md из корня workspace если есть
-          if [ -f "CLAUDE.md" ]; then
-            cp "CLAUDE.md" "$BACKUP_DIR/CLAUDE.md"
-            echo "✓ CLAUDE.md backed up"
+          # Копируем QWEN.md из корня workspace если есть
+          if [ -f "QWEN.md" ]; then
+            cp "QWEN.md" "$BACKUP_DIR/QWEN.md"
+            echo "✓ QWEN.md backed up"
           fi
 
           # Проверяем, есть ли изменения

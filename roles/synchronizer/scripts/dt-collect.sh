@@ -231,7 +231,7 @@ print(json.dumps(result))
 }
 
 # ============================================================
-# 3. Claude Code Sessions
+# 3. Qwen Code Sessions
 # ============================================================
 
 collect_sessions() {
@@ -299,7 +299,7 @@ collect_wp() {
     # Формат строки: | <NNN> | <P> | <Название> | <Ст> | <Репо> | <Бюджет> |
     # Статусы: ✅ done · 🔄 in_progress · ⏳ pending · 📦 archived · ↗️ merged · 🧪 testing
     local REGISTRY_FILE="$GOVERNANCE_DIR/docs/WP-REGISTRY.md"
-    local MEMORY_FILE="$HOME/.claude/projects/-Users-$(whoami)-IWE/memory/MEMORY.md"
+    local MEMORY_FILE="$HOME/.qwen/projects/-Users-$(whoami)-IWE/memory/MEMORY.md"
 
     python3 -c "
 import json, os

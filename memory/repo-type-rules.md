@@ -73,12 +73,12 @@ description: "Операционный файл памяти IWE"
 
 > **Репо агентов/ботов = преимущественно код и текст-как-код.**
 > Архитектурные решения, UX-модели, доменные описания → Pack цифровой платформы.
-> В instrument-репо остаётся: код, конфиги, CLAUDE.md (привязка к Pack), README (как запустить).
+> В instrument-репо остаётся: код, конфиги, QWEN.md (привязка к Pack), README (как запустить).
 
 ### Именование DS/instrument для ИИ-систем
 
 Конвенция: `DS-{slug}` (примеры: `DS-strategist-agent`, `DS-extractor-agent`).
-Привязка к Pack через `source-of-truth: {ID}` в CLAUDE.md репо, не через имя.
+Привязка к Pack через `source-of-truth: {ID}` в QWEN.md репо, не через имя.
 
 ### DS/governance: DS-strategy (личная база данных)
 

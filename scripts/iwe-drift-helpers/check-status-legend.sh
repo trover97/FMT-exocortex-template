@@ -11,7 +11,7 @@
 #   I3. **Format compliance — terminal id:** строки с crossed id `| ~~<num>~~ |` имеют
 #       терминальный статус из {✅, 📦, ↗️}.
 #
-# I2 + I3 — invariant id-format ↔ status (см. .claude/rules/formatting.md «Таблицы с РП»).
+# I2 + I3 — invariant id-format ↔ status (см. .qwen/rules/formatting.md «Таблицы с РП»).
 # Сломан = расхождение row-format и status, что ломает счётчики (linear-sync.sh, day-close.sh).
 #
 # Usage:

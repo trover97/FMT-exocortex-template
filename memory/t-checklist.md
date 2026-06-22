@@ -8,7 +8,7 @@ valid_from: 2026-04-10
 
 > Линейный, не требующий суждения. Каждый пункт: owner, trigger, symptom-if-skipped.
 > **Класс T (True maintenance):** идемпотентно, календарно, автопилот.
-> Различение T ≠ S ≠ R: см. `.claude/rules/distinctions.md`.
+> Различение T ≠ S ≠ R: см. `.qwen/rules/distinctions.md`.
 
 ## Session Close (Quick Close ≤15 мин, или по триггеру «закрывай»)
 
@@ -30,7 +30,7 @@ valid_from: 2026-04-10
 |---|----------|-------|---------|--------------------|
 | T6 | Все T1-T5 выполнены для текущей сессии | агент | конец дня | см. выше |
 | T7 | Архивация done WP contexts → archive/wp-contexts/ | агент | день | inbox/ забит, путаница активных/закрытых |
-| T8 | Backup memory/ + CLAUDE.md → `<strategy-repo>/exocortex/` (governance-репо пользователя) | агент | день | экзокортекс отстаёт, recovery ломается |
+| T8 | Backup memory/ + QWEN.md → `<strategy-repo>/exocortex/` (governance-репо пользователя) | агент | день | экзокортекс отстаёт, recovery ломается |
 | T9 | Архивация старых DayPlan'ов → archive/day-plans/ | агент | день (auto-chore) | current/ забит устаревшими DayPlan |
 | T10 | Downstream sync (update.sh — reindex + pack-project + template) | агент | день при изменениях Pack | MCP-сервер отдаёт устаревший Pack, template-sync ломается |
 | T11 | Linear sync (статусы linear ↔ git) | агент | день | Linear отражает не то, что в git |
@@ -58,7 +58,7 @@ valid_from: 2026-04-10
 
 ## Month Close (первый Пн месяца)
 
-> **Триггер:** скилл `/month-close` (см. `.claude/skills/month-close/SKILL.md`). T23-T25 выполняются как шаги 6-7 алгоритма Month Close.
+> **Триггер:** скилл `/month-close` (см. `.qwen/skills/month-close/SKILL.md`). T23-T25 выполняются как шаги 6-7 алгоритма Month Close.
 
 | # | Действие | Owner | Trigger | Symptom-if-skipped |
 |---|----------|-------|---------|--------------------|

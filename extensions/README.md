@@ -40,7 +40,7 @@ fi
 - `<hook>` — точка вставки (`before`, `after`, `checks`)
 - `<suffix>` — произвольное имя модуля (например, `health`, `linear`, `slack`)
 
-**Loader native (с 0.29.9):** все skills/protocols вызывают `bash .claude/scripts/load-extensions.sh <protocol> <hook>` и итерируют по выводу. И manifest-, и suffix-стиль работают одинаково. Manifest вручную делегирующий в suffix-файлы больше не нужен (вызовет двойное выполнение).
+**Loader native (с 0.29.9):** все skills/protocols вызывают `bash .qwen/scripts/load-extensions.sh <protocol> <hook>` и итерируют по выводу. И manifest-, и suffix-стиль работают одинаково. Manifest вручную делегирующий в suffix-файлы больше не нужен (вызовет двойное выполнение).
 
 ### Поддерживаемые extension points
 
@@ -123,7 +123,7 @@ extensions/day-close.after.linear.md      # модуль 2: Linear sync
 extensions/day-close.after.telegram.md    # модуль 3: Telegram notification
 ```
 
-Loader (`.claude/scripts/load-extensions.sh day-close after`) возвращает все matching файлы в **алфавитном порядке** — все три выполнятся (`health` → `linear` → `telegram`). Конфликта имён нет.
+Loader (`.qwen/scripts/load-extensions.sh day-close after`) возвращает все matching файлы в **алфавитном порядке** — все три выполнятся (`health` → `linear` → `telegram`). Конфликта имён нет.
 
 > **Порядок при смешивании manifest и suffix:** lexicographic sort даёт `<protocol>.<hook>.<suffix>.md` < `<protocol>.<hook>.md` (потому что `.h` < `.m` в точке-префикс сравнении). Manifest без suffix всегда выполнится **последним**. Если важен порядок — используй suffix-имена с явной нумерацией (`day-close.after.01-health.md`, `day-close.after.02-linear.md`).
 

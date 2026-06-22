@@ -6,6 +6,99 @@
 
 ---
 
+<!-- QWEN-OFFLINE:BEGIN (адаптер adapt-to-qwen-offline.sh переносит этот блок) -->
+## ⚙️ Ветка `qwen-windows-offline` — адаптация под Qwen Code / Windows / offline
+
+Эта ветка адаптирует шаблон под среду:
+
+- **Агент:** [Qwen Code](https://github.com/QwenLM/qwen-code) (`qwen`) вместо Claude Code.
+- **ОС:** Windows 10, работа в **git bash** (не PowerShell).
+- **LLM:** локальные модели через OpenAI-совместимый сервер (настраивается в `.qwen/settings.json`).
+- **Сеть:** **без интернета** — облачные функции отключены, обновление через ZIP.
+- **Планировщик:** отсутствует — задачи по расписанию запускаются **вручную**.
+
+### Установка (один раз после распаковки ZIP)
+
+> **Модель установки — как в оригинальном IWE.** Workspace — это **внешняя папка**
+> (например `~/IWE`), а FMT-репозиторий лежит **внутри** неё
+> (`~/IWE/FMT-exocortex-template/`). Установка разворачивает файлы из FMT в workspace.
+> Отличия от macOS-оригинала: offline, без планировщика, git bash (env в `~/.bashrc`,
+> не `~/.zshenv`), симлинк `memory` с fallback на копию (симлинки в git bash капризны).
+
+Распакуй ZIP так, чтобы получилось `~/IWE/FMT-exocortex-template/`, затем:
+
+```bash
+cd ~/IWE/FMT-exocortex-template
+bash setup-offline.sh        # развернёт QWEN.md, .qwen/, memory, .iwe-runtime, DS-strategy в ~/IWE
+source ~/.bashrc             # подхватить IWE_* переменные
+cd ~/IWE                     # workspace (НЕ каталог FMT)
+qwen                         # запустить агента из workspace
+```
+
+Раскладка после установки:
+```
+~/IWE/                          ← workspace (IWE_ROOT)
+├── FMT-exocortex-template/     ← этот репо (source, обновляемый)
+├── QWEN.md  .qwen/  .mcp.json  params.yaml  .iwe-runtime/   ← развёрнуто из FMT
+├── memory/                     ← симлинк на ~/.qwen/projects/<proj>/memory (или копия)
+└── DS-strategy/                ← governance-репо (твои РП, планы, архив)
+```
+
+**Workspace — любой путь.** Не обязательно `~/IWE`. На вопрос скрипта укажи свой,
+например `/c/Work/IWE` (git bash-формат пути; `C:\Work\IWE`). `setup-offline.sh`
+пропишет `IWE_ROOT`/`IWE_WORKSPACE` на него в `~/.iwe-paths` (подключается из `~/.bashrc`).
+Папку FMT **переименовывать не нужно** — путь к ней берётся фактический, поэтому
+распакованная из ZIP `FMT-exocortex-template-qwen-windows-offline` работает как есть.
+
+Перенос своих знаний (архив РП, паки, память) — см. [`MIGRATION.md`](MIGRATION.md).
+
+### Обновление установленной версии
+
+> **`setup-offline.sh` — первая установка. `update.sh` — обновление.** Не запускай
+> `setup-offline.sh` повторно для обновления: он сеет шаблонную память поверх твоей.
+> Для обновления используй `update.sh` — он сохраняет память и настройки и делает бэкап.
+
+Без интернета обновление идёт через ZIP-архив ветки:
+
+```bash
+# 1. На машине с сетью: открой ветку qwen-windows-offline форка →
+#    «Code» → «Download ZIP». Перенеси архив и распакуй (например в /tmp/iwe-new).
+
+# 2. Замени папку FMT новой версией (персоналка лежит СНАРУЖИ — в ~/IWE, не в FMT):
+rm -rf ~/IWE/FMT-exocortex-template
+cp -r /tmp/iwe-new/FMT-exocortex-template-qwen-windows-offline ~/IWE/FMT-exocortex-template
+
+# 3. Разъедь обновление в workspace (из обновлённого FMT):
+cd ~/IWE/FMT-exocortex-template
+bash update.sh --check        # превью: что обновится, что сохранится
+bash update.sh                # применить
+```
+
+`update.sh` обновляет код (`.qwen/`, `QWEN.md` через 3-way merge), пересобирает
+`.iwe-runtime/` и **не трогает** `memory/MEMORY.md`, `memory/day-rhythm-config.yaml`,
+`params.yaml`, `.qwen/settings.local.json`, `DS-strategy/`, `extensions/`. Перед записью
+в каталог памяти создаётся бэкап `<memory>.bak-<дата>`.
+
+### Что изменено относительно оригинала
+
+| Было (Claude Code) | Стало (Qwen Code) |
+|--------------------|-------------------|
+| `CLAUDE.md` | `QWEN.md` (+ `AGENTS.md` читается нативно) |
+| `.claude/` | `.qwen/` (settings, hooks, skills, agents, rules) |
+| `$CLAUDE_PROJECT_DIR` | `$QWEN_PROJECT_DIR` |
+| matcher'ы хуков по именам инструментов Claude | matcher'ы под инструменты Qwen (`Edit`, `WriteFile`, `Shell`, ...) |
+| `setup.sh` (macOS, cloud) | `setup-offline.sh` (git bash, offline) |
+| `update.sh` (git pull) | `update.sh` → обновление установки из обновлённого FMT (память/настройки сохраняются, бэкап) |
+| MCP, Telegram, Calendar, телеметрия | отключены (offline) |
+| launchd-расписание | ручной запуск — см. [`MANUAL-JOBS.md`](MANUAL-JOBS.md) |
+| `setup.sh` (macOS, env в `~/.zshenv`) | `setup-offline.sh` (git bash, env в `~/.bashrc`) |
+| симлинк `memory` (macOS) | `memory` через симлинк → **junction** (`mklink /J`, без админа) → копия; `scripts/link-memory.sh` |
+
+Все 5 hook-событий IWE (`UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`, `PreCompact`) поддерживаются Qwen Code и сохранены.
+
+Подробно о ручном запуске фоновых задач — в [`MANUAL-JOBS.md`](MANUAL-JOBS.md).
+<!-- QWEN-OFFLINE:END -->
+
 ## Проблема
 
 ИИ-ассистенты умеют генерировать текст, код и ответы. Но у большинства пользователей одни и те же проблемы:
@@ -144,10 +237,10 @@ claude
 ## FAQ
 
 **Q: Нужна ли подписка Anthropic?**
-A: Для полной установки (Claude Code) — рекомендуется Claude Pro ($20/мес). Для минимальной (`setup.sh --core`) — работает с любым AI CLI. Подробнее: [SETUP-GUIDE.md](docs/SETUP-GUIDE.md).
+A: Для полной установки (Qwen Code) — рекомендуется Claude Pro ($20/мес). Для минимальной (`setup.sh --core`) — работает с любым AI CLI. Подробнее: [SETUP-GUIDE.md](docs/SETUP-GUIDE.md).
 
 **Q: Работает ли с другими ИИ (не Claude)?**
-A: Да. Ядро IWE — markdown-файлы. Работает с Claude Code, Codex (OpenAI), Aider и другими AI CLI. Подробнее: [SETUP-GUIDE.md](docs/SETUP-GUIDE.md).
+A: Да. Ядро IWE — markdown-файлы. Работает с Qwen Code, Codex (OpenAI), Aider и другими AI CLI. Подробнее: [SETUP-GUIDE.md](docs/SETUP-GUIDE.md).
 
 **Q: Работает ли на Linux/Windows?**
 A: Да. Ядро работает на любой ОС. Автоматизация Стратега: macOS — launchd, Linux — cron, Windows — WSL. Подробнее: [SETUP-GUIDE.md](docs/SETUP-GUIDE.md).
@@ -165,10 +258,10 @@ A: Три зоны защиты: локальная, GitHub (приватные 
 A: Obsidian — хранилище заметок. IWE — **рабочая среда** с протоколами, ИИ-агентами и формализацией знаний. Вы можете использовать Obsidian внутри IWE для заметок, но IWE даёт структуру, планирование и накопление компетенций.
 
 **Q: Нужно ли программировать?**
-A: Нет. Шаблон — готовая конфигурация. Установка через setup.sh. Работа — через Claude Code на естественном языке.
+A: Нет. Шаблон — готовая конфигурация. Установка через setup.sh. Работа — через Qwen Code на естественном языке.
 
 **Q: Можно ли без Стратега?**
-A: Да. Claude Code + CLAUDE.md + memory/ работают полностью. Стратег — автоматизация планирования. Без него планируете вручную.
+A: Да. Qwen Code + QWEN.md + memory/ работают полностью. Стратег — автоматизация планирования. Без него планируете вручную.
 
 **Q: Как настроить день стратегирования?**
 A: В `memory/day-rhythm-config.yaml` измените `strategy_day: monday` на нужный день. Подробнее: [LEARNING-PATH.md](docs/LEARNING-PATH.md).

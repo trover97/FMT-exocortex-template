@@ -3,343 +3,343 @@
   "description": "Манифест платформенных файлов FMT-exocortex-template. Используется update.sh для доставки обновлений.",
   "files": [
     {
-      "path": ".claude/agents/wp-sync-actualizer.md"
+      "path": ".qwen/agents/wp-sync-actualizer.md"
     },
     {
-      "path": ".claude/capture-config.sh.example"
+      "path": ".qwen/capture-config.sh.example"
     },
     {
-      "path": ".claude/config/capture-detectors.sh"
+      "path": ".qwen/config/capture-detectors.sh"
     },
     {
-      "path": ".claude/detectors/README.md"
+      "path": ".qwen/detectors/README.md"
     },
     {
-      "path": ".claude/detectors/detector_decision.sh"
+      "path": ".qwen/detectors/detector_decision.sh"
     },
     {
-      "path": ".claude/detectors/detector_incident.sh"
+      "path": ".qwen/detectors/detector_incident.sh"
     },
     {
-      "path": ".claude/detectors/detector_pattern_awareness.sh"
+      "path": ".qwen/detectors/detector_pattern_awareness.sh"
     },
     {
-      "path": ".claude/hooks/agent-trace-recorder.sh"
+      "path": ".qwen/hooks/agent-trace-recorder.sh"
     },
     {
-      "path": ".claude/hooks/agent-trace-uploader.sh"
+      "path": ".qwen/hooks/agent-trace-uploader.sh"
     },
     {
-      "path": ".claude/hooks/capture-bus.sh"
+      "path": ".qwen/hooks/capture-bus.sh"
     },
     {
-      "path": ".claude/hooks/check-trash.sh"
+      "path": ".qwen/hooks/check-trash.sh"
     },
     {
-      "path": ".claude/hooks/close-gate-reminder.sh"
+      "path": ".qwen/hooks/close-gate-reminder.sh"
     },
     {
-      "path": ".claude/hooks/destructive-guard.sh"
+      "path": ".qwen/hooks/destructive-guard.sh"
     },
     {
-      "path": ".claude/hooks/dry-run-gate.sh"
+      "path": ".qwen/hooks/dry-run-gate.sh"
     },
     {
-      "path": ".claude/hooks/extensions-gate.sh"
+      "path": ".qwen/hooks/extensions-gate.sh"
     },
     {
-      "path": ".claude/hooks/inject-code-style.sh"
+      "path": ".qwen/hooks/inject-code-style.sh"
     },
     {
-      "path": ".claude/hooks/inject-communication-style.sh"
+      "path": ".qwen/hooks/inject-communication-style.sh"
     },
     {
-      "path": ".claude/hooks/inject-fault-profile.sh"
+      "path": ".qwen/hooks/inject-fault-profile.sh"
     },
     {
-      "path": ".claude/hooks/memory-exocortex-sync.sh"
+      "path": ".qwen/hooks/memory-exocortex-sync.sh"
     },
     {
-      "path": ".claude/hooks/pack-creator-spf-guard.sh"
+      "path": ".qwen/hooks/pack-creator-spf-guard.sh"
     },
     {
-      "path": ".claude/hooks/precompact-checkpoint.sh"
+      "path": ".qwen/hooks/precompact-checkpoint.sh"
     },
     {
-      "path": ".claude/hooks/protocol-artifact-validate.sh"
+      "path": ".qwen/hooks/protocol-artifact-validate.sh"
     },
     {
-      "path": ".claude/hooks/protocol-completion-reminder.sh"
+      "path": ".qwen/hooks/protocol-completion-reminder.sh"
     },
     {
-      "path": ".claude/hooks/protocol-stop-gate.sh"
+      "path": ".qwen/hooks/protocol-stop-gate.sh"
     },
     {
-      "path": ".claude/hooks/pull-on-touch.sh"
+      "path": ".qwen/hooks/pull-on-touch.sh"
     },
     {
-      "path": ".claude/hooks/response-clarity-hook.sh"
+      "path": ".qwen/hooks/response-clarity-hook.sh"
     },
     {
-      "path": ".claude/hooks/rule-engine.sh"
+      "path": ".qwen/hooks/rule-engine.sh"
     },
     {
-      "path": ".claude/hooks/wakatime-heartbeat.sh"
+      "path": ".qwen/hooks/wakatime-heartbeat.sh"
     },
     {
-      "path": ".claude/hooks/wp-gate-reminder.sh"
+      "path": ".qwen/hooks/wp-gate-reminder.sh"
     },
     {
-      "path": ".claude/lib/behaviour-report.sh"
+      "path": ".qwen/lib/behaviour-report.sh"
     },
     {
-      "path": ".claude/lib/capture_selftest.sh"
+      "path": ".qwen/lib/capture_selftest.sh"
     },
     {
-      "path": ".claude/lib/capture_writer.sh"
+      "path": ".qwen/lib/capture_writer.sh"
     },
     {
-      "path": ".claude/lib/iwe-env-bootstrap.sh"
+      "path": ".qwen/lib/iwe-env-bootstrap.sh"
     },
     {
-      "path": ".claude/lib/log_formatter.sh"
+      "path": ".qwen/lib/log_formatter.sh"
     },
     {
-      "path": ".claude/lib/resolve_target_repo.sh"
+      "path": ".qwen/lib/resolve_target_repo.sh"
     },
     {
-      "path": ".claude/parity-contract.yaml"
+      "path": ".qwen/parity-contract.yaml"
     },
     {
-      "path": ".claude/rules/distinctions.md"
+      "path": ".qwen/rules/distinctions.md"
     },
     {
-      "path": ".claude/rules/formatting.md"
+      "path": ".qwen/rules/formatting.md"
     },
     {
-      "path": ".claude/rules/role-prefixes.md"
+      "path": ".qwen/rules/role-prefixes.md"
     },
     {
-      "path": ".claude/rules/wp-scope.md"
+      "path": ".qwen/rules/wp-scope.md"
     },
     {
-      "path": ".claude/runtime-overlay.yaml"
+      "path": ".qwen/runtime-overlay.yaml"
     },
     {
-      "path": ".claude/scripts/check-index-health.py"
+      "path": ".qwen/scripts/check-index-health.py"
     },
     {
-      "path": ".claude/scripts/generate-rules-registry.py"
+      "path": ".qwen/scripts/generate-rules-registry.py"
     },
     {
-      "path": ".claude/scripts/load-extensions.sh"
+      "path": ".qwen/scripts/load-extensions.sh"
     },
     {
-      "path": ".claude/scripts/wp-sync-bundle.sh"
+      "path": ".qwen/scripts/wp-sync-bundle.sh"
     },
     {
-      "path": ".claude/settings.json"
+      "path": ".qwen/settings.json"
     },
     {
-      "path": ".claude/skills-catalog.yaml"
+      "path": ".qwen/skills-catalog.yaml"
     },
     {
-      "path": ".claude/skills/SKILL-INDEX.yaml"
+      "path": ".qwen/skills/SKILL-INDEX.yaml"
     },
     {
-      "path": ".claude/skills/_template/SKILL.md"
+      "path": ".qwen/skills/_template/SKILL.md"
     },
     {
-      "path": ".claude/skills/agent-fault/SKILL.md"
+      "path": ".qwen/skills/agent-fault/SKILL.md"
     },
     {
-      "path": ".claude/skills/apply-captures/SKILL.md"
+      "path": ".qwen/skills/apply-captures/SKILL.md"
     },
     {
-      "path": ".claude/skills/archgate/SKILL.md"
+      "path": ".qwen/skills/archgate/SKILL.md"
     },
     {
-      "path": ".claude/skills/artifactor/SKILL.md"
+      "path": ".qwen/skills/artifactor/SKILL.md"
     },
     {
-      "path": ".claude/skills/audit-docs/SKILL.md"
+      "path": ".qwen/skills/audit-docs/SKILL.md"
     },
     {
-      "path": ".claude/skills/audit-installation/SKILL.md"
+      "path": ".qwen/skills/audit-installation/SKILL.md"
     },
     {
-      "path": ".claude/skills/bottleneck-pick/SKILL.md"
+      "path": ".qwen/skills/bottleneck-pick/SKILL.md"
     },
     {
-      "path": ".claude/skills/check-secret/SKILL.md"
+      "path": ".qwen/skills/check-secret/SKILL.md"
     },
     {
-      "path": ".claude/skills/check-secret/check.sh"
+      "path": ".qwen/skills/check-secret/check.sh"
     },
     {
-      "path": ".claude/skills/consent/SKILL.md"
+      "path": ".qwen/skills/consent/SKILL.md"
     },
     {
-      "path": ".claude/skills/day-close/SKILL.md"
+      "path": ".qwen/skills/day-close/SKILL.md"
     },
     {
-      "path": ".claude/skills/day-close/day-close/SKILL.md"
+      "path": ".qwen/skills/day-close/day-close/SKILL.md"
     },
     {
-      "path": ".claude/skills/day-open/SKILL.md"
+      "path": ".qwen/skills/day-open/SKILL.md"
     },
     {
-      "path": ".claude/skills/day-open/templates.md"
+      "path": ".qwen/skills/day-open/templates.md"
     },
     {
-      "path": ".claude/skills/decompose/SKILL.md"
+      "path": ".qwen/skills/decompose/SKILL.md"
     },
     {
-      "path": ".claude/skills/diagnose-iwe/SKILL.md"
+      "path": ".qwen/skills/diagnose-iwe/SKILL.md"
     },
     {
-      "path": ".claude/skills/discovery-session/SKILL.md"
+      "path": ".qwen/skills/discovery-session/SKILL.md"
     },
     {
-      "path": ".claude/skills/extend/SKILL.md"
+      "path": ".qwen/skills/extend/SKILL.md"
     },
     {
-      "path": ".claude/skills/fpf/SKILL.md"
+      "path": ".qwen/skills/fpf/SKILL.md"
     },
     {
-      "path": ".claude/skills/iwe-bug-report/SKILL.md"
+      "path": ".qwen/skills/iwe-bug-report/SKILL.md"
     },
     {
-      "path": ".claude/skills/iwe-restore/SKILL.md"
+      "path": ".qwen/skills/iwe-restore/SKILL.md"
     },
     {
-      "path": ".claude/skills/iwe-rules-review/SKILL.md"
+      "path": ".qwen/skills/iwe-rules-review/SKILL.md"
     },
     {
-      "path": ".claude/skills/iwe-update/SKILL.md"
+      "path": ".qwen/skills/iwe-update/SKILL.md"
     },
     {
-      "path": ".claude/skills/ke/SKILL.md"
+      "path": ".qwen/skills/ke/SKILL.md"
     },
     {
-      "path": ".claude/skills/kimi-peer-writer/SKILL.md"
+      "path": ".qwen/skills/kimi-peer-writer/SKILL.md"
     },
     {
-      "path": ".claude/skills/lesson-close/SKILL.md"
+      "path": ".qwen/skills/lesson-close/SKILL.md"
     },
     {
-      "path": ".claude/skills/month-close/SKILL.md"
+      "path": ".qwen/skills/month-close/SKILL.md"
     },
     {
-      "path": ".claude/skills/org-dev/SKILL.md"
+      "path": ".qwen/skills/org-dev/SKILL.md"
     },
     {
-      "path": ".claude/skills/org-dev/test_skill.sh"
+      "path": ".qwen/skills/org-dev/test_skill.sh"
     },
     {
-      "path": ".claude/skills/pack-creator/SKILL.md"
+      "path": ".qwen/skills/pack-creator/SKILL.md"
     },
     {
-      "path": ".claude/skills/pack-creator/test_guard.sh"
+      "path": ".qwen/skills/pack-creator/test_guard.sh"
     },
     {
-      "path": ".claude/skills/pack-new/SKILL.md"
+      "path": ".qwen/skills/pack-new/SKILL.md"
     },
     {
-      "path": ".claude/skills/peer-conversation/SKILL.md"
+      "path": ".qwen/skills/peer-conversation/SKILL.md"
     },
     {
-      "path": ".claude/skills/peer-conversation/modes.md"
+      "path": ".qwen/skills/peer-conversation/modes.md"
     },
     {
-      "path": ".claude/skills/personal-guide-render/SKILL.md"
+      "path": ".qwen/skills/personal-guide-render/SKILL.md"
     },
     {
-      "path": ".claude/skills/personal-guide-render/templates/reflection-template.md"
+      "path": ".qwen/skills/personal-guide-render/templates/reflection-template.md"
     },
     {
-      "path": ".claude/skills/personal-guide-start/SKILL.md"
+      "path": ".qwen/skills/personal-guide-start/SKILL.md"
     },
     {
-      "path": ".claude/skills/platform-bottleneck/SKILL.md"
+      "path": ".qwen/skills/platform-bottleneck/SKILL.md"
     },
     {
-      "path": ".claude/skills/restore-exocortex/SKILL.md"
+      "path": ".qwen/skills/restore-exocortex/SKILL.md"
     },
     {
-      "path": ".claude/skills/run-protocol/SKILL.md"
+      "path": ".qwen/skills/run-protocol/SKILL.md"
     },
     {
-      "path": ".claude/skills/setup-wakatime/SKILL.md"
+      "path": ".qwen/skills/setup-wakatime/SKILL.md"
     },
     {
-      "path": ".claude/skills/skill-creator/SKILL.md"
+      "path": ".qwen/skills/skill-creator/SKILL.md"
     },
     {
-      "path": ".claude/skills/skill-creator/assets/skill-scaffold-full.md"
+      "path": ".qwen/skills/skill-creator/assets/skill-scaffold-full.md"
     },
     {
-      "path": ".claude/skills/skill-creator/assets/skill-scaffold-minimal.md"
+      "path": ".qwen/skills/skill-creator/assets/skill-scaffold-minimal.md"
     },
     {
-      "path": ".claude/skills/skill-creator/scripts/batch-fix-skills.py"
+      "path": ".qwen/skills/skill-creator/scripts/batch-fix-skills.py"
     },
     {
-      "path": ".claude/skills/skill-creator/scripts/content-audit.sh"
+      "path": ".qwen/skills/skill-creator/scripts/content-audit.sh"
     },
     {
-      "path": ".claude/skills/skill-creator/scripts/scaffold-init.sh"
+      "path": ".qwen/skills/skill-creator/scripts/scaffold-init.sh"
     },
     {
-      "path": ".claude/skills/skill-creator/scripts/verify-skill.sh"
+      "path": ".qwen/skills/skill-creator/scripts/verify-skill.sh"
     },
     {
-      "path": ".claude/skills/strategy-session/SKILL.md"
+      "path": ".qwen/skills/strategy-session/SKILL.md"
     },
     {
-      "path": ".claude/skills/think/SKILL.md"
+      "path": ".qwen/skills/think/SKILL.md"
     },
     {
-      "path": ".claude/skills/transcribe/SKILL.md"
+      "path": ".qwen/skills/transcribe/SKILL.md"
     },
     {
-      "path": ".claude/skills/vdv/SKILL.md"
+      "path": ".qwen/skills/vdv/SKILL.md"
     },
     {
-      "path": ".claude/skills/vdv/test_cases.md"
+      "path": ".qwen/skills/vdv/test_cases.md"
     },
     {
-      "path": ".claude/skills/verify/SKILL.md"
+      "path": ".qwen/skills/verify/SKILL.md"
     },
     {
-      "path": ".claude/skills/verify/verify-fpf-subsection.md"
+      "path": ".qwen/skills/verify/verify-fpf-subsection.md"
     },
     {
-      "path": ".claude/skills/verify/verify-pedagogy-subsection.md"
+      "path": ".qwen/skills/verify/verify-pedagogy-subsection.md"
     },
     {
-      "path": ".claude/skills/w-reflection/SKILL.md"
+      "path": ".qwen/skills/w-reflection/SKILL.md"
     },
     {
-      "path": ".claude/skills/week-close-pilot/SKILL.md"
+      "path": ".qwen/skills/week-close-pilot/SKILL.md"
     },
     {
-      "path": ".claude/skills/week-close/SKILL.md"
+      "path": ".qwen/skills/week-close/SKILL.md"
     },
     {
-      "path": ".claude/skills/week-close/week-close/SKILL.md"
+      "path": ".qwen/skills/week-close/week-close/SKILL.md"
     },
     {
-      "path": ".claude/skills/wp-new/SKILL.md"
+      "path": ".qwen/skills/wp-new/SKILL.md"
     },
     {
-      "path": ".claude/styles/p05-core.md"
+      "path": ".qwen/styles/p05-core.md"
     },
     {
-      "path": ".claude/styles/s0-core.md"
+      "path": ".qwen/styles/s0-core.md"
     },
     {
-      "path": ".claude/sync-manifest.yaml"
+      "path": ".qwen/sync-manifest.yaml"
     },
     {
       "path": ".githooks/pre-commit"
@@ -360,7 +360,7 @@
       "path": "CHANGELOG.md"
     },
     {
-      "path": "CLAUDE.md"
+      "path": "QWEN.md"
     },
     {
       "path": "ONTOLOGY.md"

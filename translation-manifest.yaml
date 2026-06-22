@@ -33,7 +33,7 @@ exclusions:
     - FMT-exocortex-template
     - iwe-local-gateway
     - FMT-s2r
-    - CLAUDE.md
+    - QWEN.md
     - AGENTS.md
     - AGENTS-agent-blocks.md
     - params.yaml
@@ -68,11 +68,11 @@ categories:
     description: "Agent instructions — require human adaptation for EN context"
     drift_check: true
     files:
-      - CLAUDE.md
+      - QWEN.md
       - AGENTS.md
       - AGENTS-agent-blocks.md
-      - .claude/rules/
-      - .claude/skills/**/SKILL.md
+      - .qwen/rules/
+      - .qwen/skills/**/SKILL.md
       - params.yaml
       - scripts/install-hooks.sh
 
@@ -82,7 +82,7 @@ categories:
     files:
       - CHANGELOG.md
       - CONTRIBUTING.md
-      - .claude/skills/**/README.md
+      - .qwen/skills/**/README.md
 
   N:
     policy: skip

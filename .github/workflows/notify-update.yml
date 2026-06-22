@@ -102,7 +102,7 @@ jobs:
         id: significance
         run: |
           # Проверяем, есть ли значимые изменения для пользователей
-          # Незначительные: только CLAUDE.md, memory/, .claude/rules/, version bump, typo fix
+          # Незначительные: только QWEN.md, memory/, .qwen/rules/, version bump, typo fix
           # Значимые: скиллы, роли, протоколы, install/update, docs, новые файлы
 
           CHANGELOG=$(cat /tmp/changelog_entry.txt)

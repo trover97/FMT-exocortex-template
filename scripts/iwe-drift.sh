@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # routing: helper  skill=iwe-rules-review  called-by=haiku  deterministic=true
 # see DP.SC.159, DP.ROLE.059
-# iwe-drift.sh — MVP drift-отчёт по .claude/sync-manifest.yaml
+# iwe-drift.sh — MVP drift-отчёт по .qwen/sync-manifest.yaml
 #
 # WP-217 Ф3b, черновик 2026-04-10.
 # НЕ переносить в scripts/ до ревью владельца.
@@ -24,7 +24,7 @@
 set -eu
 
 IWE_ROOT="${IWE_ROOT:-$HOME/IWE}"
-MANIFEST="${MANIFEST:-$IWE_ROOT/.claude/sync-manifest.yaml}"
+MANIFEST="${MANIFEST:-$IWE_ROOT/.qwen/sync-manifest.yaml}"
 MODE="all"
 TOP_N=0
 

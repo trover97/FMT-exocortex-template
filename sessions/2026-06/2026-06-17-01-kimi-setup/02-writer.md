@@ -21,9 +21,9 @@ consensus: none
 
 2. **Справочная заметка в IWE**: `{{IWE_GOVERNANCE_REPO}}/exocortex/reference_kimi_config.md` прямо описывает:
    - `extra_skill_dirs` — чтобы Kimi находил IWE-скиллы вне дефолтных путей;
-   - `merge_all_available_skills = true` — чтобы мёрджить скиллы из `.claude/skills`, `.kimi/skills` и др.
+   - `merge_all_available_skills = true` — чтобы мёрджить скиллы из `.qwen/skills`, `.kimi/skills` и др.
 
-3. **Почему в шаблоне нет `.kimi/skills`**: в `FMT-exocortex-template` скиллы лежат в `.claude/skills/`. Чтобы Kimi их увидел, в `extra_skill_dirs` нужно указать именно `<путь-к-репо>/FMT-exocortex-template/.claude/skills`. У пилота в конфиге сейчас указан `{{IWE_GOVERNANCE_REPO}}/.kimi/skills` — это его личные Kimi-скиллы для standalone-сессий, они не относятся к шаблону.
+3. **Почему в шаблоне нет `.kimi/skills`**: в `FMT-exocortex-template` скиллы лежат в `.qwen/skills/`. Чтобы Kimi их увидел, в `extra_skill_dirs` нужно указать именно `<путь-к-репо>/FMT-exocortex-template/.qwen/skills`. У пилота в конфиге сейчас указан `{{IWE_GOVERNANCE_REPO}}/.kimi/skills` — это его личные Kimi-скиллы для standalone-сессий, они не относятся к шаблону.
 
 Таким образом, шаг 3 в инструкции — не догадка, а воспроизводимая механика. Я добавлю в `KIMI-SETUP.md` пример с `<путь-к-репо>` и поясню, что путь зависит от того, куда форкнули шаблон.
 
@@ -32,7 +32,7 @@ consensus: none
 - **Standalone**: не упоминаем в шаблоне. Там нет `session-guard` и `.kimi/skills/session-open/close`. Peer-режим — единственный поддерживаемый способ работы Кими в шаблоне.
 - **Smoke-тест**: усиливаю. Проверяем три вещи:
   1. `which claude` — без Claude CLI `claude-peer-adapter.sh` не запустится.
-  2. `ls <repo>/.claude/skills/kimi-peer-writer/SKILL.md` — скилл физически на месте.
+  2. `ls <repo>/.qwen/skills/kimi-peer-writer/SKILL.md` — скилл физически на месте.
   3. В чате Kimi вводим `/kimi-peer-writer --list` — скилл отзывается.
 - **SETUP-GUIDE.md**: добавлю короткий раздел «Kimi как второй агент» со ссылкой на `KIMI-SETUP.md`.
 - **config.toml локальный**: добавлю пометку, что файл живёт в домашней директории и не коммитится. В `.gitignore` шаблона добавлять нечего — файл вне репо.

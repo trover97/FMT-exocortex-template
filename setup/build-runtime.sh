@@ -122,7 +122,7 @@ if [ -z "$ENV_FILE" ] || [ ! -f "$ENV_FILE" ]; then
     exit 2
 fi
 
-OVERLAY_FILE="$TEMPLATE_DIR/.claude/runtime-overlay.yaml"
+OVERLAY_FILE="$TEMPLATE_DIR/.qwen/runtime-overlay.yaml"
 if [ ! -f "$OVERLAY_FILE" ]; then
     echo "ERROR: Overlay-реестр не найден: $OVERLAY_FILE" >&2
     exit 3

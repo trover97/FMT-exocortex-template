@@ -22,8 +22,8 @@ schema_version: 1
 | Триггер | Аргумент | Skill |
 |---------|---------|-------|
 | «закрываю сессию» / «всё» / «закрывай» | `close` или `close session` | Quick Close (ниже, inline) |
-| «закрываю день» / «итоги дня» | `close day` | `.claude/skills/day-close/SKILL.md` — **шаг 6: WakaTime + Мультипликатор IWE** |
-| «закрываю неделю» / «итоги недели» | `week-close` | `.claude/skills/week-close/SKILL.md` |
+| «закрываю день» / «итоги дня» | `close day` | `.qwen/skills/day-close/SKILL.md` — **шаг 6: WakaTime + Мультипликатор IWE** |
+| «закрываю неделю» / «итоги недели» | `week-close` | `.qwen/skills/week-close/SKILL.md` |
 
 > **`close` без уточнения** → Quick Close (сессия) по умолчанию.
 
@@ -38,7 +38,7 @@ schema_version: 1
 
 1. **Pre-commit checks → Commit + Push**
 
-   **1a. Pre-commit checks (БЛОКИРУЮЩЕЕ).** `bash .claude/scripts/load-extensions.sh protocol-close checks` — exit 0 → `Read` каждый файл из вывода (alphabetic) → выполнить. Exit 1 → пропустить. Поддерживает `extensions/protocol-close.checks.md` И `extensions/protocol-close.checks.<suffix>.md`. **При ❌ commit запрещён** — исправить, повторить checks, только потом 1b. Семантика идентична Day/Week Close (см. `run-protocol/SKILL.md` Шаг 1b).
+   **1a. Pre-commit checks (БЛОКИРУЮЩЕЕ).** `bash .qwen/scripts/load-extensions.sh protocol-close checks` — exit 0 → `Read` каждый файл из вывода (alphabetic) → выполнить. Exit 1 → пропустить. Поддерживает `extensions/protocol-close.checks.md` И `extensions/protocol-close.checks.<suffix>.md`. **При ❌ commit запрещён** — исправить, повторить checks, только потом 1b. Семантика идентична Day/Week Close (см. `run-protocol/SKILL.md` Шаг 1b).
 
    **1b. Commit + Push (БЛОКИРУЮЩЕЕ).** `git status --short` по ВСЕМ репо, которых касалась сессия (не только governance). Незафиксированные изменения → `git add <specific paths>` → commit → push. Затем убедиться что `git status` чист. Только после этого переходить к шагу 2.
 
@@ -55,7 +55,7 @@ schema_version: 1
    - Незавершённое → context file. Идея → `MAPSTRATEGIC.md`. Зерно → `drafts/draft-list.md`
 
 2.5. **KE** — прочитать поле «Что узнали» в «Осталось». Маршрутизировать СЕЙЧАС:
-   - правило (1-3 строки) → `CLAUDE.md` или `distinctions.md`
+   - правило (1-3 строки) → `QWEN.md` или `distinctions.md`
    - доменное знание → Pack (конкретный файл)
    - урок → `memory/lessons_*.md` + строка в MEMORY.md
    - нет нового знания → пропустить молча (анонс не нужен)
@@ -97,7 +97,7 @@ schema_version: 1
 **РП:** #N — [название]
 **Статус:** done / in_progress
 **Git:** закоммичено + запушено ✅
-**EXTENSION POINT (protocol-close after):** `bash .claude/scripts/load-extensions.sh protocol-close after` — exit 0 → `Read` каждый файл из вывода (alphabetic) → выполнить. Exit 1 → пропустить. Поддерживает `extensions/protocol-close.after.md` И `extensions/protocol-close.after.<suffix>.md`.
+**EXTENSION POINT (protocol-close after):** `bash .qwen/scripts/load-extensions.sh protocol-close after` — exit 0 → `Read` каждый файл из вывода (alphabetic) → выполнить. Exit 1 → пропустить. Поддерживает `extensions/protocol-close.after.md` И `extensions/protocol-close.after.<suffix>.md`.
 **Handoff:** → WP context «Осталось» обновлён / done
 ```
 
@@ -122,15 +122,15 @@ schema_version: 1
 ## Week Close (Неделя)
 
 > **Роль:** R1 Стратег. **Бюджет:** ~20-30 мин. **Триггер:** «закрываю неделю» / `/week-close`.
-> Выполняется через `.claude/skills/week-close/SKILL.md` + платформенные шаги.
+> Выполняется через `.qwen/skills/week-close/SKILL.md` + платформенные шаги.
 
 ### Шаги Week Close
 
 1. **Бэкап + грязные репо** — `backup-icloud.sh` + `check-dirty-repos.sh` (платформа)
 2. **Memory Validate** — `memory-bleed.sh` (HOT-лимит, orphans, superseded_by)
 3. **ТО памяти (T, SC.024.3)** — проверка здоровья статической нагрузки:
-   - `wc -l {{HOME_DIR}}/IWE/.claude/rules/distinctions.md` → **> 80 строк = drift-флаг** (по правилу DP.KR.001 §6: 1-3 строки на различение). Предложить аудит в WP-7.
-   - `wc -l ~/.claude/projects/*/memory/MEMORY.md` → **> 200 строк = флаг** (превышен лимит).
+   - `wc -l {{HOME_DIR}}/IWE/.qwen/rules/distinctions.md` → **> 80 строк = drift-флаг** (по правилу DP.KR.001 §6: 1-3 строки на различение). Предложить аудит в WP-7.
+   - `wc -l ~/.qwen/projects/*/memory/MEMORY.md` → **> 200 строк = флаг** (превышен лимит).
    - Feedback/lessons файлы в `memory/` с `mtime > 14 дней` без обращения → предложить понизить `horizon: warm`.
    - Флаги — информативно. Пользователь решает действие.
 4. **iwe-drift.sh** — полный drift-отчёт в Week Report (S)
@@ -149,7 +149,7 @@ schema_version: 1
 
 ## Мультипликатор IWE (WP-299 Ф5, шаг 6 Day Close)
 
-> **Полная спецификация → `.claude/skills/day-close/SKILL.md` § 6.**
+> **Полная спецификация → `.qwen/skills/day-close/SKILL.md` § 6.**
 
 - **WakaTime-источник:** CLI `~/.wakatime/wakatime-cli --today` → если недоступен: Neon `domain_event WHERE event_type='coding_time'` за дату (fallback).
 - **Мультипликатор** = сумма бюджетов закрытых РП за день / WakaTime (сек). Формат: `N.Nx`.

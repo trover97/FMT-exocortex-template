@@ -16,7 +16,7 @@ consensus: none
 
 1. **Предварительные требования**: VS Code, установленный Kimi Code (Moonshot AI), клонированный IWE.
 2. **Автозагрузка правил**: Kimi Code при открытии репо читает `AGENTS.md` — это базовое «подключение» к культуре IWE.
-3. **Настройка скиллов**: `~/.kimi/config.toml` → `extra_skill_dirs = ["<путь>/IWE/.claude/skills"]` + `merge_all_available_skills = true`. Без этого Kimi не увидит IWE-скиллы (`/kimi-peer-writer`, `/peer-conversation` и др.).
+3. **Настройка скиллов**: `~/.kimi/config.toml` → `extra_skill_dirs = ["<путь>/IWE/.qwen/skills"]` + `merge_all_available_skills = true`. Без этого Kimi не увидит IWE-скиллы (`/kimi-peer-writer`, `/peer-conversation` и др.).
 4. **Проверка**: команда/способ убедиться, что скиллы подхватились.
 5. **Режимы работы**:
    - Peer-сессия Kimi = писатель (`/kimi-peer-writer`)

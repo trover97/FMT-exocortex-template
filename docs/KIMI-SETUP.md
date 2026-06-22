@@ -9,7 +9,7 @@ updated: 2026-06-17
 
 > Для кого: пилот, который форкнул шаблон `FMT-exocortex-template` и хочет работать с IWE через Kimi Code.
 > Время: ~15 минут.
-> Source-of-truth: `AGENTS.md`, `.claude/skills/kimi-peer-writer/SKILL.md`, `.claude/skills/peer-conversation/SKILL.md`.
+> Source-of-truth: `AGENTS.md`, `.qwen/skills/kimi-peer-writer/SKILL.md`, `.qwen/skills/peer-conversation/SKILL.md`.
 
 ## Что получится
 
@@ -22,7 +22,7 @@ updated: 2026-06-17
 - VS Code.
 - Установленное расширение **Kimi Code** (Moonshot AI).
 - Форкнутый и склонированный шаблон `FMT-exocortex-template`.
-- Установленный **Claude Code CLI** (`claude`) — он нужен для peer-сессий, когда Kimi вызывает Claude.
+- Установленный **Qwen Code CLI** (`claude`) — он нужен для peer-сессий, когда Kimi вызывает Claude.
 
 Проверьте, что `claude` доступен:
 
@@ -30,7 +30,7 @@ updated: 2026-06-17
 which claude
 ```
 
-Если команда ничего не вернула — установите Claude Code CLI до начала peer-сессий.
+Если команда ничего не вернула — установите Qwen Code CLI до начала peer-сессий.
 
 ## Как Kimi узнаёт правила IWE
 
@@ -46,14 +46,14 @@ which claude
 
 ## Настройка скиллов IWE
 
-По умолчанию Kimi Code ищет скиллы в стандартных путях (`~/.kimi/skills/`, `<git-root>/.kimi/skills/`). IWE-скиллы лежат в `.claude/skills/` вашего репо, поэтому их нужно подключить вручную.
+По умолчанию Kimi Code ищет скиллы в стандартных путях (`~/.kimi/skills/`, `<git-root>/.kimi/skills/`). IWE-скиллы лежат в `.qwen/skills/` вашего репо, поэтому их нужно подключить вручную.
 
-Откройте файл `~/.kimi/config.toml` и добавьте путь к `.claude/skills` вашего репо в массив `extra_skill_dirs`:
+Откройте файл `~/.kimi/config.toml` и добавьте путь к `.qwen/skills` вашего репо в массив `extra_skill_dirs`:
 
 ```toml
 merge_all_available_skills = true
 extra_skill_dirs = [
-  "/путь/к/FMT-exocortex-template/.claude/skills",
+  "/путь/к/FMT-exocortex-template/.qwen/skills",
   # другие пути, если они уже были
 ]
 ```
@@ -62,7 +62,7 @@ extra_skill_dirs = [
 
 - `~/.kimi/config.toml` — персональный файл на вашей машине, он **не коммитится** в репо.
 - Если `extra_skill_dirs` уже содержит пути (например, к `.kimi/skills` вашего governance-репо) — **добавьте** новый путь в массив, не заменяйте существующие.
-- В массиве должен быть путь к `.claude/skills` **вашего репо**, а не к `.kimi/skills`. Это разные директории.
+- В массиве должен быть путь к `.qwen/skills` **вашего репо**, а не к `.kimi/skills`. Это разные директории.
 - Если путь содержит пробелы или спецсимволы, заключите его в кавычки.
 - После сохранения перезапустите окно Kimi Code или обновите список скиллов.
 
@@ -79,8 +79,8 @@ extra_skill_dirs = [
 2. **Файлы IWE-скиллов на месте**:
 
    ```bash
-   ls /путь/к/FMT-exocortex-template/.claude/skills/kimi-peer-writer/SKILL.md
-   ls /путь/к/FMT-exocortex-template/.claude/skills/peer-conversation/SKILL.md
+   ls /путь/к/FMT-exocortex-template/.qwen/skills/kimi-peer-writer/SKILL.md
+   ls /путь/к/FMT-exocortex-template/.qwen/skills/peer-conversation/SKILL.md
    ```
 
 3. **Скилл откликается в Kimi Code**:
@@ -93,13 +93,13 @@ extra_skill_dirs = [
 
    Если скилл подключён, вы увидите журнал peer-сессий из `sessions/00-index.md`.
 
-Если `/kimi-peer-writer --list` не сработал, проверьте, что в `extra_skill_dirs` указан именно путь к `.claude/skills`, и что `merge_all_available_skills = true`.
+Если `/kimi-peer-writer --list` не сработал, проверьте, что в `extra_skill_dirs` указан именно путь к `.qwen/skills`, и что `merge_all_available_skills = true`.
 
 ## Режимы работы
 
 ### Kimi = писатель, Claude = напарник
 
-Скилл: `/kimi-peer-writer` (`.claude/skills/kimi-peer-writer/SKILL.md`).
+Скилл: `/kimi-peer-writer` (`.qwen/skills/kimi-peer-writer/SKILL.md`).
 
 Триггеры:
 
@@ -113,7 +113,7 @@ Kimi инициирует сессию, пишет начальную позиц
 
 ### Kimi = напарник, Claude = писатель
 
-Скилл: `/peer-conversation` (`.claude/skills/peer-conversation/SKILL.md`).
+Скилл: `/peer-conversation` (`.qwen/skills/peer-conversation/SKILL.md`).
 
 Триггеры:
 
@@ -140,7 +140,7 @@ Claude инициирует сессию и вызывает Kimi через `sc
 
 ## Если что-то не работает
 
-1. Проверьте путь в `extra_skill_dirs` — он должен вести к `.claude/skills` вашего репо.
+1. Проверьте путь в `extra_skill_dirs` — он должен вести к `.qwen/skills` вашего репо.
 2. Убедитесь, что `merge_all_available_skills = true`.
 3. Перезапустите окно Kimi Code.
 4. Проверьте, что `claude` CLI установлен (`which claude`).
@@ -150,6 +150,6 @@ Claude инициирует сессию и вызывает Kimi через `sc
 
 - `AGENTS.md` — правила для всех агентов.
 - `docs/inter-agent-handoff.md` — передача контекста между агентами.
-- `.claude/skills/kimi-peer-writer/SKILL.md` — Kimi как писатель.
-- `.claude/skills/peer-conversation/SKILL.md` — Kimi как напарник.
+- `.qwen/skills/kimi-peer-writer/SKILL.md` — Kimi как писатель.
+- `.qwen/skills/peer-conversation/SKILL.md` — Kimi как напарник.
 - `docs/skills-catalog.md` и `docs/scripts-catalog.md` — каталоги скиллов и скриптов.

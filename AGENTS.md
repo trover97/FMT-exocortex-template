@@ -1,10 +1,10 @@
 # AGENTS.md
 
 > **Для Kimi Code:** этот файл читается автоматически при открытии репо в VS Code. Не редактируй вручную.
-> Кастомизация для Kimi → `extensions/` или `AGENTS-agent-blocks.md`. Claude читает `CLAUDE.md`. Hermes — через Aisystant MCP.
+> Кастомизация для Kimi → `extensions/` или `AGENTS-agent-blocks.md`. Claude читает `QWEN.md`. Hermes — через Aisystant MCP.
 >
 > **Сгенерировано `scripts/sync-agent-instructions.sh`. НЕ РЕДАКТИРОВАТЬ ВРУЧНУЮ.**
-> Общее ядро → блок `<!-- SYNC-CORE -->` в `CLAUDE.md`. Агент-специфика → `AGENTS-agent-blocks.md`.
+> Общее ядро → блок `<!-- SYNC-CORE -->` в `QWEN.md`. Агент-специфика → `AGENTS-agent-blocks.md`.
 
 
 ## WP Gate — CRITICAL
@@ -15,7 +15,7 @@
 
 **NEVER use `git add -u`, `git add .`, or `git add -A`.**
 
-These commands pick up staged/unstaged changes from OTHER agents (Claude Code works in the same repo simultaneously). Wrong attribution and accidental commits of other agents' work result.
+These commands pick up staged/unstaged changes from OTHER agents (Qwen Code works in the same repo simultaneously). Wrong attribution and accidental commits of other agents' work result.
 
 **Always stage only specific files you edited:**
 ```bash
@@ -110,7 +110,7 @@ git commit --amend --trailer "Co-Authored-By: Kimi <noreply@moonshot.ai>"
 git commit -m "feat: description" --trailer "Co-Authored-By: Hermes <noreply@nousresearch.com>"
 ```
 
-**Hermes Agent** — оркестратор в экосистеме IWE (РП392). Подключён к Aisystant MCP, работает через CLI/Telegram. Hermes НЕ заменяет Claude Code или Kimi Code в кодинге — он координирует, запоминает и даёт мобильный доступ.
+**Hermes Agent** — оркестратор в экосистеме IWE (РП392). Подключён к Aisystant MCP, работает через CLI/Telegram. Hermes НЕ заменяет Qwen Code или Kimi Code в кодинге — он координирует, запоминает и даёт мобильный доступ.
 
 ## IWE Instructions Level (Kimi headless)
 
@@ -130,7 +130,7 @@ Determination basis: `get_user_context()` document_count ≥ 5000 + multiple Pac
 
 ## Coordination Protocol (MCP Gateway)
 
-> Для агентов с доступом к Local Gateway (Claude Code, Kimi). Hermes НЕ имеет MCP Gateway
+> Для агентов с доступом к Local Gateway (Qwen Code, Kimi). Hermes НЕ имеет MCP Gateway
 > (`acquire_file_lock` / `release_file_lock`) — он использует `terminal` + `patch` напрямую,
 > а при конфликте на push сообщает пилоту.
 
@@ -158,7 +158,7 @@ Before starting any edit task:
 ## Hermes Agent — координация
 
 Если в экосистеме присутствует Hermes Agent (оркестратор с персистентной памятью, РП-392):
-- Hermes НЕ заменяет Claude Code / Kimi Code в кодинге — координирует, запоминает, даёт мобильный доступ.
+- Hermes НЕ заменяет Qwen Code / Kimi Code в кодинге — координирует, запоминает, даёт мобильный доступ.
 - Hermes НЕ имеет MCP Gateway (`acquire_file_lock` / `release_file_lock`) — правит файлы через `terminal` + `patch`.
 - При правках критичных файлов: сначала `git pull`, проверить `git status`, потом править; конфликт на push — сообщить пилоту.
 

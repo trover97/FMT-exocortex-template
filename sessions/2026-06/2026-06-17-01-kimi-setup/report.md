@@ -19,7 +19,7 @@ confidence: high
 ## 2. Позиции по темам
 
 **Тема 1: механизм подключения скиллов.**
-- **Kimi:** для подключения IWE-скиллов нужно в `~/.kimi/config.toml` указать `merge_all_available_skills = true` и `extra_skill_dirs` с путём к `.claude/skills` репо.
+- **Kimi:** для подключения IWE-скиллов нужно в `~/.kimi/config.toml` указать `merge_all_available_skills = true` и `extra_skill_dirs` с путём к `.qwen/skills` репо.
 - **Claude:** сначала возразил, что это неверифицированное утверждение, потому что в шаблоне нет `.kimi/skills`.
 - **Разрешение:** Kimi привёл фактический `~/.kimi/config.toml` пилота и справочную заметку `{{IWE_GOVERNANCE_REPO}}/exocortex/reference_kimi_config.md`. Claude принял доказательства.
 
@@ -38,7 +38,7 @@ confidence: high
 
 ## 4. Зафиксированное решение [synthesized]
 
-Создать `docs/KIMI-SETUP.md` из 8 разделов: результат, требования, автозагрузка правил, настройка скиллов, smoke-тест, режимы работы, handoff, troubleshooting. Добавить ссылку в `docs/SETUP-GUIDE.md`. В разделе про `extra_skill_dirs` явно предупредить, что путь должен вести к `.claude/skills` репо, а не к `.kimi/skills`.
+Создать `docs/KIMI-SETUP.md` из 8 разделов: результат, требования, автозагрузка правил, настройка скиллов, smoke-тест, режимы работы, handoff, troubleshooting. Добавить ссылку в `docs/SETUP-GUIDE.md`. В разделе про `extra_skill_dirs` явно предупредить, что путь должен вести к `.qwen/skills` репо, а не к `.kimi/skills`.
 
 ## 5. Открытые вопросы и эскалации
 
@@ -60,4 +60,4 @@ confidence: high
 ## 7. Метаданные и навигация
 
 - **Журнал:** `00-writer.md`, `01-peer.md`, `02-writer.md`, `03-peer.md`.
-- **Связанные артефакты:** `AGENTS.md`, `docs/inter-agent-handoff.md`, `.claude/skills/kimi-peer-writer/SKILL.md`, `.claude/skills/peer-conversation/SKILL.md`.
+- **Связанные артефакты:** `AGENTS.md`, `docs/inter-agent-handoff.md`, `.qwen/skills/kimi-peer-writer/SKILL.md`, `.qwen/skills/peer-conversation/SKILL.md`.

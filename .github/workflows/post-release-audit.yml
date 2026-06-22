@@ -58,7 +58,7 @@ jobs:
 
             ## Шаги
 
-            1. Открыть Claude Code сессию в FMT-exocortex-template
+            1. Открыть Qwen Code сессию в FMT-exocortex-template
             2. Скопировать промпт ниже и адаптировать <TARGET-VERSION>
             3. Прогнать через \`Agent\` или sub-agent
             4. Найденные классы → +detector в \`integration-contract-validator.sh\`
