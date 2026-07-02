@@ -17,7 +17,7 @@
 | `/day-close` | Протокол закрытия дня (Day Close). Алиас для /run-protocol close day — симметрия с /day-open. |
 | `/day-open` | Day Open protocol. Collects yesterday's commits, issues, notes, calendar, bot QA, Scout, world events — build… |
 | `/decompose` | Decompose work into stages with physical artifacts and acceptance checklists. Gap detector. Use when opening… |
-| `/diagnose-iwe` | Диагностика ступени мастерства (Диагност R28, FORM.089 §6.1 v5.0) прямо в VS Code / claude.ai. До 6 вопросов,… |
+| `/diagnose` | Диагностика ступени мастерства (Диагност R28, FORM.089 §6.1 v5.0) прямо в VS Code / claude.ai. До 6 вопросов,… |
 | `/discovery-session` | Разговор-распаковка неудовлетворённостей (discovery-стратегирование). Сократический разбор сырой рефлексии и… |
 | `/extend` | IWE extensibility catalog: what can be customized, which extension points exist, which parameters are availab… |
 | `/fpf` | Загрузка применимых принципов для задачи из иерархии Pack → SPF → FPF. Используй когда нужно найти релевантны… |

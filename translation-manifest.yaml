@@ -48,6 +48,11 @@ exclusions:
     - Day Close
     - Week Close
 
+frontmatter_translate_keys:
+  - title
+  - description
+  - summary
+
 # FILE CATEGORIES
 # Д — Documentation: auto-translate via LLM pipeline + glossary
 # И — Instructions (agent): manual adaptation only, CI drift-check
