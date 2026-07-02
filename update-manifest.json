@@ -1,5 +1,5 @@
 {
-  "version": "0.35.4",
+  "version": "0.35.5",
   "description": "Манифест платформенных файлов FMT-exocortex-template. Используется update.sh для доставки обновлений.",
   "files": [
     {
@@ -990,6 +990,7 @@
     "docs/developer/README.md",
     "docs/developer/card-template.md",
     "docs/developer/developer-guide.md",
+    "docs/developer/testing-as-spec.md",
     "docs/maintaining-skills.md",
     "docs/release-audit-log.md",
     "promotion-status.yaml",
@@ -1021,6 +1022,7 @@
     "scripts/day-open-scaffold.sh",
     "scripts/day-open-smoke-extended.sh",
     "scripts/day-open-smoke.sh",
+    "scripts/delivery_checks.py",
     "scripts/fmt-critical-alert.sh",
     "scripts/generate-catalogs.py",
     "scripts/generate-diagnose-skill.py",
@@ -1078,7 +1080,10 @@
     "scripts/test-route-task.sh",
     "scripts/tests/conftest.py",
     "scripts/tests/test_agent_dashboard.py",
+    "scripts/tests/test_delivery_content.py",
+    "scripts/tests/test_delivery_formal.py",
     "scripts/tests/test_skill_promote.py",
+    "scripts/tests/test_translate_delta.py",
     "scripts/translate.py",
     "scripts/validate-fmt-scripts.sh",
     "scripts/validate-skill.sh",
@@ -1143,6 +1148,18 @@
     {
       "path": "strategist-agent/scripts/strategist.sh",
       "reason": "strategist-agent directory removed"
+    },
+    {
+      "path": "roles/strategist/WORKPLAN.md",
+      "reason": "hub-and-spoke antipattern removed in WP-283 2026-05-11"
+    },
+    {
+      "path": ".claude/hooks/wakatime-heartbeat.sh",
+      "reason": "removed from platform in v0.34 — user-installed hook only"
+    },
+    {
+      "path": ".claude/skills/peer-conversation/modes.md",
+      "reason": "removed from platform — moved to peer-conversation skill internals"
     }
   ]
 }
