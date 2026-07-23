@@ -31,8 +31,12 @@ AUTO_YES=false
 FAST_CHECK=false
 
 # Allow extra curl flags via env var (e.g. CURL_OPTS="--insecure" for Windows corporate firewall).
+# --max-time 20: without it a stalled/slow connection hangs update.sh forever with no
+# output (found 2026-07-22, WP-5 Ubuntu-audit — an interactive run produced zero output
+# and had to be killed). CURL_OPTS overrides the whole string, so a caller who needs a
+# different timeout can still set it explicitly.
 # shellcheck disable=SC2086  # $CURL_BASE_OPTS intentionally unquoted (multi-token flag)
-CURL_BASE_OPTS="${CURL_OPTS:-}"
+CURL_BASE_OPTS="${CURL_OPTS:---max-time 20}"
 
 # Windows (msys/cygwin) schannel backend may fail with CRYPT_E_NO_REVOCATION_CHECK.
 # Detect the best available SSL revocation flag without making a network call.
@@ -78,6 +82,54 @@ fi
 hash_file() {
     shasum -a 256 "$1" 2>/dev/null | cut -d' ' -f1 || \
     sha256sum "$1" 2>/dev/null | cut -d' ' -f1
+}
+
+# sed_escape_replacement STR — экранирует &, | и \ для безопасной подстановки
+# STR как replacement в `sed s|...|STR|` (issue #269 verify-фикс). Без этого
+# значение из .exocortex.env, содержащее & (sed: «весь мэтч») или | (наш
+# разделитель) тихо портит подстановку вместо явной ошибки.
+sed_escape_replacement() {
+    printf '%s' "$1" | sed -e 's/[\&|]/\\&/g'
+}
+
+# substitute_claude_placeholders SRC DST — копирует SRC в DST с подставленными
+# {{PLACEHOLDER}} (issue #269). setup.sh подставляет их в workspace/CLAUDE.md И
+# в .claude.md.base при установке; update.sh раньше копировал upstream-файл в
+# 3-way merge и в новый .base сырым — плейсхолдер, который апстрим добавил в
+# CLAUDE.md, приезжал нерезолвленным и застревал в merge-base для всех
+# последующих обновлений. Читает .exocortex.env тем же безопасным парсером,
+# что и Step 5b (только простые KEY=VALUE, без source/eval).
+substitute_claude_placeholders() {
+    local src="$1" dst="$2"
+    local env_file=""
+    [ -f "$WORKSPACE_DIR/.exocortex.env" ] && env_file="$WORKSPACE_DIR/.exocortex.env"
+    [ -z "$env_file" ] && [ -f "$SCRIPT_DIR/.exocortex.env" ] && env_file="$SCRIPT_DIR/.exocortex.env"
+
+    cp "$src" "$dst"
+    [ -z "$env_file" ] && return 0
+    grep -qE '^\s*(source|eval|exec|\.|`|;|\$\()' "$env_file" 2>/dev/null && return 0
+
+    local key value
+    while IFS= read -r line; do
+        case "$line" in \#*|"") continue ;; esac
+        key="${line%%=*}"; value="${line#*=}"
+        key=$(echo "$key" | tr -d '[:space:]')
+        [ -z "$key" ] && continue
+        declare "SUBST_$key=$value"
+    done < "$env_file"
+
+    sed_inplace \
+        -e "s|{{GITHUB_USER}}|$(sed_escape_replacement "${SUBST_GITHUB_USER:-}")|g" \
+        -e "s|{{WORKSPACE_DIR}}|$(sed_escape_replacement "${SUBST_WORKSPACE_DIR:-$WORKSPACE_DIR}")|g" \
+        -e "s|{{CLAUDE_PATH}}|$(sed_escape_replacement "${SUBST_CLAUDE_PATH:-}")|g" \
+        -e "s|{{CLAUDE_PROJECT_SLUG}}|$(sed_escape_replacement "${SUBST_CLAUDE_PROJECT_SLUG:-$CLAUDE_PROJECT_SLUG}")|g" \
+        -e "s|{{TIMEZONE_HOUR}}|$(sed_escape_replacement "${SUBST_TIMEZONE_HOUR:-}")|g" \
+        -e "s|{{TIMEZONE_DESC}}|$(sed_escape_replacement "${SUBST_TIMEZONE_DESC:-}")|g" \
+        -e "s|{{HOME_DIR}}|$(sed_escape_replacement "${SUBST_HOME_DIR:-$HOME}")|g" \
+        -e "s|{{GOVERNANCE_REPO}}|$(sed_escape_replacement "${SUBST_GOVERNANCE_REPO:-}")|g" \
+        -e "s|{{IWE_TEMPLATE}}|$(sed_escape_replacement "${SUBST_IWE_TEMPLATE:-$SCRIPT_DIR}")|g" \
+        -e "s|{{IWE_RUNTIME}}|$(sed_escape_replacement "${SUBST_IWE_RUNTIME:-}")|g" \
+        "$dst"
 }
 
 # Личные L4-конфиги в memory/: update.sh сеет их при ОТСУТСТВИИ (новая инсталляция),
@@ -236,7 +288,12 @@ repair_pass() {
                 fname=$(basename "$fpath")
                 [ "$fname" = "MEMORY.md" ] && continue
                 if [ -d "$CLAUDE_MEMORY_DIR" ]; then
-                    mem_dst="$CLAUDE_MEMORY_DIR/$fname"
+                    # Относительный путь от memory/ сохраняет вложенность (issue #287/#294) —
+                    # basename ронял memory/reference/agent-core.md на плоский memory/agent-core.md,
+                    # и 9 ссылок на него в CLAUDE.md указывали в никуда.
+                    rel="${fpath#memory/}"
+                    mem_dst="$CLAUDE_MEMORY_DIR/$rel"
+                    mkdir -p "$(dirname "$mem_dst")"
                     if [ ! -f "$mem_dst" ]; then
                         cp "$SCRIPT_DIR/$fpath" "$mem_dst"
                         echo "  ⟲ $fpath → memory/ (repair)"
@@ -441,6 +498,27 @@ if [ "$TOTAL_CHANGES" -eq 0 ]; then
         echo "  ℹ Режим --check: repair-pass пропущен (может чинить workspace, запусти без --check)."
     else
         repair_pass
+        # issue #279: TOTAL_CHANGES=0 сравнивает только содержимое файлов, не
+        # версию в update-manifest.json — без этого локальный манифест навсегда
+        # остаётся на старой версии, и --check --fast (сравнивающий только версию)
+        # ложно сообщает об обновлении на каждом следующем прогоне.
+        if [ -f "$MANIFEST" ]; then
+            LOCAL_HASH_BEFORE=$(hash_file "$SCRIPT_DIR/update-manifest.json" 2>/dev/null || true)
+            REMOTE_HASH=$(hash_file "$MANIFEST" 2>/dev/null || true)
+            if [ "$LOCAL_HASH_BEFORE" != "$REMOTE_HASH" ]; then
+                cp "$MANIFEST" "$SCRIPT_DIR/update-manifest.json" \
+                    && echo "  • update-manifest.json: версия синхронизирована (v$UPSTREAM_VERSION)"
+                if is_author_mode; then
+                    git add "$SCRIPT_DIR/update-manifest.json" 2>/dev/null || true
+                else
+                    git add -C "$SCRIPT_DIR" update-manifest.json 2>/dev/null || true
+                fi
+                # pathspec после `--`: коммитить ТОЛЬКО манифест — bare `git commit`
+                # коммитит весь текущий индекс, включая чужое pre-staged (Kimi/Hermes
+                # работают параллельно) под обманчивым "chore: sync..." сообщением.
+                git commit -m "chore: sync update-manifest.json version to v$UPSTREAM_VERSION" --no-verify -- "$SCRIPT_DIR/update-manifest.json" 2>&1 | sed 's/^/  /'
+            fi
+        fi
     fi
     echo "✓ Всё актуально. Обновлений нет. ($UNCHANGED файлов проверено)"
     exit 0
@@ -559,7 +637,8 @@ for f in "${UPDATED_FILES[@]}"; do
     # Special handling for CLAUDE.md: 3-way merge preserving user customizations
     if [ "$f" = "CLAUDE.md" ] && [ -f "$SCRIPT_DIR/$f" ]; then
         BASE_FILE="$SCRIPT_DIR/.claude.md.base"
-        NEW_FILE="$TMPDIR_UPDATE/files/$f"
+        NEW_FILE="$TMPDIR_UPDATE/files/claude-new-substituted.md"
+        substitute_claude_placeholders "$TMPDIR_UPDATE/files/$f" "$NEW_FILE"
         CURRENT_FILE="$SCRIPT_DIR/$f"
 
         if [ -f "$BASE_FILE" ] && command -v git >/dev/null 2>&1; then
@@ -679,9 +758,10 @@ for i in "${!DEPRECATED_FOUND[@]}"; do
             [ -f "$ws_path" ] && rm "$ws_path" && echo "    (также из workspace)"
             ;;
         esac
-        # Also remove from Claude memory dir (memory/* files)
+        # Also remove from Claude memory dir (memory/* files) — relative path from
+        # memory/ (not basename), symmetric with repair_pass() delivery (issue #287).
         case "$f" in memory/*.md|memory/*.yaml|memory/*.yml)
-            mem_path="$CLAUDE_MEMORY_DIR/$(basename "$f")"
+            mem_path="$CLAUDE_MEMORY_DIR/${f#memory/}"
             [ -f "$mem_path" ] && rm "$mem_path" && echo "    (также из memory/)"
             ;;
         esac
@@ -874,6 +954,10 @@ CLAUDE_UPDATED=false
 for f in "${NEW_FILES[@]}" "${UPDATED_FILES[@]}"; do
     if [ "$f" = "CLAUDE.md" ]; then
         # 3-way merge for workspace CLAUDE.md (same logic as repo copy)
+        # WS_NEW уже подставлен (issue #269) — Step 5 выше записал substituted-версию
+        # в $SCRIPT_DIR/CLAUDE.md через substitute_claude_placeholders(); повторный
+        # вызов здесь не нужен и был бы избыточен. Это зависимость от порядка
+        # выполнения циклов, не самодостаточный код — не переставлять Step 5/6 местами.
         WS_BASE="$WORKSPACE_DIR/.claude.md.base"
         WS_CURRENT="$WORKSPACE_DIR/CLAUDE.md"
         WS_NEW="$SCRIPT_DIR/CLAUDE.md"
@@ -927,7 +1011,10 @@ if [ -d "$CLAUDE_MEMORY_DIR" ]; then
         case "$f" in
             memory/*.md|memory/*.yaml|memory/*.yml)
                 fname=$(basename "$f")
-                dst="$CLAUDE_MEMORY_DIR/$fname"
+                # Относительный путь от memory/, не basename — сохраняет вложенность
+                # (memory/reference/agent-core.md), симметрично repair_pass() (issue #287).
+                dst="$CLAUDE_MEMORY_DIR/${f#memory/}"
+                mkdir -p "$(dirname "$dst")"
                 if [ "$fname" != "MEMORY.md" ]; then
                     # issue #229: same owner:user guard as repair_pass() — this loop runs on
                     # every update.sh call (not just repair), so it's the more common path
@@ -1214,6 +1301,20 @@ if $ROLES_CHANGED && command -v launchctl >/dev/null 2>&1; then
                 echo "  ○ $(basename "$role_dir"): переустановите вручную"
         fi
     done
+fi
+
+# === Step 6d2: Regenerate hot-files.list (issue #294/#291) ===
+# hot-files.list ships pre-baked with the author's GOVERNANCE_REPO name; regenerate
+# so verify-context-budget.sh resolves the governance CLAUDE.md on THIS install
+# (script reads GOVERNANCE_REPO from $WORKSPACE_DIR/.exocortex.env itself).
+if [ -f "$SCRIPT_DIR/scripts/generate-hot-files-list.sh" ]; then
+    if $CHECK_ONLY; then
+        echo "  [CHECK] Would regenerate hot-files.list (bash $SCRIPT_DIR/scripts/generate-hot-files-list.sh)"
+    else
+        HOTFILES_OUTPUT=$(IWE_ROOT="$WORKSPACE_DIR" bash "$SCRIPT_DIR/scripts/generate-hot-files-list.sh" 2>&1) && \
+            echo "$HOTFILES_OUTPUT" | sed 's/^/  /' || \
+            { echo "$HOTFILES_OUTPUT" | sed 's/^/  /'; echo "  ⚠ hot-files.list не пересобран — запусти вручную: bash $SCRIPT_DIR/scripts/generate-hot-files-list.sh"; }
+    fi
 fi
 
 # === Step 6e: Replace local manifest with downloaded remote manifest ===

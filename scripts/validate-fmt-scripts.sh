@@ -82,8 +82,17 @@ if [[ "$MODE" != "settings-json" ]]; then
         #   - os.environ.get("GOVERNANCE_REPO", "DS-strategy")  (python fallback)
         #   - GOV_REPO_TMPL="DS-strategy"          (template identity literal)
         #   - VAR="DS-strategy" \                  (env override в команде, line cont)
+        #   - cmd || echo "DS-strategy"            (bare fallback после ||, issue #275)
+        #   - if [ -d "$DIR/DS-strategy" ]; ... case DS-strategy)  (auto-detect идиома,
+        #     физическая проверка существования репо, не хардкод-протечка, issue #275)
         # Запрещено: буквальное имя governance-репо вне fallback-паттерна в исполняемых строках
         # Комментарии (#) пропускаются — документация не влияет на поведение
+        #
+        # issue #275: паттерны "|| echo <literal>" и "if [ -d .../<literal> ]" исключаются
+        # только когда <literal> встречается на строке РОВНО ОДИН раз — иначе, например,
+        # `cd ".../DS-strategy" || echo "DS-strategy"` (реальный хардкод в cd, замаскированный
+        # безопасным fallback-хвостом) прошёл бы незамеченным, т.к. хвост строки матчит
+        # safe-паттерн, даже когда начало строки содержит отдельный, опасный хардкод.
         if grep -q "$AUTHOR_GOV_REPO" "$f" 2>/dev/null; then
             bad_lines=$(grep -n "$AUTHOR_GOV_REPO" "$f" \
                 | grep -v '^\s*#\|^[0-9]*:\s*#' \
@@ -93,6 +102,24 @@ if [[ "$MODE" != "settings-json" ]]; then
                 | grep -vE "os\.environ\.get\([^)]*,[[:space:]]*[\"']" \
                 | grep -vE '^[0-9]*:\s*[A-Z_][A-Z0-9_]*="[^"]*"[[:space:]]*[\\]$' \
                 || true)
+            if [[ -n "$bad_lines" ]]; then
+                bad_lines=$(echo "$bad_lines" | while IFS= read -r bl; do
+                    line_content="${bl#*:}"
+                    occurrences=$(grep -o "$AUTHOR_GOV_REPO" <<<"$line_content" | wc -l | tr -d ' ')
+                    if [[ "$occurrences" -eq 1 ]]; then
+                        if echo "$bl" | grep -qE "\\|\\|[[:space:]]*echo[[:space:]]+\"$AUTHOR_GOV_REPO\"[[:space:]]*\\)?[[:space:]]*\$"; then
+                            continue
+                        fi
+                        if echo "$bl" | grep -qE '^[0-9]*:[[:space:]]*if \[ -d "[^"]*/'"$AUTHOR_GOV_REPO"'" \]; then$'; then
+                            continue
+                        fi
+                        if echo "$bl" | grep -qE '^[0-9]*:[[:space:]]*[A-Za-z0-9_*|-]*\|?'"$AUTHOR_GOV_REPO"'\)[[:space:]]*$'; then
+                            continue
+                        fi
+                    fi
+                    echo "$bl"
+                done)
+            fi
             if [[ -n "$bad_lines" ]]; then
                 echo "  ❌ $fname: '$AUTHOR_GOV_REPO' без env fallback в коде" >&2
                 echo "$bad_lines" | head -3 | sed 's/^/     /' >&2

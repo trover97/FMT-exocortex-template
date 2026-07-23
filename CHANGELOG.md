@@ -110,10 +110,11 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 
 
-## [Unreleased] — обновлено 2026-07-19
+## [0.36.1] — 2026-07-22
 
 ### Added
 
+- feat(wp483): sync guide-kit v0.1.2 into template (снимок Ф9 система №16 + слияние приоритета Портного + degree-контекст)
 - `4484b4c` feat(skill-promote): защита L3-констант через inline-маркер (WP-5)
 - `5aabac2` feat(wp483): sync guide-kit v0.1.1 into template
 

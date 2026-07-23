@@ -78,7 +78,7 @@ WakaTime CLI (`~/.wakatime/wakatime-cli --today`) или Neon-fallback → Бю�
 <!-- Детали: day-close-details.md § Шаг 6 -->
 
 ### 7. Черновик итогов (показать пользователю)
-Обзор (РП × статус) + Что нового узнал + Похвала + Не забыто (dirty repos, /slot часы, мысли, обещания) + Видео + Draft-list + Задел на завтра.
+Обзор (РП × статус) + Что нового узнал + Похвала + Не забыто (dirty repos, /slot часы, мысли, обещания) + Видео + Draft-list + Задел на завтра + **Утренние приоритеты (priorities.yaml)**.
 <!-- Детали: day-close-details.md § Шаг 7 -->
 
 ### 8. Согласование
@@ -86,6 +86,13 @@ WakaTime CLI (`~/.wakatime/wakatime-cli --today`) или Neon-fallback → Бю�
 
 ### 9. Запись итогов
 **9a.** Дописать «Итоги дня» в DayPlan (шаблон: `memory/templates-dayplan.md`). Валидация: «Завтра начать с» непустое + каждый pending РП с конкретным next action. Postcondition: bash-grep по паттерну `Итоги дня|Day summary` (оба языка — issue #234: при `language: english` заголовок DayPlan «Day summary», русский grep всегда FAIL) → `9a OK/FAIL`.
+
+При архивации DayPlan (шаг 3) — frontmatter `status: active` → `status: closed`:
+```bash
+TODAY_DAYPLAN="${IWE_GOVERNANCE_REPO:-DS-strategy}/archive/day-plans/DayPlan $(date +%Y-%m-%d).md"
+[ -f "$TODAY_DAYPLAN" ] && sed -i.bak 's/^status: active$/status: closed/' "$TODAY_DAYPLAN" && rm -f "$TODAY_DAYPLAN.bak"
+```
+Не путать с шагом 10c ниже (P1, WP-5 Ubuntu-audit): гард day-open-pipeline.sh проверяет присутствие архивного DayPlan в git, не это поле — `status: closed` служит только людям/сторонним инструментам, не текущей реализации гарда.
 **9b.** Дописать сводку в WeekReport (`<details>`, обратная хронология). Fallback на WeekPlan если нет WeekReport. Postcondition: bash-grep по паттерну `Сводка|Results` (оба языка — issue #234) → `9b OK/FAIL`.
 `*a/*b FAIL` → НЕ помечать completed, вернуться к записи.
 <!-- Детали postconditions: day-close-details.md § Шаг 9 -->
@@ -95,6 +102,18 @@ WakaTime CLI (`~/.wakatime/wakatime-cli --today`) или Neon-fallback → Бю�
 
 ### 10b. Финальный коммит (все затронутые репозитории, не только governance)
 `git status --short` по КАЖДОМУ репо, который сессия трогала за день — как минимум workspace root (`{{HOME_DIR}}/IWE/`, там физически лежат `MEMORY.md` и `memory/*.md`, их правят шаги 4б/4) и `${IWE_GOVERNANCE_REPO:-DS-strategy}` (WeekPlan/DayPlan/WP-REGISTRY). Незафиксированное → `git add <specific paths>` → commit → push. Переходить к шагу 11 только когда `git status` чист во всех репо.
+
+### 10c. Heartbeat для Day Open guard
+Пишется ПОСЛЕ push шага 10b — DayPlan уже реально закоммичен. day-open-pipeline.sh на следующий день читает этот файл как сигнал «Day Close сделан» (fallback — присутствие архивного DayPlan в git, симметрично day-open):
+```bash
+mkdir -p ~/.claude/state
+jq -n \
+  --arg date "$(date +%Y-%m-%d)" \
+  --arg commit "$(git -C "${IWE_GOVERNANCE_REPO:-DS-strategy}" rev-parse HEAD)" \
+  --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+  '{date: $date, commit_hash: $commit, timestamp: $ts, status: "success"}' \
+  > ~/.claude/state/day-close-last-success.json
+```
 
 ### 11. Верификация (Haiku R23)
 Sub-agent Haiku R23 (context isolation): передать чеклист + черновик итогов + список обновлённых файлов. По ❌ — исправить до показа пользователю.
