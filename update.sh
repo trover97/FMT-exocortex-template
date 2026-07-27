@@ -21,7 +21,7 @@ EXIT_GENERAL=1
 
 trap 'echo "ОШИБКА: update.sh прервался на строке ${LINENO}: ${BASH_COMMAND}" >&2' ERR
 
-VERSION="2.4.0"  # fix #229: repair-pass no longer stale-repairs memory files with owner: user in frontmatter; fix #228: hot-budget validator warns when memory/*.md horizon:hot lines exceed threshold
+VERSION="2.4.1"  # fix (WP-401): deprecated-file removal now checks is_protected_user_file() — a protected file (e.g. sessions/00-index.md) listed in deprecated_files by mistake could previously be deleted despite the "Не затрагиваются" report claiming otherwise; fix #229: repair-pass no longer stale-repairs memory files with owner: user in frontmatter; fix #228: hot-budget validator warns when memory/*.md horizon:hot lines exceed threshold
 REPO="TserenTserenov/FMT-exocortex-template" # UPSTREAM-CONST: do not substitute
 BRANCH="main"
 RAW_BASE="https://raw.githubusercontent.com/$REPO/$BRANCH"
@@ -114,6 +114,13 @@ substitute_claude_placeholders() {
         case "$line" in \#*|"") continue ;; esac
         key="${line%%=*}"; value="${line#*=}"
         key=$(echo "$key" | tr -d '[:space:]')
+        # issue #316-fix2: значения в .exocortex.env процитированы с #223 —
+        # этот парсер читает файл строкой, не через `source`, поэтому кавычки
+        # остаются частью значения буквально (не синтаксис, а данные) и
+        # подставились бы в CLAUDE.md как есть, напр. {{TIMEZONE_DESC}} → "4:00 UTC".
+        # Тот же паттерн снятия кавычек, что уже применён к этому файлу в другом
+        # non-source парсере (см. ENV_WS/ENV_GOV ниже по файлу).
+        value=$(echo "$value" | tr -d '"' | tr -d "'")
         [ -z "$key" ] && continue
         declare "SUBST_$key=$value"
     done < "$env_file"
@@ -130,6 +137,19 @@ substitute_claude_placeholders() {
         -e "s|{{IWE_TEMPLATE}}|$(sed_escape_replacement "${SUBST_IWE_TEMPLATE:-$SCRIPT_DIR}")|g" \
         -e "s|{{IWE_RUNTIME}}|$(sed_escape_replacement "${SUBST_IWE_RUNTIME:-}")|g" \
         "$dst"
+}
+
+# Protected user files (issue #154): once seeded, these hold user-authored content
+# (permissions, memory, peer-session journal) — update.sh must never touch them again,
+# neither overwrite (download loop) nor delete (deprecated-file cleanup). Single source
+# of truth for both checks — a file listed here but not the other used to silently lose
+# its delete-protection (bug found 2026-07-23, sessions/00-index.md deleted despite being
+# in the "Не затрагиваются" report section — see WP-401 Ф6.1 write-up).
+is_protected_user_file() {
+    case "$1" in
+        params.yaml|memory/MEMORY.md|.claude/settings.local.json|sessions/00-index.md) return 0 ;;
+        *) return 1 ;;
+    esac
 }
 
 # Личные L4-конфиги в memory/: update.sh сеет их при ОТСУТСТВИИ (новая инсталляция),
@@ -250,15 +270,59 @@ UPSTREAM_VERSION=$(grep '"version"' "$MANIFEST" | head -1 | sed 's/.*"version"[[
 echo "  Версия upstream: $UPSTREAM_VERSION"
 echo ""
 
-# === Fast check (issue #230): version-only comparison, skips the ~330-file download loop ===
+# === Fast check (issue #230): manifest-content comparison, skips the ~330-file download loop ===
 # Достаточно для светофора Day Open (шаг 5) — полный список изменений всё ещё
 # доступен через `--check` без `--fast`.
+#
+# issue #288: version-only сравнение молчало, когда files[] менялся (файлы
+# добавлены/удалены/переименованы) без бампа версии — «✓ обновлений нет»,
+# хотя доступны новые файлы. Манифест уже скачан выше (Step 1), поэтому
+# сравнение хэша files[] той же стоимости, что версии, но ловит состав, не
+# только номер. python3 недоступен → откат на version-only с явной пометкой
+# (не тихий даунгрейд гарантии).
 if $CHECK_ONLY && $FAST_CHECK; then
     LOCAL_MANIFEST="$SCRIPT_DIR/update-manifest.json"
     LOCAL_VERSION=""
     [ -f "$LOCAL_MANIFEST" ] && LOCAL_VERSION=$(grep '"version"' "$LOCAL_MANIFEST" | head -1 | sed 's/.*"version"[[:space:]]*:[[:space:]]*"//;s/".*//')
-    if [ -n "$LOCAL_VERSION" ] && [ "$LOCAL_VERSION" = "$UPSTREAM_VERSION" ]; then
-        echo "✓ Версия совпадает с upstream (v$UPSTREAM_VERSION). Обновлений нет."
+
+    if command -v python3 >/dev/null 2>&1 && [ -f "$LOCAL_MANIFEST" ]; then
+        FILES_MATCH=$(python3 -c "
+import json, sys
+def files_key(path):
+    try:
+        with open(path) as f:
+            data = json.load(f)
+    except Exception:
+        return None
+    return sorted(json.dumps(f, sort_keys=True) for f in data.get('files', []))
+local_files = files_key('$LOCAL_MANIFEST')
+upstream_files = files_key('$MANIFEST')
+if local_files is None or upstream_files is None:
+    print('unknown')
+else:
+    print('match' if local_files == upstream_files else 'differ')
+" 2>/dev/null)
+        VERSIONS_MATCH=false
+        [ -n "$LOCAL_VERSION" ] && [ "$LOCAL_VERSION" = "$UPSTREAM_VERSION" ] && VERSIONS_MATCH=true
+        # issue #288 review fix: FILES_MATCH="unknown" (manifest JSON unparseable
+        # on either side) used to fall into the generic "версия отличается" branch
+        # even when the two version STRINGS were in fact identical — printed the
+        # same version number twice while claiming a mismatch. Four distinct cases
+        # now, not three collapsed into one catch-all.
+        if [ "$FILES_MATCH" = "match" ] && $VERSIONS_MATCH; then
+            echo "✓ Версия и состав манифеста совпадают с upstream (v$UPSTREAM_VERSION). Обновлений нет."
+        elif [ "$FILES_MATCH" = "differ" ]; then
+            echo "⚠ Состав манифеста изменился (файлы добавлены/удалены/обновлены)."
+            echo "  Для полного списка изменений: bash update.sh --check (без --fast)."
+        elif $VERSIONS_MATCH; then
+            echo "⚠ Версия совпадает (v$UPSTREAM_VERSION), но не удалось сверить состав манифеста (не распарсился JSON)."
+            echo "  Для полного списка изменений: bash update.sh --check (без --fast)."
+        else
+            echo "⚠ Версия отличается: локально v${LOCAL_VERSION:-неизвестно}, upstream v$UPSTREAM_VERSION."
+            echo "  Для полного списка изменений: bash update.sh --check (без --fast)."
+        fi
+    elif [ -n "$LOCAL_VERSION" ] && [ "$LOCAL_VERSION" = "$UPSTREAM_VERSION" ]; then
+        echo "✓ Версия совпадает с upstream (v$UPSTREAM_VERSION). python3 не найден — состав манифеста не сверен."
     else
         echo "⚠ Версия отличается: локально v${LOCAL_VERSION:-неизвестно}, upstream v$UPSTREAM_VERSION."
         echo "  Для полного списка изменений: bash update.sh --check (без --fast)."
@@ -395,14 +459,12 @@ DOWNLOAD_IDX=0
 while IFS='|' read -r fpath fdesc; do
     [ -z "$fpath" ] && continue
     # Protected user files (issue #154): never overwrite if they already exist locally.
-    # The "Не затрагиваются" list below is cosmetic; this is the actual skip-if-exists guard.
-    case "$fpath" in
-        params.yaml|memory/MEMORY.md|.claude/settings.local.json|sessions/00-index.md)
-            if [ -f "$SCRIPT_DIR/$fpath" ]; then
-                UNCHANGED=$((UNCHANGED + 1))
-                continue
-            fi ;;
-    esac
+    # The "Не затрагиваются" list below is cosmetic; is_protected_user_file() is the
+    # actual skip-if-exists guard (shared with the deprecated-file removal loop below).
+    if is_protected_user_file "$fpath" && [ -f "$SCRIPT_DIR/$fpath" ]; then
+        UNCHANGED=$((UNCHANGED + 1))
+        continue
+    fi
     DOWNLOAD_IDX=$((DOWNLOAD_IDX + 1))
     printf "  (%s/%s) %s\r" "$DOWNLOAD_IDX" "$TOTAL_FILES" "$fpath"
 
@@ -466,6 +528,10 @@ DEPRECATED_REASONS=()
 
 while IFS='|' read -r fpath freason; do
     [ -z "$fpath" ] && continue
+    # Same guard as the download loop above: a protected user file must never be
+    # deleted either, even if a future manifest lists it as deprecated by mistake
+    # (bug found 2026-07-23 — sessions/00-index.md was listed, protection didn't apply).
+    is_protected_user_file "$fpath" && continue
     if [ -f "$SCRIPT_DIR/$fpath" ]; then
         DEPRECATED_FOUND+=("$fpath")
         DEPRECATED_REASONS+=("${freason:-устарел}")
@@ -616,8 +682,11 @@ for f in "${NEW_FILES[@]}"; do
     mkdir -p "$SCRIPT_DIR/$(dirname "$f")"
     cp "$TMPDIR_UPDATE/files/$f" "$SCRIPT_DIR/$f"
     APPLIED_PATHS+=("$f")
-    # Make scripts executable
-    case "$f" in *.sh) chmod +x "$SCRIPT_DIR/$f" ;; esac
+    # Make scripts executable — files arrive via raw `curl -o` (no file-mode
+    # metadata survives), so the +x bit must be reapplied explicitly here.
+    # issue #308: .githooks/* is not cosmetic (git silently skips a non-executable
+    # hook); wp-list.py/check-claude-md-links.py are git-tracked 755 upstream.
+    case "$f" in *.sh|.githooks/*|scripts/wp-list.py|scripts/check-claude-md-links.py) chmod +x "$SCRIPT_DIR/$f" ;; esac
     echo "  + $f"
     APPLIED=$((APPLIED + 1))
 done
@@ -702,7 +771,8 @@ for f in "${UPDATED_FILES[@]}"; do
         fi
     else
         cp "$TMPDIR_UPDATE/files/$f" "$SCRIPT_DIR/$f"
-        case "$f" in *.sh) chmod +x "$SCRIPT_DIR/$f" ;; esac
+        # issue #308: same +x reapply as the NEW_FILES loop above (curl fetch drops file mode).
+        case "$f" in *.sh|.githooks/*|scripts/wp-list.py|scripts/check-claude-md-links.py) chmod +x "$SCRIPT_DIR/$f" ;; esac
         echo "  ~ $f"
     fi
     APPLIED=$((APPLIED + 1))
@@ -807,6 +877,10 @@ if [ -f "$ENV_FILE" ]; then
             value="${line#*=}"
             # Trim whitespace from key
             key=$(echo "$key" | tr -d '[:space:]')
+            # issue #316-fix2: см. тот же комментарий в substitute_claude_placeholders() —
+            # non-source парсер, кавычки из процитированных (#223) значений остаются
+            # буквально в строке и ломают DETECT_WS/[ -d ... ] ниже без снятия.
+            value=$(echo "$value" | tr -d '"' | tr -d "'")
             [ -z "$key" ] && continue
             # Export for use below (secrets: L4_DATABASE_URL etc. are loaded but not substituted into files)
             declare "ENV_$key=$value"
@@ -901,16 +975,19 @@ else
     DETECTED_WORKSPACE="$WORKSPACE_DIR"
     DETECTED_REPO="$(basename "$SCRIPT_DIR")"
 
+    # issue #316: значения ВСЕГДА в кавычках — тот же паттерн, что setup.sh
+    # применил для #223. Непроцитированное значение с пробелом (напр.
+    # TIMEZONE_DESC=4:00 UTC) ломает sourcing ('UTC: command not found').
     cat > "$ENV_FILE" <<ENVEOF
 # Exocortex configuration (auto-detected by update.sh — verify and fix values)
 # SECURITY: chmod 600. Listed in .gitignore. Do NOT commit this file.
-GITHUB_USER=your-username
-WORKSPACE_DIR=$DETECTED_WORKSPACE
-CLAUDE_PATH=$(command -v claude 2>/dev/null || echo 'claude')
-CLAUDE_PROJECT_SLUG=$(echo "$DETECTED_WORKSPACE" | tr '/' '-')
-TIMEZONE_HOUR=4
-TIMEZONE_DESC=4:00 UTC
-HOME_DIR=$HOME
+GITHUB_USER="your-username"
+WORKSPACE_DIR="$DETECTED_WORKSPACE"
+CLAUDE_PATH="$(command -v claude 2>/dev/null || echo 'claude')"
+CLAUDE_PROJECT_SLUG="$(echo "$DETECTED_WORKSPACE" | tr '/' '-')"
+TIMEZONE_HOUR="4"
+TIMEZONE_DESC="4:00 UTC"
+HOME_DIR="$HOME"
 
 # === Knowledge Gateway (T3+) — fill in if using personal Pack index ===
 L4_BACKEND=
@@ -951,58 +1028,69 @@ echo "Обновление platform-space..."
 
 # Copy CLAUDE.md to workspace root
 CLAUDE_UPDATED=false
-for f in "${NEW_FILES[@]}" "${UPDATED_FILES[@]}"; do
-    if [ "$f" = "CLAUDE.md" ]; then
-        # 3-way merge for workspace CLAUDE.md (same logic as repo copy)
-        # WS_NEW уже подставлен (issue #269) — Step 5 выше записал substituted-версию
-        # в $SCRIPT_DIR/CLAUDE.md через substitute_claude_placeholders(); повторный
-        # вызов здесь не нужен и был бы избыточен. Это зависимость от порядка
-        # выполнения циклов, не самодостаточный код — не переставлять Step 5/6 местами.
-        WS_BASE="$WORKSPACE_DIR/.claude.md.base"
-        WS_CURRENT="$WORKSPACE_DIR/CLAUDE.md"
-        WS_NEW="$SCRIPT_DIR/CLAUDE.md"
-
-        if [ -f "$WS_BASE" ] && [ -f "$WS_CURRENT" ] && command -v git >/dev/null 2>&1; then
-            WS_MERGE_TMP="$TMPDIR_UPDATE/ws-claude-merge.md"
-            cp "$WS_CURRENT" "$WS_MERGE_TMP"
-            if git merge-file -p "$WS_MERGE_TMP" "$WS_BASE" "$WS_NEW" > "$TMPDIR_UPDATE/ws-claude-merged.md" 2>/dev/null; then
-                cp "$TMPDIR_UPDATE/ws-claude-merged.md" "$WS_CURRENT"
-                cp "$WS_NEW" "$WS_BASE"
-                echo "  ✓ $WS_CURRENT обновлён (3-way merge)"
-            else
-                WS_CONFLICTS=$(grep -c '^<<<<<<<' "$TMPDIR_UPDATE/ws-claude-merged.md" 2>/dev/null || true); WS_CONFLICTS=${WS_CONFLICTS:-0}
-                cp "$TMPDIR_UPDATE/ws-claude-merged.md" "$WS_CURRENT"
-                cp "$WS_NEW" "$WS_BASE"
-                CLAUDE_CONFLICTS=$((CLAUDE_CONFLICTS + WS_CONFLICTS))
-                if [ "$WS_CONFLICTS" -gt 0 ]; then
-                    # issue #226: don't abort here — a CLAUDE.md conflict is an isolated
-                    # artifact, not a reason to skip the rest of the delivery (memory/hooks/
-                    # skills propagation, repair-pass, commit). Warn now, fail at the end.
-                    echo "  ~ $WS_CURRENT ($WS_CONFLICTS конфликтов — разрешите вручную)"
-                    echo "    Конфликты обозначены <<<<<<< / ======= / >>>>>>>"
-                    CLAUDE_CONFLICT_DETECTED=true
-                    CLAUDE_CONFLICT_FILES+=("$WS_CURRENT")
-                else
-                    echo "  ✓ $WS_CURRENT обновлён (3-way merge)"
-                fi
-            fi
-        else
-            # Fallback: USER-SPACE preserve (first update or no git)
-            if [ -f "$WS_CURRENT" ]; then
-                WS_USER_SECTION=$(sed -n '/^<!-- USER-SPACE/,/^<!-- \/USER-SPACE/p' "$WS_CURRENT")
-            fi
-            cp "$WS_NEW" "$WS_CURRENT"
-            if [ -n "${WS_USER_SECTION:-}" ]; then
-                sed_inplace '/^<!-- USER-SPACE/,/^<!-- \/USER-SPACE/d' "$WS_CURRENT"
-                echo "" >> "$WS_CURRENT"
-                echo "$WS_USER_SECTION" >> "$WS_CURRENT"
-            fi
-            cp "$WS_NEW" "$WS_BASE"
-            echo "  ✓ $WS_CURRENT обновлён (базовый файл создан)"
-        fi
-        CLAUDE_UPDATED=true
+# issue #289: раньше это было гейтом по членству "CLAUDE.md" в NEW_FILES/
+# UPDATED_FILES этого прогона — если Step 5 упал на конфликте, пилот разрешил
+# маркеры вручную и перезапустил update.sh, FMT-копия во втором прогоне уже ==
+# upstream → в UPDATED_FILES ничего не попадает → Step 6 молча пропускался,
+# workspace-копия и её .claude.md.base замирали навсегда без предупреждения.
+# Теперь триггер — реальное расхождение база/FMT-копия, а не факт правки в
+# ЭТОМ прогоне: закрывает и обрыв-и-перезапуск, и любой другой пропуск Step 5.
+NEEDS_WS_CLAUDE_SYNC=false
+if [ -f "$SCRIPT_DIR/CLAUDE.md" ]; then
+    if [ ! -f "$WORKSPACE_DIR/.claude.md.base" ] || ! diff -q "$WORKSPACE_DIR/.claude.md.base" "$SCRIPT_DIR/CLAUDE.md" >/dev/null 2>&1; then
+        NEEDS_WS_CLAUDE_SYNC=true
     fi
-done
+fi
+if [ "$NEEDS_WS_CLAUDE_SYNC" = "true" ]; then
+    # 3-way merge for workspace CLAUDE.md (same logic as repo copy)
+    # WS_NEW уже подставлен (issue #269) — Step 5 выше записал substituted-версию
+    # в $SCRIPT_DIR/CLAUDE.md через substitute_claude_placeholders(); повторный
+    # вызов здесь не нужен и был бы избыточен. Это зависимость от порядка
+    # выполнения циклов, не самодостаточный код — не переставлять Step 5/6 местами.
+    WS_BASE="$WORKSPACE_DIR/.claude.md.base"
+    WS_CURRENT="$WORKSPACE_DIR/CLAUDE.md"
+    WS_NEW="$SCRIPT_DIR/CLAUDE.md"
+
+    if [ -f "$WS_BASE" ] && [ -f "$WS_CURRENT" ] && command -v git >/dev/null 2>&1; then
+        WS_MERGE_TMP="$TMPDIR_UPDATE/ws-claude-merge.md"
+        cp "$WS_CURRENT" "$WS_MERGE_TMP"
+        if git merge-file -p "$WS_MERGE_TMP" "$WS_BASE" "$WS_NEW" > "$TMPDIR_UPDATE/ws-claude-merged.md" 2>/dev/null; then
+            cp "$TMPDIR_UPDATE/ws-claude-merged.md" "$WS_CURRENT"
+            cp "$WS_NEW" "$WS_BASE"
+            echo "  ✓ $WS_CURRENT обновлён (3-way merge)"
+        else
+            WS_CONFLICTS=$(grep -c '^<<<<<<<' "$TMPDIR_UPDATE/ws-claude-merged.md" 2>/dev/null || true); WS_CONFLICTS=${WS_CONFLICTS:-0}
+            cp "$TMPDIR_UPDATE/ws-claude-merged.md" "$WS_CURRENT"
+            cp "$WS_NEW" "$WS_BASE"
+            CLAUDE_CONFLICTS=$((CLAUDE_CONFLICTS + WS_CONFLICTS))
+            if [ "$WS_CONFLICTS" -gt 0 ]; then
+                # issue #226: don't abort here — a CLAUDE.md conflict is an isolated
+                # artifact, not a reason to skip the rest of the delivery (memory/hooks/
+                # skills propagation, repair-pass, commit). Warn now, fail at the end.
+                echo "  ~ $WS_CURRENT ($WS_CONFLICTS конфликтов — разрешите вручную)"
+                echo "    Конфликты обозначены <<<<<<< / ======= / >>>>>>>"
+                CLAUDE_CONFLICT_DETECTED=true
+                CLAUDE_CONFLICT_FILES+=("$WS_CURRENT")
+            else
+                echo "  ✓ $WS_CURRENT обновлён (3-way merge)"
+            fi
+        fi
+    else
+        # Fallback: USER-SPACE preserve (first update or no git)
+        if [ -f "$WS_CURRENT" ]; then
+            WS_USER_SECTION=$(sed -n '/^<!-- USER-SPACE/,/^<!-- \/USER-SPACE/p' "$WS_CURRENT")
+        fi
+        cp "$WS_NEW" "$WS_CURRENT"
+        if [ -n "${WS_USER_SECTION:-}" ]; then
+            sed_inplace '/^<!-- USER-SPACE/,/^<!-- \/USER-SPACE/d' "$WS_CURRENT"
+            echo "" >> "$WS_CURRENT"
+            echo "$WS_USER_SECTION" >> "$WS_CURRENT"
+        fi
+        cp "$WS_NEW" "$WS_BASE"
+        echo "  ✓ $WS_CURRENT обновлён (базовый файл создан)"
+    fi
+    CLAUDE_UPDATED=true
+fi
 
 # Copy memory files to Claude projects directory
 if [ -d "$CLAUDE_MEMORY_DIR" ]; then
