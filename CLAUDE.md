@@ -23,7 +23,7 @@
 1. **WP Gate:** ЛЮБОЕ задание → `memory/protocol-open.md` ДО начала работы. Новый РП → Ритуал согласования → явное «да»/«делаем»/«открывай»; без этого не регистрировать.
 2. **Push:** «заливай»/«запуши»/«закрывай» → commit + push без вопросов, ДО отчёта Закрытия. Любой Close: `git status --short` по всем репо → незафиксированное commit + push ДО следующего шага.
 3. **Close:** Триггер Закрытия → протокол Закрытия → выполнить.
-4. **Pull-on-Touch:** `git pull --rebase` при первом обращении к репо за сессию (все `/Users/avlakriv/IWE/*`). Dirty → stash; конфликт → `memory/reference/agent-core.md`.
+4. **Pull-on-Touch:** PreToolUse-хук автоматически делает best-effort `git pull --rebase --autostash` один раз на репо. Не выполняй ручной `cd && git pull`; при сбое хук сообщает `potentially stale`, процедура → `memory/reference/agent-core.md`.
 5. **Чеклист-верификация:** Quick/Day Close — sub-agent Haiku R23 сверяет с чеклистом. Исключения: ≤15 мин или без изменений файлов.
 6. **Hooks/Scripts Bypass Gate (S-33):** без явного разрешения не менять `.claude/hooks|scripts/`, `.iwe-runtime/`, `FMT-exocortex-template/`, не обходить хуки; блок хука → bug-файл + пилоту + ждать. → `.claude/rules-lazy/hooks-bypass-gate.md`.
 7. **Автономность:** не спрашивать подтверждения — выполни → отчитайся. Исключения: необратимо-разрушительное; WP Gate Ритуал; choice-question. Полный текст → `.claude/rules-lazy/blocking-rules-full.md` п.7.
@@ -82,7 +82,7 @@ Hot-каркас ≤20K токенов (M1), строгая цель ≤12K (M2)
 
 ## Agent Core (SYNC-CORE → AGENTS.md)
 
-> **WP-394 Ф4.2.** Единое ядро для всех агентов (Claude, Kimi, Hermes). `AGENTS.md` генерируется отсюда скриптом `scripts/sync-agent-instructions.sh` — **не редактировать `AGENTS.md` вручную**. Элаборация → `memory/reference/agent-core.md`.
+> **WP-394 Ф4.2.** Единое ядро для всех агентов (Claude, Kimi, Codex, Hermes). `AGENTS.md` генерируется отсюда скриптом `scripts/sync-agent-instructions.sh` — **не редактировать `AGENTS.md` вручную**. Элаборация → `memory/reference/agent-core.md`.
 
 <!-- SYNC-CORE-START -->
 
@@ -112,7 +112,7 @@ Discrepancy found (file ≠ plan, stale content): **report to pilot, do not sile
 
 ## Status Reporting — Agent Status Registry (РП-395)
 
-**Primary (обязательно):** в начале задачи `agent_status_update(agent=<claude-code|kimi|hermes>, status=working, task=<кратко>, files=[...])`; по завершении — `status=idle`. Статусы: `idle|working|peer-session|blocked`; пилот видит всех через `agent_status_list`. Командный режим (`repo=`) и fail-safe скрипт → `memory/reference/agent-core.md`.
+**Primary (обязательно):** в начале задачи `agent_status_update(agent=<claude-code|kimi|codex|hermes>, status=working, task=<кратко>, files=[...])`; по завершении — `status=idle`. Статусы: `idle|working|peer-session|blocked`; пилот видит всех через `agent_status_list`. Командный режим (`repo=`) и fail-safe скрипт → `memory/reference/agent-core.md`.
 
 ## Long Operation Protocol — 180 s Silence Threshold
 
