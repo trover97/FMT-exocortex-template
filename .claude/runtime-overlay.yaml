@@ -85,6 +85,7 @@ placeholders:
   - GOVERNANCE_REPO
   - IWE_TEMPLATE      # путь к FMT (read-only upstream)
   - IWE_RUNTIME       # путь к $WORKSPACE_DIR/.iwe-runtime/ (writable substituted)
+  - USER_NAME         # unix-логин (LaunchAgent env: без USER/LOGNAME claude CLI не резолвит логин — "Not logged in" при launchd-запуске)
 
 # === Runtime layout (что появляется в $WORKSPACE_DIR/ после build-runtime.sh) ===
 #
