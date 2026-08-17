@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "version": "0.38.3",
+  "version": "0.38.4",
   "description": "Манифест платформенных файлов FMT-exocortex-template. Используется update.sh для доставки обновлений.",
   "files": [
     {
@@ -229,7 +229,7 @@
     },
     {
       "path": ".claude/runtime-overlay.yaml",
-      "sha256": "d1abe1101e48aa8187acf8e96aec286313c410174ef1fb2d80b7b9a33471e4bc"
+      "sha256": "8a7a0cfcd3606ab80d76fbf3aaf8dec71c2079c01070130ad50913e9e1e30b36"
     },
     {
       "path": ".claude/scripts/check-index-health.py",
@@ -261,7 +261,7 @@
     },
     {
       "path": ".claude/scripts/wp-sync-bundle.sh",
-      "sha256": "cbb565d904644e70489a32e5df117239283a92a76794362fcac305c72ad4fa35"
+      "sha256": "7881aab93ca6f0d8a20d10f587b5faa731a5445244b950a02abe9e79fe3a0f10"
     },
     {
       "path": ".claude/settings.json",
@@ -653,7 +653,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "1a4d72d70e384d2ea6b7b0b18fab93328b00809deb49c750596c8013c72d61e8"
+      "sha256": "f6d88e3bc47a30d9f561b68934078bf7e286de880cc5926e02864a161b137b4d"
     },
     {
       "path": "CLAUDE.md",
@@ -686,6 +686,10 @@
     {
       "path": "docs/CLOUD-SCHEDULER.md",
       "sha256": "5d4510a031d43cc85cd16735ec3a3a7490a8c14822622fb73902abd068b588cd"
+    },
+    {
+      "path": "docs/DATA-DOMAINS-REGISTRY.yaml",
+      "sha256": "45d88d5f96f662d4708c1db7dae448a1afdffe8340f926b7028d39b60ec245d2"
     },
     {
       "path": "docs/DATA-POLICY.md",
@@ -760,6 +764,10 @@
       "sha256": "641a2bc17471a86b1819a05177eaa5e8583ed44bd9ac8d08e879e7d60ec8006a"
     },
     {
+      "path": "docs/adr/ADR-004-data-domain-map.md",
+      "sha256": "5557957af5744ec4765e5a26a2c0e377613cc1aab480e9e1462199ef6a595deb"
+    },
+    {
       "path": "docs/agent-coordination-manifest.md",
       "sha256": "532c87fa48d758839890d5ccdfef9bfc959e18b95ad48ff633555ca4e10e7f33"
     },
@@ -769,7 +777,7 @@
     },
     {
       "path": "docs/hindsight-setup.md",
-      "sha256": "e861597999c50406c300b9dd671446c8c8c27b9b82ec2a6c6ef07f2aea3aea3f"
+      "sha256": "db3f6ba15eb8d45871cb772dfef40fa670107445cf4bac80084ae9764a1f2f36"
     },
     {
       "path": "docs/inter-agent-handoff.md",
@@ -865,7 +873,7 @@
     },
     {
       "path": "extensions/agent-inbox/scripts/iwe-agent-dispatcher.py",
-      "sha256": "53a9a4916563f10849b0590584ebf0ea2452b8263ee2c99fe4938bd7dc418960"
+      "sha256": "d736ab9d8b2c7d3c51f1b03a43e230b9ce6b0c11c8e0ec3440add731cbe78fd2"
     },
     {
       "path": "extensions/agent-inbox/templates/_template.md",
@@ -953,7 +961,15 @@
     },
     {
       "path": "extensions/strategy-cycle/SPEC.md",
-      "sha256": "11dc6bde6782588e40a8c733ca04628a2f310a96d07363ef61a568d8fb69daca"
+      "sha256": "24df14999e91c3d51c4f2a6556fd6c90e67aa8bc94b17b808bc81a8dfbea8e68"
+    },
+    {
+      "path": "extensions/strategy-cycle/scripts/test-validate-event.sh",
+      "sha256": "66c5009439715c2103af2c42fad62c9ac749f91c66f88d4ff067f51385b6ac6c"
+    },
+    {
+      "path": "extensions/strategy-cycle/scripts/validate-event.sh",
+      "sha256": "6a201fdbf5149798f6843d1c1bcce820eb4dc82b695c9044ee33b606fecd0a69"
     },
     {
       "path": "guide-kit/.gitignore",
@@ -1333,7 +1349,7 @@
     },
     {
       "path": "memory/protocol-open.md",
-      "sha256": "838b7a9b7becb7a09b61dc2338147e29f9f2b00f26d1a084686a75c0fbe0c9e6"
+      "sha256": "fe6c7ab7e9c4382b831b3bf58985c6ce5c6d8ef667834efa3d2e80759fb7778a"
     },
     {
       "path": "memory/protocol-work.md",
@@ -1469,7 +1485,7 @@
     },
     {
       "path": "roles/extractor/prompts/inbox-check.md",
-      "sha256": "a2fa14ca7b56e477dcc2de15f6dc632e266106dab3c43eabf8303e6cdc5af09a"
+      "sha256": "e0d869263a97a5541d5a24635572490e2e9f37a59ac62ea36d387284cfcd9074"
     },
     {
       "path": "roles/extractor/prompts/knowledge-audit.md",
@@ -1493,11 +1509,11 @@
     },
     {
       "path": "roles/extractor/scripts/extractor.sh",
-      "sha256": "0745ce19bb3dbb5b1c1d7cb3164c07a0bc1b2d8cb9544fd69e061c76c8dcd284"
+      "sha256": "a63006b35ff917c73853c7db1bce5ce91dcc1c791d43e55b16f790e02a77aa38"
     },
     {
       "path": "roles/extractor/scripts/launchd/com.extractor.inbox-check.plist",
-      "sha256": "1880ce67abc95b3c0a99e1eea0198c17deb85dd02e20559ca24e65ac36eb3abf"
+      "sha256": "0f698455a221d847c195a22d3207c1ae348c338c86f2f6e1ba7cba8b7b37a45e"
     },
     {
       "path": "roles/extractor/scripts/systemd/iwe-extractor-inbox-check.service",
@@ -1589,7 +1605,7 @@
     },
     {
       "path": "roles/strategist/prompts/strategy-session-weekly/steps/03-dissatisfactions.md",
-      "sha256": "e94477f479a6918fd6bf7ee6af24353421fec63008c2da2f13370cf3be515be9"
+      "sha256": "e171f1183bab34f96217e5c70873a249ff76271f5b51c61362397ad10e408c79"
     },
     {
       "path": "roles/strategist/prompts/strategy-session-weekly/steps/04-strategy-sync.md",
@@ -1653,11 +1669,11 @@
     },
     {
       "path": "roles/strategist/scripts/launchd/com.strategist.morning.plist",
-      "sha256": "838ba9496656b28cef7f53abef6c249f4b20ba9a14de1582a43eaab9a8df3b95"
+      "sha256": "a79e22b95bd917fa194695500ee8ed28f32df180bb56bd62313b776b67970677"
     },
     {
       "path": "roles/strategist/scripts/launchd/com.strategist.weekreview.plist",
-      "sha256": "4df6b00840deaa46316078d7f55e00b33067d26dbd74dba8cb5eaadd09dfa9fa"
+      "sha256": "0cb4af08c5f63d01bfcbc07736453383ccb9be35b2e804e0f660eb10424ae637"
     },
     {
       "path": "roles/strategist/scripts/strategist.sh",
@@ -1717,7 +1733,7 @@
     },
     {
       "path": "roles/synchronizer/scripts/launchd/com.exocortex.scheduler.plist",
-      "sha256": "843bcfcc161f38832c90475d289f16da39d84c00eb2dd4d544d3ae9869953ec1"
+      "sha256": "0f555d8af7de37467ac34955e2d58c3f2deb0141b69e2e956e54a15bfdd54293"
     },
     {
       "path": "roles/synchronizer/scripts/notify.sh",
@@ -1881,7 +1897,7 @@
     },
     {
       "path": "scripts/claude-peer-adapter.sh",
-      "sha256": "00260975c09e2d5fc47506a5faf725f16ff432dd1adce923a728264f4bb2b67c"
+      "sha256": "e77e76d34ed89227d54bfafbffd4550d6603301bbe7a4e3a6707ad4e2c99eb14"
     },
     {
       "path": "scripts/close-wp.sh",
@@ -1917,7 +1933,7 @@
     },
     {
       "path": "scripts/create-wp.sh",
-      "sha256": "d915d9acaea07dfd2be43266d2136b1cae6fe9589987ea7c877277888a4cd551"
+      "sha256": "4652a5dee092c6e8f29506125e999e823aef049c8fc890011f6a65b721626aca"
     },
     {
       "path": "scripts/day-close-lock.sh",
@@ -1962,6 +1978,10 @@
     {
       "path": "scripts/day-open-smoke.sh",
       "sha256": "fc7780833a9aacb15cc104c61f8e2ca974577a0f70e35fdeb0d037cebce771a7"
+    },
+    {
+      "path": "scripts/external-tracker.py",
+      "sha256": "d248cb83b373ad9e8e71c6af6a42634d8dde25c5a56ba2ef667627109321ad9b"
     },
     {
       "path": "scripts/fmt-critical-alert.sh",
@@ -2021,7 +2041,7 @@
     },
     {
       "path": "scripts/iwe-agent-dispatcher.py",
-      "sha256": "53a9a4916563f10849b0590584ebf0ea2452b8263ee2c99fe4938bd7dc418960"
+      "sha256": "d736ab9d8b2c7d3c51f1b03a43e230b9ce6b0c11c8e0ec3440add731cbe78fd2"
     },
     {
       "path": "scripts/iwe-audit.sh",
@@ -2260,6 +2280,10 @@
       "sha256": "a2c4efd4a82bc5b432a968a54918da7821b3357a442ed4be4e29c7e1070fccf0"
     },
     {
+      "path": "scripts/test_external_tracker.py",
+      "sha256": "f2ae015d394a447778e1ed75ecfa16d80fe98e1164655b3431940c7e783d206c"
+    },
+    {
       "path": "scripts/tests/lib/capture_fixture.sh",
       "sha256": "edf6eba925d890e2aa52541be8fff27fb48ab11f5c7c69a8a3b1b001408978cd"
     },
@@ -2321,7 +2345,11 @@
     },
     {
       "path": "scripts/tests/test_fresh_seed_reproduction.sh",
-      "sha256": "4d2e8834838166733d45f9bab1edb5ea19f804159a9f63b187d4deecb7766d6a"
+      "sha256": "f8459d2cf2c065888d7e80d285a372166c6d88503c89c05a47409234b1171588"
+    },
+    {
+      "path": "scripts/tests/test_hindsight_docs_contract.sh",
+      "sha256": "6e63ee7b0210a6ad47b3bff1d04c3ca404d6b4b627d7977ba8207da198ae7c3c"
     },
     {
       "path": "scripts/tests/test_hook_classification.sh",
@@ -2330,6 +2358,10 @@
     {
       "path": "scripts/tests/test_issues_413_418.py",
       "sha256": "bec574712bb6c776c2c3b0f571b87b152c33745214fe9dd7788b2a2dbff6fedd"
+    },
+    {
+      "path": "scripts/tests/test_launchd_identity_runtime.sh",
+      "sha256": "b17a1aad7203e700583f3a08c45a42244c8e552f8cf590975e95ab3925f4dada"
     },
     {
       "path": "scripts/tests/test_session_guard_hypothesis_gate.sh",
@@ -2345,7 +2377,7 @@
     },
     {
       "path": "scripts/tests/test_update_install_path_guard.sh",
-      "sha256": "d8e59a1836aaea9642f8a380c2dad3de2ae29104c1db337077eeb92b59f966d6"
+      "sha256": "d3dd4ac16d5351d21d2e13e49c2d62cf73675aa88bee1f52ae2f750073afedcb"
     },
     {
       "path": "scripts/tests/test_update_settings_merge_drift.sh",
@@ -2401,11 +2433,11 @@
     },
     {
       "path": "setup.sh",
-      "sha256": "e1617e4fc32c145856785463d38aa167e3b275691bebf12595ba1e3a6eb6717c"
+      "sha256": "0cd3bee4f5048a69eaddc4d3bca75b366754f14a3baf957bc9d3be28c2198927"
     },
     {
       "path": "setup/build-runtime.sh",
-      "sha256": "160757ad12d1a56c089ec3a4bd0545891e7b46e0a931be72687ec1a5a2950c3c"
+      "sha256": "818f7ed16d24e87fea34a028d093709bdd09e41ba6a6afec23f8460c4b6ebe20"
     },
     {
       "path": "setup/install-iwe-paths.sh",
@@ -2441,7 +2473,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "0ad89d565a318539dfbbb6f008ad6284b4579268bdbf57394256511f78e4532d"
+      "sha256": "8a1ad0eace84c53a1f06f967952e9e501e3eacb449fb1a9cda92e89635aae62d"
     }
   ],
   "excluded_paths": [
