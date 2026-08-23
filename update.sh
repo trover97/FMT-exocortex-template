@@ -30,6 +30,12 @@ trap 'echo "ОШИБКА: update.sh прервался на строке ${LINEN
 VERSION="2.4.1"  # fix (WP-401): deprecated-file removal now checks is_protected_user_file() — a protected file (e.g. sessions/00-index.md) listed in deprecated_files by mistake could previously be deleted despite the "Не затрагиваются" report claiming otherwise; fix #229: repair-pass no longer stale-repairs memory files with owner: user in frontmatter; fix #228: hot-budget validator warns when memory/*.md horizon:hot lines exceed threshold
 REPO="TserenTserenov/FMT-exocortex-template" # UPSTREAM-CONST: do not substitute
 BRANCH="main"
+# Delivery channel (WP-529 F7, pilot decision 2026-08-21, prompted by an
+# external user's report): "release" (default) pins the delivery to the last
+# published release tag — users must not receive unreleased, possibly red,
+# main. IWE_UPDATE_CHANNEL=main opts back into the moving branch (author/dev
+# workflow, and the automatic fallback when no release exists yet).
+UPDATE_CHANNEL="${IWE_UPDATE_CHANNEL:-release}"
 RAW_BASE="https://raw.githubusercontent.com/$REPO/$BRANCH"
 API_BASE="https://api.github.com/repos/$REPO"
 
@@ -703,7 +709,32 @@ exit_clean() {
 # that immutable commit, so a push between manifest and file requests cannot mix
 # hashes from one revision with content from another (issue #398).
 resolve_delivery_ref() {
-    local resolved_ref
+    local resolved_ref release_tag
+    if [ "$UPDATE_CHANNEL" = "release" ]; then
+        # sed, not python: the tag must be resolvable even on installs where
+        # py_available fails — a release tag is already an immutable-enough
+        # pin, unlike the moving branch the no-python path degrades to below.
+        # shellcheck disable=SC2086
+        release_tag=$(curl $CURL_BASE_OPTS $_CURL_SSL_OPT -sSfL "$API_BASE/releases/latest" 2>/dev/null | \
+            sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
+        if [ -n "$release_tag" ]; then
+            if py_available && resolved_ref=$(curl $CURL_BASE_OPTS $_CURL_SSL_OPT -sSfL "$API_BASE/commits/$release_tag" 2>/dev/null | \
+                "$PY_BIN" -c '
+import json, re, sys
+sha = json.load(sys.stdin).get("sha", "")
+if not re.fullmatch(r"[0-9a-f]{40}", sha):
+    raise SystemExit(1)
+print(sha)'); then
+                RAW_BASE="https://raw.githubusercontent.com/$REPO/$resolved_ref"
+                echo "  Канал поставки: релиз $release_tag (снимок ${resolved_ref:0:12})"
+            else
+                RAW_BASE="https://raw.githubusercontent.com/$REPO/$release_tag"
+                echo "  Канал поставки: релиз $release_tag (закреплён по тегу)"
+            fi
+            return 0
+        fi
+        echo "  ⚠ Не удалось определить последний релиз (нет релизов или API недоступен) — откат на ветку $BRANCH."
+    fi
     if ! py_available; then
         echo "  ⚠ Нет python3: поставка проверяется по подвижной ветке $BRANCH."
         return 0
@@ -749,6 +780,12 @@ if [ -f "$UPDATE_INCOMPLETE_MARKER" ]; then
 fi
 
 # === Step 0: Self-update (bootstrap) ===
+# issue #505 root, part 1: the channel must be resolved BEFORE self-update.
+# Step 0 used to fetch update.sh from the DEFAULT moving main while Step 1
+# then pinned the delivery to the release snapshot — so the local update.sh
+# ping-ponged between the main and release versions on every run, and Step 5
+# always saw update.sh as "updated" (see part 2 at the apply loop).
+resolve_delivery_ref
 echo "[0] Проверка update.sh..."
 # Capture hash before any network activity — used for --check integrity guard below (fix #205)
 SELF_HASH_BEFORE=$(hash_file "$SCRIPT_DIR/update.sh")
@@ -762,8 +799,16 @@ if curl $CURL_BASE_OPTS $_CURL_SSL_OPT -sSfL "$RAW_BASE/update.sh" -o "$REMOTE_U
             echo "  ⚠ Новая версия update.sh доступна. Запустите без --check для обновления."
         else
             echo "  Найдена новая версия update.sh — обновляю..."
-            cp "$REMOTE_UPDATE" "$SCRIPT_DIR/update.sh"
-            chmod +x "$SCRIPT_DIR/update.sh"
+            # issue #505 class (residual, found in the same sweep): replace
+            # the RUNNING script via sibling tmp + mv — rename swaps the
+            # directory entry and this process keeps its old inode; a plain cp
+            # truncates the very file bash is executing. Historically survived
+            # only because the few remaining commands sat in bash's read
+            # buffer.
+            _boot_staged="$SCRIPT_DIR/.update.sh.staged.$$"
+            cp "$REMOTE_UPDATE" "$_boot_staged"
+            chmod +x "$_boot_staged"
+            mv -f "$_boot_staged" "$SCRIPT_DIR/update.sh"
             echo "  Перезапуск..."
             exec bash "$SCRIPT_DIR/update.sh" "$@"
         fi
@@ -774,7 +819,6 @@ echo ""
 
 # === Step 1: Fetch manifest ===
 echo "[1] Загрузка манифеста..."
-resolve_delivery_ref
 MANIFEST_URL="$RAW_BASE/update-manifest.json"
 MANIFEST="$TMPDIR_UPDATE/manifest.json"
 
@@ -1100,10 +1144,126 @@ else
     # "checked composition only" as the old comment claimed).
     INTEGRITY_TAINTED=true
     echo "⚠ Python недоступен — только состав файлов сверяется, содержимое НЕ проверяется по контрольной сумме." >&2
-    grep '"path"' "$MANIFEST" | while read -r line; do
-        fpath=$(echo "$line" | sed 's/.*"path"[[:space:]]*:[[:space:]]*"//;s/".*//')
-        echo "$fpath|"
-    done > "$MANIFEST_PARSED"
+
+    # High 2 fail-closed guard (peer-session 2026-08-21-12, Codex, revised
+    # after cold-context review found the first version tautological — the
+    # extracted-count and found-count were both built from the same grep, so
+    # they were always equal even when sed extracted garbage). The fallback
+    # assumes one "path" key per line — a compact/minified manifest (several
+    # entries on one line) silently breaks that assumption, and the old code
+    # just extracted the FIRST match per line instead of failing, losing
+    # every other entry with no signal. A line-count heuristic
+    # (`wc -l == 1`) was considered and rejected: a trailing-newline-less
+    # minified file gives 0, and a compact multi-line manifest can still
+    # pack several "path" keys onto one physical line. Check the actual
+    # assumption — how many "path" occurrences share a line — not a proxy
+    # for it.
+    #
+    # Scope decision (same peer-session, second round): this fallback
+    # supports ONLY the line-per-field layout this repo's own manifest
+    # generator produces — "path" preceded solely by whitespace on its
+    # line, per PATH_LINE_RE below. A compact single-file manifest like
+    # {"files":[{"path":"x.md"}]} is valid JSON but NOT supported here and
+    # correctly hits EXIT_RUNTIME (test-update-issue-226.sh Scenario H) —
+    # a looser prefix (^.*"path") was considered and rejected: it would
+    # let arbitrary text ahead of the real key mask corruption or a "path"
+    # match inside an unrelated string value, undermining the whole-line
+    # grammar match's actual guarantee.
+    #
+    # Every grep below has an explicit 0/1/>1 status check (peer-session
+    # 2026-08-21-12, High 2): this script has `set -e` but not `pipefail`,
+    # so a grep failing inside a pipe or process substitution would
+    # otherwise be silently absorbed by the next command in the chain —
+    # exactly the "fail-open under error" this guard exists to prevent.
+    # grep_or_die PATTERN FILE DEST-VAR — runs "grep -c PATTERN FILE",
+    # writes stdout to DEST-VAR (a file path), returns 0. Aborts the script
+    # on any grep exit status other than 0 (matches found) or 1 (no
+    # matches) — status >1 means grep itself failed to read/execute.
+    grep_or_die() {
+        local pattern="$1" file="$2" dest="$3" rc=0
+        grep -c -- "$pattern" "$file" > "$dest" 2>/dev/null || rc=$?
+        if [ "$rc" -gt 1 ]; then
+            echo "✗ Не удалось прочитать манифест обновлений для резервного разбора (grep вернул код ${rc})." >&2
+            exit "$EXIT_RUNTIME"
+        fi
+        return 0
+    }
+
+    # -c counts MATCHING LINES; that's exactly what both guards need — the
+    # multi-path check cares whether ANY line has 2+ occurrences (a line
+    # either qualifies as a violation or doesn't), and once that guard has
+    # passed, "at most one path per line" makes line-count and
+    # occurrence-count the same number for the total.
+    MULTI_PATH_COUNT_FILE=$(mktemp)
+    grep_or_die '"path".*"path"' "$MANIFEST" "$MULTI_PATH_COUNT_FILE"
+    MULTI_PATH_LINES=$(cat "$MULTI_PATH_COUNT_FILE")
+    rm -f "$MULTI_PATH_COUNT_FILE"
+    if [ "$MULTI_PATH_LINES" -gt 0 ]; then
+        echo "✗ Манифест обновлений в компактном/минифицированном формате (несколько записей на одной строке) — резервный разбор без Python это не поддерживает." >&2
+        echo "  Обновление остановлено: обычная извлечённая запись отбросила бы соседние записи на той же строке без предупреждения." >&2
+        exit "$EXIT_RUNTIME"
+    fi
+
+    PATH_KEY_COUNT_FILE=$(mktemp)
+    grep_or_die '"path"' "$MANIFEST" "$PATH_KEY_COUNT_FILE"
+    PATH_KEY_TOTAL=$(cat "$PATH_KEY_COUNT_FILE")
+    rm -f "$PATH_KEY_COUNT_FILE"
+
+    # grep_or_die's -c count above already confirms whether "path" occurs;
+    # the actual matching lines still need a second, non-counting pass
+    # (grep without -c) to feed the per-line grammar check below. Same
+    # explicit-status contract as grep_or_die: status 1 (no matches) can't
+    # happen here (PATH_KEY_TOTAL already proved matches exist above), so
+    # >0 is unconditionally a read error, not "no matches." The `|| grep_rc=$?`
+    # form (not a bare `grep ...; grep_rc=$?`, found by cold-context review)
+    # matters under `set -e`: a plain non-zero exit from an unguarded
+    # command aborts the script on that line — the following `grep_rc=$?`
+    # would never run, so a failing grep would kill the script with a raw
+    # exit 1/2 instead of this guard's own EXIT_RUNTIME.
+    PATH_LINES_FILE=$(mktemp)
+    grep_rc=0
+    grep -- '"path"' "$MANIFEST" > "$PATH_LINES_FILE" 2>/dev/null || grep_rc=$?
+    if [ "$grep_rc" -gt 0 ]; then
+        echo "✗ Не удалось прочитать манифест обновлений для резервного разбора (grep вернул код ${grep_rc})." >&2
+        exit "$EXIT_RUNTIME"
+    fi
+
+    # Whole-line grammar match (peer-session 2026-08-21-12, Codex: validate
+    # the full line belongs to the supported form BEFORE extracting, not
+    # just eyeball what sed happened to return). Supported form only:
+    # optional leading whitespace, "path", optional whitespace, colon,
+    # optional whitespace, a double-quoted value with no embedded '"' or
+    # '\' (this fallback cannot decode JSON escapes), then anything after
+    # the closing quote (comma, more keys) is accepted without further
+    # constraint since it isn't part of the path value itself.
+    PATH_LINE_RE='^[[:space:]]*"path"[[:space:]]*:[[:space:]]*"[^"\\]+".*$'
+    PATH_ENTRIES_FOUND=0
+    : > "$MANIFEST_PARSED"
+    while IFS= read -r line; do
+        [ -z "$line" ] && continue
+        case "$line" in
+            *'"path"'*)
+                if ! printf '%s\n' "$line" | grep -Eq -- "$PATH_LINE_RE"; then
+                    echo "✗ Резервный разбор манифеста: строка с ключом \"path\" не в поддерживаемой форме (строка $((PATH_ENTRIES_FOUND + 1)) среди найденных совпадений)." >&2
+                    echo "  Поддерживается только: \"path\": \"значение_без_кавычек_и_обратных_слэшей\" на одной строке." >&2
+                    exit "$EXIT_RUNTIME"
+                fi
+                fpath=$(printf '%s\n' "$line" | sed -E 's/^[[:space:]]*"path"[[:space:]]*:[[:space:]]*"([^"\\]+)".*$/\1/')
+                if [ -z "$fpath" ]; then
+                    echo "✗ Резервный разбор манифеста: строка совпала с формой, но извлечённое значение пути пустое." >&2
+                    exit "$EXIT_RUNTIME"
+                fi
+                PATH_ENTRIES_FOUND=$((PATH_ENTRIES_FOUND + 1))
+                echo "$fpath|" >> "$MANIFEST_PARSED"
+                ;;
+        esac
+    done < "$PATH_LINES_FILE"
+    rm -f "$PATH_LINES_FILE"
+
+    if [ "$PATH_ENTRIES_FOUND" -ne "$PATH_KEY_TOTAL" ]; then
+        echo "✗ Резервный разбор манифеста нашёл ${PATH_KEY_TOTAL} ключ(ей) \"path\", но подтверждённо извлёк только ${PATH_ENTRIES_FOUND} запись(ей) — формат манифеста не полностью соответствует ожиданиям этого разбора." >&2
+        exit "$EXIT_RUNTIME"
+    fi
 fi
 
 # Duplicate-path check (peer-session 2026-08-21-09, Codex: must run on every
@@ -1389,9 +1549,19 @@ done < <(
 import json, sys
 with open(sys.argv[1]) as f:
     data = json.load(f)
+# 2026-08-22 (external report): a path present in BOTH the delivered files
+# set and deprecated_files is a generator inconsistency — removal deleted 10
+# files HEAD still ships, right after a clean no-change update. Delivery wins;
+# the conflict is reported, never acted on. generate-manifest.sh now filters
+# this at the source; this guard protects against a bad published manifest.
+delivered = {e.get('path') for e in data.get('files', [])}
 for entry in data.get('deprecated_files', []):
-    print(entry.get('path','') + '|' + entry.get('reason',''))
-" "$MANIFEST" 2>/dev/null || true
+    path = entry.get('path','')
+    if path in delivered:
+        print('  ⚠ %s: и в поставке, и в deprecated_files — удаление пропущено (несогласованный манифест)' % path, file=sys.stderr)
+        continue
+    print(path + '|' + entry.get('reason',''))
+" "$MANIFEST" || true
     fi)
 fi
 
@@ -1637,6 +1807,20 @@ for f in "${UPDATED_FILES[@]}"; do
         echo "  ⚠ $f — author_mode: несмёрженные правки, файл не тронут."
         echo "    Сверь: diff \"$TMPDIR_UPDATE/files/$f\" \"$SCRIPT_DIR/$f\""
         AUTHOR_SKIPPED=$((AUTHOR_SKIPPED + 1))
+        continue
+    fi
+    # issue #505 root, part 2: update.sh is delivered ONLY by Step 0's
+    # self-update (fetch, compare, replace, re-exec). Applying it here did two
+    # kinds of damage at once: `cp` truncated the very inode bash was still
+    # reading (execution continued into garbage — "line 1875: command not
+    # found", rc=127, stale .update-incomplete), and the placeholder
+    # substitution pass below then baked the install's real paths into the
+    # freshly applied copy's own {{KEY}} sed templates — after which the local
+    # hash never matches upstream again and every run re-applies it. A
+    # residual diff here (e.g. an already-baked local copy) is healed by the
+    # next run's Step 0, which fetches the clean snapshot copy.
+    if [ "$f" = "update.sh" ]; then
+        echo "  ~ $f — пропущен: доставляется только самообновлением Шага 0 (issue #505)"
         continue
     fi
     APPLIED_PATHS+=("$f")
@@ -1960,6 +2144,10 @@ ENVEOF
 
     # Still substitute what we can (HOME_DIR and WORKSPACE_DIR)
     for f in "${NEW_FILES[@]}" "${UPDATED_FILES[@]}"; do
+        # issue #505: update.sh CONTAINS {{KEY}} sed templates as its own code —
+        # substituting into it bakes this install's paths into the updater and
+        # permanently desyncs its hash from upstream. Never touch it here.
+        [ "$f" = "update.sh" ] && continue
         filepath="$SCRIPT_DIR/$f"
         [ -f "$filepath" ] || continue
         sed_inplace \
