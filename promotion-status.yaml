@@ -1,0 +1,15 @@
+---
+schema_version: 1
+updated_at: 2026-08-22T07:42:16Z
+---
+# promotion-status.yaml — журнал промоций артефактов из author IWE в FMT
+# see DP.SC.NNN, WP-7/PZ-6
+# Writer: scripts/promote-common.sh::record_promotion()
+# Append-only: новые записи добавляются вниз; редактировать вручную не рекомендуется.
+promotions:
+  - artifact_path: .claude/styles/s0-core.md
+    type: style
+    source_sha: ""
+    fmt_sha: ""
+    promoted_at: 2026-08-22T07:42:16Z
+    verified_in_clean_env: true
