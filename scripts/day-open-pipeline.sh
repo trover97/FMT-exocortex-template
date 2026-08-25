@@ -209,13 +209,13 @@ if [ "$FORCE" != "true" ]; then
     # alert even though a DayPlan genuinely exists for today.
     OTHER_COMMIT=$(git log -1 --format=%H HEAD origin/main -- "$DAYPLAN_FILE" 2>/dev/null | head -1)
     OTHER_COMMIT="${OTHER_COMMIT:-unknown}"
-    mkdir -p "$HOME/.claude/state"
+    mkdir -p "$HOME/.qwen/state"
     jq -n \
       --arg date "$DATE" \
       --arg commit "$OTHER_COMMIT" \
       --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
       '{date: $date, commit_hash: $commit, timestamp: $ts, status: "success", note: "done by the other machine"}' \
-      > "$HOME/.claude/state/day-open-pipeline-last-success.json"
+      > "$HOME/.qwen/state/day-open-pipeline-last-success.json"
     exit 0
   fi
 fi
@@ -239,7 +239,7 @@ echo $$ > "$LOCK_FILE"
 # a duplicate trap here would just get overwritten by that later `trap ... EXIT`.
 
 # --- State store (pipeline heartbeat) ---
-STATE_DIR="$HOME/.claude/state"
+STATE_DIR="$HOME/.qwen/state"
 HEARTBEAT_FILE="$STATE_DIR/day-open-pipeline-last-success.json"
 mkdir -p "$STATE_DIR"
 

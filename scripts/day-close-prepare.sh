@@ -18,7 +18,7 @@ set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=/dev/null
-source "$SCRIPT_DIR/../.claude/lib/iwe-env-bootstrap.sh" || exit 1
+source "$SCRIPT_DIR/../.qwen/lib/iwe-env-bootstrap.sh" || exit 1
 
 GOV="$IWE_DS_MY_STRATEGY"
 TODAY=$(date +%Y-%m-%d)
@@ -29,7 +29,7 @@ memory_files() {
   if [ -f "$WORKSPACE_DIR/memory/MEMORY.md" ]; then
     echo "$WORKSPACE_DIR/memory/MEMORY.md"
   else
-    ls "$HOME"/.claude/projects/*/memory/MEMORY.md 2>/dev/null
+    ls "$HOME"/.qwen/projects/*/memory/MEMORY.md 2>/dev/null
   fi
 }
 
@@ -90,7 +90,7 @@ for d in "$WORKSPACE_DIR"/*/; do
   [ -d "$d/.git" ] || continue
   commits=$(git -C "$d" log --since="today 00:00" --oneline --no-merges 2>/dev/null \
     | grep -vE "^[a-f0-9]+ (docs|chore|ci|style|perf|test)(\(|:| )" \
-    | grep -vE "memory/|\.claude/rules/|template-sync|backup|reindex" || true)
+    | grep -vE "memory/|\.qwen/rules/|template-sync|backup|reindex" || true)
   if [ -n "$commits" ]; then
     echo "=== $(basename "$d") ==="
     echo "$commits"
@@ -120,7 +120,7 @@ done
 if [ -n "$HITS" ]; then echo "$HITS"; else echo "(no drift patterns found)"; fi
 
 echo "--- 5. INDEX HEALTH ---"
-IH="$IWE_TEMPLATE/.claude/scripts/check-index-health.py"
+IH="$IWE_TEMPLATE/.qwen/scripts/check-index-health.py"
 if [ -f "$IH" ]; then
   python3 "$IH" 2>&1 | head -60
 else

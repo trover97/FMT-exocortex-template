@@ -83,7 +83,7 @@ def test_registry_number_column_stays_bare(tmp_path):
 def test_consent_file_path_stays_bare_number(tmp_path):
     """Consent-файл — внутренний хендшейк (touch .../wp-consent-{N}), не публичный путь: не паддится."""
     strategy = _scaffold_governance_repo(tmp_path)
-    state_dir = tmp_path / ".claude" / "state"
+    state_dir = tmp_path / ".qwen" / "state"
     state_dir.mkdir(parents=True)
     (state_dir / "wp-consent-9").touch()
 

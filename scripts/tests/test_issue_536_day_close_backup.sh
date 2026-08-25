@@ -7,7 +7,7 @@ set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 DAY_CLOSE="$ROOT/scripts/day-close.sh"
 RESTORE="$ROOT/scripts/restore-from-exocortex.sh"
-MEMORY_HOOK="$ROOT/.claude/hooks/memory-exocortex-sync.sh"
+MEMORY_HOOK="$ROOT/.qwen/hooks/memory-exocortex-sync.sh"
 TEST_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/iwe-issue-536-backup.XXXXXX")"
 BACKUP_MANIFEST=".day-close-backup-manifest.json"
 BACKUP_QUARANTINE=".day-close-backup-incomplete"
@@ -124,7 +124,7 @@ write_rhythm_v1 "$MEMORY/day-rhythm-config.yaml"
 printf 'managed, unchanged\n' > "$MEMORY/owned-unchanged.md"
 printf 'managed, later edited in backup\n' > "$MEMORY/owned-modified.md"
 printf 'nested managed file\n' > "$MEMORY/reference/managed.yaml"
-printf 'must not become memory-owned\n' > "$MEMORY/CLAUDE.md"
+printf 'must not become memory-owned\n' > "$MEMORY/QWEN.md"
 printf 'must not become memory-owned\n' > "$MEMORY/AGENTS.md"
 printf 'protected\n' > "$MEMORY/extensions/private.md"
 printf 'protected\n' > "$MEMORY/agent-fault-profile/private.md"
@@ -179,7 +179,7 @@ with open(sys.argv[1], encoding="utf-8") as stream:
 files = payload.get("files", {})
 required = {"owned-unchanged.md", "owned-modified.md", "reference/managed.yaml"}
 forbidden_files = {
-    "CLAUDE.md",
+    "QWEN.md",
     "AGENTS.md",
     "day-rhythm-config.yaml",
     "params.yaml",
@@ -1140,7 +1140,7 @@ if [ "$(cat "$FRESH_MEMORY/$DASH_MEMORY_NAME" 2>/dev/null || true)" = \
         "dash-prefixed memory" ] && \
    [ "$(cat "$FRESH_WS/extensions/$DASH_EXTENSION_NAME" 2>/dev/null || true)" = \
         "dash-prefixed extension" ] && \
-   [ "$(cat "$FRESH_WS/.claude/rules/-nested/$DASH_RULE_NAME" 2>/dev/null || true)" = \
+   [ "$(cat "$FRESH_WS/.qwen/rules/-nested/$DASH_RULE_NAME" 2>/dev/null || true)" = \
         "dash-prefixed rule" ]; then
     pass "every variable-filename restore branch treats dash-prefixed names as operands"
 else
@@ -1218,15 +1218,15 @@ CLAUDE_LINK_EXO="$CLAUDE_LINK_WS/governance/exocortex"
 CLAUDE_LINK_OUTSIDE="$CLAUDE_LINK/outside.md"
 mkdir -p "$CLAUDE_LINK_WS/home" "$CLAUDE_LINK_MEMORY" "$CLAUDE_LINK_EXO"
 printf 'outside target remains\n' > "$CLAUDE_LINK_OUTSIDE"
-printf 'workspace={{HOME_DIR}}\n' > "$CLAUDE_LINK_EXO/CLAUDE.md"
+printf 'workspace={{HOME_DIR}}\n' > "$CLAUDE_LINK_EXO/QWEN.md"
 printf 'ordinary\n' > "$CLAUDE_LINK_EXO/note.md"
-ln -s "$CLAUDE_LINK_OUTSIDE" "$CLAUDE_LINK_WS/CLAUDE.md"
+ln -s "$CLAUDE_LINK_OUTSIDE" "$CLAUDE_LINK_WS/QWEN.md"
 CLAUDE_LINK_RC=0
 run_restore \
     "$CLAUDE_LINK_WS" "$CLAUDE_LINK_MEMORY" "$CLAUDE_LINK/run.out" || \
     CLAUDE_LINK_RC=$?
-if [ "$CLAUDE_LINK_RC" -eq 0 ] && [ ! -L "$CLAUDE_LINK_WS/CLAUDE.md" ] && \
-   [ "$(cat "$CLAUDE_LINK_WS/CLAUDE.md")" = "workspace=$CLAUDE_LINK_WS/home" ] && \
+if [ "$CLAUDE_LINK_RC" -eq 0 ] && [ ! -L "$CLAUDE_LINK_WS/QWEN.md" ] && \
+   [ "$(cat "$CLAUDE_LINK_WS/QWEN.md")" = "workspace=$CLAUDE_LINK_WS/home" ] && \
    [ "$(cat "$CLAUDE_LINK_OUTSIDE")" = "outside target remains" ]; then
     pass "CLAUDE restore atomically replaces only the final symlink"
 else

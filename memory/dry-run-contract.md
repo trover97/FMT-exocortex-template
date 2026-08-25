@@ -73,7 +73,7 @@ v2 (WP-7/BUGTRIAGE2, issue #237): не regex по всей строке кома
 (3) классифицировать каждый фрагмент по первому слову (после пропуска `VAR=val`/
 `command`/`env`/`nohup`/`time`/`sudo`). Закрывает одновременно subshell-обход
 (`(git commit)`) и ложные срабатывания на текст внутри кавычек (`echo "git commit"`).
-Реализация — `.claude/hooks/dry-run-gate.sh`, секция «Bash matchers».
+Реализация — `.qwen/hooks/dry-run-gate.sh`, секция «Bash matchers».
 
 Классифицируемые команды (по первому слову фрагмента):
 
@@ -93,8 +93,8 @@ Whitelist read-only helpers (issue #264) — разрешены под dry-run, 
 в коде скрипта нет (проверяется при добавлении, см. правило ниже):
 
 ```
-.claude/scripts/load-extensions.sh                    # относительный, от workspace-root
-$HOME/IWE/.claude/scripts/load-extensions.sh          # абсолютный, захардкожен
+.qwen/scripts/load-extensions.sh                    # относительный, от workspace-root
+$HOME/IWE/.qwen/scripts/load-extensions.sh          # абсолютный, захардкожен
 scripts/day-close-prepare.sh                          # относительный (issue #315) — рабочий,
                                                         # только если CWD внутри FMT-exocortex-template
 ${IWE_SCRIPTS:-$HOME/IWE/scripts}/day-close-prepare.sh # абсолютный (нестатический — реальный вложенный
@@ -107,8 +107,8 @@ Python-whitelist (issue #460 путь 5, добавлен после того к
 безусловный block ломает `close day` на первом же шаге):
 
 ```
-${IWE_TEMPLATE:-<HOME_DIR>/IWE/FMT-exocortex-template}/.claude/scripts/memory-drift-scan.py
-${IWE_TEMPLATE:-<HOME_DIR>/IWE/FMT-exocortex-template}/.claude/scripts/check-index-health.py
+${IWE_TEMPLATE:-<HOME_DIR>/IWE/FMT-exocortex-template}/.qwen/scripts/memory-drift-scan.py
+${IWE_TEMPLATE:-<HOME_DIR>/IWE/FMT-exocortex-template}/.qwen/scripts/check-index-health.py
 ```
 
 Обе — read-only диагностика (day-close/SKILL.md шаги 1-2), без write-путей в коде
@@ -121,12 +121,12 @@ allow, глотая command substitution маркером раньше, чем �
 сегментировать. `rule-classifier.py` (day-close/SKILL.md шаг «Rule-engine»)
 сознательно НЕ в whitelist — сам SKILL.md документирует, что скрипт вносит правки.
 `{{HOME_DIR}}` в исходнике SKILL.md — шаблонный плейсхолдер репозитория-шаблона
-(setup.sh рендерит только CLAUDE.md, не `.claude/skills/`); ожидается, что
+(setup.sh рендерит только QWEN.md, не `.qwen/skills/`); ожидается, что
 исполняющий агент подставляет реальный путь при формировании Bash-вызова — тот
 же принцип, что у уже существующего `WL_ABS`/`WL_ABS2` (bash-whitelist).
 
-Абсолютный паттерн захардкожен в `$HOME/IWE`, не glob `*/.claude/...` и не
-`$IWE_ROOT` — иначе подложный `/tmp/.claude/scripts/load-extensions.sh` или
+Абсолютный паттерн захардкожен в `$HOME/IWE`, не glob `*/.qwen/...` и не
+`$IWE_ROOT` — иначе подложный `/tmp/.qwen/scripts/load-extensions.sh` или
 env-инъекция `IWE_ROOT=/tmp/evil` прошли бы gate (review-01 High, review-02 H1).
 Пользователи с нестандартным расположением workspace вызывают helper
 относительным путём из корня workspace.
@@ -134,8 +134,8 @@ env-инъекция `IWE_ROOT=/tmp/evil` прошли бы gate (review-01 High
 Реальный (и единственный документированный) вызов `day-close-prepare.sh` —
 `bash "$IWE_SCRIPTS/day-close-prepare.sh"` (day-close/SKILL.md, day-close-details.md).
 `$IWE_SCRIPTS` по умолчанию = `$WORKSPACE_DIR/FMT-exocortex-template/scripts`
-(`scripts/` не копируется в workspace-root, в отличие от `.claude/` — см.
-`.claude/lib/iwe-env-bootstrap.sh:86`), поэтому ни один из двух путей выше сам
+(`scripts/` не копируется в workspace-root, в отличие от `.qwen/` — см.
+`.qwen/lib/iwe-env-bootstrap.sh:86`), поэтому ни один из двух путей выше сам
 по себе не совпадает с реальным вызовом: переменная в кавычках `"$IWE_SCRIPTS/..."`
 попадает под общее схлопывание кавычек (шаг 1 Bash matchers) раньше, чем до неё
 доходит whitelist-case, и превращается в неотличимый токен `QSTR`. Точечная

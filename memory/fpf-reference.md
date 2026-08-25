@@ -48,7 +48,7 @@ description: "Справочник FPF паттернов применимых �
 | C.11 | Decision Theory (Decsn-CAL) | Stable | Выбор альтернатив в ArchGate, Strategy Session |
 | C.16 | MM-CHR Measurement & Metrics | Stable | Измерения RCS, baseline, показатели пилота |
 | C.19 | Explore–Exploit Governor | Stable | Pool-политика экспериментов и методов |
-| C.24 | Agentic Tool-Use & Call-Planning | Stable | Протокол Claude Code tool-use бюджет |
+| C.24 | Agentic Tool-Use & Call-Planning | Stable | Протокол Qwen Code tool-use бюджет |
 | C.26 | Quantum-Like Modeling Lens | Stable | Probe-coupled взаимодействия, order effects |
 | C.27 | Temporal Claim Adequacy | Stable | Утверждения о скорости, ритме, трендах |
 | C.28 | **CausalUse-CAL** | Stable | **Причинные утверждения: M1 улучшает X, рычаг даёт Y** |
@@ -144,7 +144,7 @@ description: "Справочник FPF паттернов применимых �
 
 ## Терминология ailev ↔ IWE (DPF/SPF/TPF/LPF, WP-448 Ф8)
 
-> Анатолий Левенчук (ailev) переименовал Second Principles Framework в DPF (Domain Principles Framework), стек `FPF → DPF → LPF`. В IWE переименование не планируется — только сноски (CLAUDE.md §1, SPF/README.md). Таблица ниже — словарь перевода при чтении его текстов.
+> Анатолий Левенчук (ailev) переименовал Second Principles Framework в DPF (Domain Principles Framework), стек `FPF → DPF → LPF`. В IWE переименование не планируется — только сноски (QWEN.md §1, SPF/README.md). Таблица ниже — словарь перевода при чтении его текстов.
 
 | ailev-термин | IWE-эквивалент | Примечание |
 |---|---|---|

@@ -9,7 +9,7 @@ SoT (Source-of-Truth): ~/IWE/<governance-repo>/scripts/iwe-agent-dispatcher.py
   - DS-autonomous-agents/scripts/
 Синхронизация: `cp <canonical> <target>` + `git add -u && git commit -m "sync iwe-agent-dispatcher"`
 
-Канал: headless `claude -p` (Claude Code CLI в неинтерактивном режиме).
+Канал: headless `claude -p` (Qwen Code CLI в неинтерактивном режиме).
 Не зависит от RemoteTrigger v1→v2 translation bug (см. bugs/bug-2026-05-17).
 
 Цикл:
@@ -775,7 +775,7 @@ class Executor:
 
 
 class ClaudeCodeExecutor(Executor):
-    """Claude Code CLI (`claude -p`). Streaming run → emits heartbeats."""
+    """Qwen Code CLI (`claude -p`). Streaming run → emits heartbeats."""
 
     name = "claude"
     supports_heartbeat = True
@@ -1432,9 +1432,9 @@ def _build_session_prompt(session_id: str, tg_chat_id: int,
 
     latest = next(t for t in turns if t["n"] == new_turn_n)
 
-    # WP-428 Ф5: identity follows the actual runtime, not a hardcoded "Claude Code"
-    # (a kimi run that is told "you are Claude Code" is a false-green smoke).
-    agent_label = {"claude": "Claude Code", "kimi": "Kimi",
+    # WP-428 Ф5: identity follows the actual runtime, not a hardcoded "Qwen Code"
+    # (a kimi run that is told "you are Qwen Code" is a false-green smoke).
+    agent_label = {"claude": "Qwen Code", "kimi": "Kimi",
                    "hermes": "Hermes"}.get(executor, executor)
     return f"""Ты — {agent_label} (IWE-агент) в External Working Session (DP.SC.162).
 Пилот работает удалённо через Telegram. session_id={session_id}, tg_chat_id={tg_chat_id}.

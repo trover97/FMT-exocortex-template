@@ -66,12 +66,12 @@ fi
 UNRELATED_SEED_PRESENT=$(cd "$SCRATCH" && python3 -c "
 import json
 manifest = json.load(open('update-manifest.json'))
-print('1' if any(entry['path'] == 'seed/strategy/CLAUDE.md' for entry in manifest['files']) else '0')
+print('1' if any(entry['path'] == 'seed/strategy/QWEN.md' for entry in manifest['files']) else '0')
 ")
 if [ "$UNRELATED_SEED_PRESENT" = "0" ]; then
     pass "unrelated seed user-space remains outside update delivery"
 else
-    fail "seed/strategy/CLAUDE.md leaked into files[] with the platform hook allow-list"
+    fail "seed/strategy/QWEN.md leaked into files[] with the platform hook allow-list"
 fi
 
 # Cross-check against the REAL setup/ tree, not a fixture: any tracked file

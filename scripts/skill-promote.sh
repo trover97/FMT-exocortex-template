@@ -6,7 +6,7 @@
 #
 # Поток:
 #   1. validate-skill.sh (gate: SKILL.md v2 обязателен)
-#   2. Копирует <skill>/ → FMT/.claude/skills/<skill>/
+#   2. Копирует <skill>/ → FMT/.qwen/skills/<skill>/
 #      - исключает мусор (.DS_Store, .git, .tmp)
 #      - делает резервную копию перед перезаписью
 #   3. Подстановки путей (HOME/IWE → env vars)
@@ -35,7 +35,7 @@ GOV_REPO_AUTHOR="${IWE_GOVERNANCE_REPO:-DS-strategy}"
 GOV_REPO_TMPL="DS-strategy"
 
 skill_name=$(basename "$SRC")
-DEST="$FMT_DIR/.claude/skills/$skill_name"
+DEST="$FMT_DIR/.qwen/skills/$skill_name"
 BACKUP_DIR="$FMT_DIR/.backups/skill-promote"
 
 if [[ ! -f "$SRC/SKILL.md" ]]; then
@@ -196,7 +196,7 @@ while IFS= read -r -d '' f; do
     substitute_file "$f"
 done < <(find "$DEST" -type f -name "*.sh" -print0 2>/dev/null)
 
-echo "✅ Промотирован: FMT/.claude/skills/$skill_name/ (layer: L1)"
+echo "✅ Промотирован: FMT/.qwen/skills/$skill_name/ (layer: L1)"
 
 # ── Шаг 6. Валидация FMT на хардкоды путей ───────────────────────────────────
 FMT_VALIDATE_SCRIPT="$FMT_DIR/scripts/validate-fmt-scripts.sh"
@@ -220,11 +220,11 @@ if [[ -f "$CATALOG_SCRIPT" ]]; then
     bash "$CATALOG_SCRIPT" 2>&1
     echo "🔄 Регенерация skills-catalog.yaml (FMT)..."
     bash "$CATALOG_SCRIPT" \
-        --skills-dir "$FMT_DIR/.claude/skills" \
-        --output "$FMT_DIR/.claude/skills-catalog.yaml" 2>&1
-    if [[ -f "$FMT_DIR/.claude/skills-catalog.yaml" ]]; then
-        sed -i.bak "s|^skills_dir: .*|skills_dir: .claude/skills|" "$FMT_DIR/.claude/skills-catalog.yaml"
-        rm -f "$FMT_DIR/.claude/skills-catalog.yaml.bak"
+        --skills-dir "$FMT_DIR/.qwen/skills" \
+        --output "$FMT_DIR/.qwen/skills-catalog.yaml" 2>&1
+    if [[ -f "$FMT_DIR/.qwen/skills-catalog.yaml" ]]; then
+        sed -i.bak "s|^skills_dir: .*|skills_dir: .qwen/skills|" "$FMT_DIR/.qwen/skills-catalog.yaml"
+        rm -f "$FMT_DIR/.qwen/skills-catalog.yaml.bak"
     fi
 fi
 
@@ -236,7 +236,7 @@ PROMOTE_COMMON="$FMT_DIR/scripts/promote-common.sh"
 if [[ -f "$PROMOTE_COMMON" ]]; then
     # shellcheck source=./promote-common.sh
     source "$PROMOTE_COMMON"
-    record_promotion ".claude/skills/$skill_name" "skill" "" "" "na"
+    record_promotion ".qwen/skills/$skill_name" "skill" "" "" "na"
 fi
 
 # ── Шаг 9. Пересборка манифеста ──────────────────────────────────────────────
@@ -250,5 +250,5 @@ fi
 
 echo ""
 echo "Следующий шаг:"
-echo "  cd $FMT_DIR && git add .claude/skills/$skill_name .claude/skills-catalog.yaml CHANGELOG.md promotion-status.yaml update-manifest.json"
+echo "  cd $FMT_DIR && git add .qwen/skills/$skill_name .qwen/skills-catalog.yaml CHANGELOG.md promotion-status.yaml update-manifest.json"
 echo "  git commit -m 'feat(WP-7/SP1): promote skill $skill_name to platform (L1)'"

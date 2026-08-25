@@ -12,9 +12,9 @@
 # `path:trimmed-line-content`, not line number, so unrelated edits elsewhere
 # in a baselined file don't cause spurious baseline drift.
 #
-# Scope: scripts/**/*.sh, setup/**/*.sh, roles/**/*.sh, .claude/hooks/**/*.sh,
-# .claude/skills/**/*.sh — every delivered shell perimeter that can invoke a
-# repo-owned Python program. The .claude perimeter was missing until issue
+# Scope: scripts/**/*.sh, setup/**/*.sh, roles/**/*.sh, .qwen/hooks/**/*.sh,
+# .qwen/skills/**/*.sh — every delivered shell perimeter that can invoke a
+# repo-owned Python program. The .qwen perimeter was missing until issue
 # #521, so all three ResidencyGate adapters escaped the original ratchet.
 # Deliberately NOT .github/workflows/** — different execution context (CI step
 # installs PyYAML explicitly), different format (YAML `run:`, not a .sh file).
@@ -57,8 +57,8 @@ scan() {
         "$SCRIPT_DIR/scripts"
         "$SCRIPT_DIR/setup"
         "$SCRIPT_DIR/roles"
-        "$SCRIPT_DIR/.claude/hooks"
-        "$SCRIPT_DIR/.claude/skills"
+        "$SCRIPT_DIR/.qwen/hooks"
+        "$SCRIPT_DIR/.qwen/skills"
     )
     {
         grep -rnE "$LITERAL_PATH_PATTERN" "${scan_dirs[@]}" --include="*.sh" 2>/dev/null || true

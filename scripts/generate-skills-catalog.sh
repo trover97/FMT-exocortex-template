@@ -4,9 +4,9 @@
 # generate-skills-catalog.sh — генератор skills-catalog.yaml
 # see DP.SC.153
 #
-# Парсит все .claude/skills/*/SKILL.md → строит skills-catalog.yaml с:
+# Парсит все .qwen/skills/*/SKILL.md → строит skills-catalog.yaml с:
 #   - метаданными из frontmatter (name, description, version, layer, status, triggers, depends_on)
-#   - вычисляемым invoked_by (из protocol-*.md + других SKILL.md + CLAUDE.md)
+#   - вычисляемым invoked_by (из protocol-*.md + других SKILL.md + QWEN.md)
 #
 # Использование:
 #   bash generate-skills-catalog.sh [--skills-dir <path>] [--output <path>] [--dry-run]
@@ -14,9 +14,9 @@
 set -uo pipefail
 
 IWE="${IWE_WORKSPACE:-$HOME/IWE}"
-SKILLS_DIR="${IWE}/.claude/skills"
+SKILLS_DIR="${IWE}/.qwen/skills"
 PROTOCOLS_DIR="${IWE}/memory"
-OUTPUT="${IWE}/.claude/skills-catalog.yaml"
+OUTPUT="${IWE}/.qwen/skills-catalog.yaml"
 dry_run=false
 
 while [[ $# -gt 0 ]]; do
@@ -57,10 +57,10 @@ get_triggers_slash() {
 build_invoked_by() {
     local skill_name="$1"
     local callers=""
-    # Ищем /skill-name в protocol-*.md и CLAUDE.md
+    # Ищем /skill-name в protocol-*.md и QWEN.md
     local search_files=""
     [[ -d "$PROTOCOLS_DIR" ]] && search_files+=" $(find "$PROTOCOLS_DIR" -name "protocol-*.md" 2>/dev/null)"
-    [[ -f "${IWE}/CLAUDE.md" ]] && search_files+=" ${IWE}/CLAUDE.md"
+    [[ -f "${IWE}/QWEN.md" ]] && search_files+=" ${IWE}/QWEN.md"
     # Ищем в других SKILL.md (depends_on)
     [[ -d "$SKILLS_DIR" ]] && search_files+=" $(find "$SKILLS_DIR" -name "SKILL.md" 2>/dev/null)"
 
@@ -70,7 +70,7 @@ build_invoked_by() {
             caller=$(basename "$(dirname "$f")")
             # Для protocol-*.md берём имя файла
             [[ "$f" == *"protocol-"* ]] && caller=$(basename "$f" .md)
-            [[ "$f" == *"CLAUDE.md"* ]] && caller="CLAUDE.md"
+            [[ "$f" == *"QWEN.md"* ]] && caller="QWEN.md"
             callers+="    - ${caller}\n"
         fi
     done

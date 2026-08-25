@@ -3,7 +3,7 @@
 #
 # Вторая половина истории портируемости (первая — backup в day-close.sh + авто-зеркало
 # memory-exocortex-sync.sh). Применяется на НОВОМ устройстве или после потери/повреждения
-# локальной memory/: разворачивает exocortex/ обратно в auto-memory + CLAUDE.md + симлинк.
+# локальной memory/: разворачивает exocortex/ обратно в auto-memory + QWEN.md + симлинк.
 #
 # Использование:
 #   restore-from-exocortex.sh [<governance-repo-path>] [--force] [--dry-run]
@@ -38,12 +38,12 @@ WORKSPACE_DIR="${WORKSPACE_DIR:-$HOME/IWE}"
 GOVERNANCE_REPO="${GOVERNANCE_REPO:-${IWE_GOVERNANCE_REPO:-DS-strategy}}"
 DS_STRATEGY="${GOV_ARG:-$WORKSPACE_DIR/$GOVERNANCE_REPO}"
 EXOCORTEX_SRC="$DS_STRATEGY/exocortex"
-# Claude Code слугифицирует путь проекта, заменяя на '-' не только '/', но и '_' и '.'.
+# Qwen Code слугифицирует путь проекта, заменяя на '-' не только '/', но и '_' и '.'.
 # Если в $HOME есть '_' (напр. username john_doe), реальная папка — '-home-john-doe-IWE'.
 # tr '/' '-' дал бы фантом '-home-john_doe-IWE' → restore промахнётся мимо auto-memory.
 # Здесь symlink-резолв непригоден: на новой машине $WORKSPACE_DIR/memory ещё не создан.
 WORKSPACE_SLUG=$(printf '%s' "$WORKSPACE_DIR" | tr '/_.' '-')
-COMPUTED_MEMORY="$HOME/.claude/projects/${WORKSPACE_SLUG}/memory"
+COMPUTED_MEMORY="$HOME/.qwen/projects/${WORKSPACE_SLUG}/memory"
 PHYSICAL_MEMORY=""
 if [ -d "$WORKSPACE_DIR/memory" ]; then
     PHYSICAL_MEMORY=$(cd -P -- "$WORKSPACE_DIR/memory" 2>/dev/null && pwd -P) || exit 1
@@ -184,31 +184,31 @@ atomic_restore_claude() {
     local src="$1" dst="$2" parent tmp
     parent=$(dirname -- "$dst")
     if $DRY_RUN; then
-        printf '  [dry-run] render CLAUDE.md atomically: %q -> %q\n' "$src" "$dst"
+        printf '  [dry-run] render QWEN.md atomically: %q -> %q\n' "$src" "$dst"
         return 0
     fi
     mkdir -p -- "$parent"
     if [ -e "$dst" ] && [ ! -f "$dst" ] && [ ! -L "$dst" ]; then
-        err "CLAUDE.md: назначение не является обычным файлом: $dst"
+        err "QWEN.md: назначение не является обычным файлом: $dst"
         return 1
     fi
-    tmp=$(mktemp -- "$parent/.CLAUDE.md.render.XXXXXX") || {
-        err "CLAUDE.md: не удалось создать временный файл"
+    tmp=$(mktemp -- "$parent/.QWEN.md.render.XXXXXX") || {
+        err "QWEN.md: не удалось создать временный файл"
         return 1
     }
     if ! sed "s|{{HOME_DIR}}|$HOME_SED_SAFE|g" "$src" > "$tmp"; then
         rm -f -- "$tmp"
-        err "CLAUDE.md: подстановка HOME не выполнена"
+        err "QWEN.md: подстановка HOME не выполнена"
         return 1
     fi
     if [ -L "$dst" ] && ! rm -- "$dst"; then
         rm -f -- "$tmp"
-        err "CLAUDE.md: не удалось убрать конечный симлинк"
+        err "QWEN.md: не удалось убрать конечный симлинк"
         return 1
     fi
     if ! mv -f -- "$tmp" "$dst"; then
         rm -f -- "$tmp"
-        err "CLAUDE.md: атомарная замена не удалась"
+        err "QWEN.md: атомарная замена не удалась"
         return 1
     fi
 }
@@ -333,7 +333,7 @@ else
 fi
 
 # === Шаг 1c: rules/ → workspace ===
-RULES_DST="$WORKSPACE_DIR/.claude/rules"
+RULES_DST="$WORKSPACE_DIR/.qwen/rules"
 if [ -d "$EXOCORTEX_SRC/rules" ]; then
     if [ -d "$RULES_DST" ] && [ -n "$(ls -A -- "$RULES_DST" 2>/dev/null)" ] && ! $FORCE && ! $DRY_RUN; then
         warn "rules/ уже не пуста: $RULES_DST — пропуск (для восстановления — --force)"
@@ -353,17 +353,17 @@ else
     warn "exocortex/rules/ отсутствует (старый бэкап) — пропуск"
 fi
 
-# === Шаг 2: CLAUDE.md → workspace root ===
+# === Шаг 2: QWEN.md → workspace root ===
 # issue #217: прямая подстановка {{HOME_DIR}} -> $HOME делает восстановление
 # ОС-агностичным (бэкап пишется на плейсхолдере в day-close.sh, шаг 1).
 # $HOME стоит в replacement-части sed s/// — экранируем & и \, иначе HOME с &
 # трактуется как «весь совпавший текст» и портит путь (cold-review находка).
 HOME_SED_SAFE=$(printf '%s' "$HOME" | sed 's/[|&\]/\\&/g')
-if [ -f "$EXOCORTEX_SRC/CLAUDE.md" ]; then
-    atomic_restore_claude "$EXOCORTEX_SRC/CLAUDE.md" "$WORKSPACE_DIR/CLAUDE.md" || exit 1
-    log "CLAUDE.md восстановлен → $WORKSPACE_DIR/CLAUDE.md"
+if [ -f "$EXOCORTEX_SRC/QWEN.md" ]; then
+    atomic_restore_claude "$EXOCORTEX_SRC/QWEN.md" "$WORKSPACE_DIR/QWEN.md" || exit 1
+    log "QWEN.md восстановлен → $WORKSPACE_DIR/QWEN.md"
 else
-    warn "CLAUDE.md в exocortex отсутствует — пропуск"
+    warn "QWEN.md в exocortex отсутствует — пропуск"
 fi
 
 # params.yaml belongs in the workspace root. Existing user configuration is
@@ -401,5 +401,5 @@ echo ""
 if $DRY_RUN; then
     warn "dry-run завершён. Для применения — запусти без --dry-run."
 else
-    log "Восстановление завершено. Перезапусти Claude Code для загрузки memory/."
+    log "Восстановление завершено. Перезапусти Qwen Code для загрузки memory/."
 fi

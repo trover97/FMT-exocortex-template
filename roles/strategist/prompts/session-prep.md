@@ -8,7 +8,7 @@
 - **Inbox:** {{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/inbox/ ([fleeting-notes.md](https://github.com/{{GITHUB_USER}}/{{GOVERNANCE_REPO}}/blob/main/inbox/fleeting-notes.md) + свежие файлы за неделю)
 - **Активные РП:** `bash {{WORKSPACE_DIR}}/scripts/active-wp-sweep.sh` (агрегатор по `{{GOVERNANCE_REPO}}/inbox/WP-*.md` + git-активность 7д — ~15с, не ручной обход)
 - **Стратегические карты:** {{WORKSPACE_DIR}}/*/MAPSTRATEGIC.md (если есть в репо)
-- **MEMORY:** ~/.claude/projects/{{CLAUDE_PROJECT_SLUG}}/memory/MEMORY.md
+- **MEMORY:** ~/.qwen/projects/{{CLAUDE_PROJECT_SLUG}}/memory/MEMORY.md
 
 ## Именование файлов в current/
 
@@ -86,7 +86,7 @@
 > Скрипт обходит все `inbox/WP-*.md`, кросс-проверяет git-активность за 7 дней,
 > выдаёт markdown-таблицу активных РП со статусами и бюджетами за секунды —
 > не читай `WORKPLAN.md` вручную по каждому репо (эти файлы почти нигде не
-> существуют, а сам `{{GOVERNANCE_REPO}}`/CLAUDE.md называет их отменённым
+> существуют, а сам `{{GOVERNANCE_REPO}}`/QWEN.md называет их отменённым
 > антипаттерном; ручной обход растягивал session-prep на 30+ минут вместо
 > секунд, WP-484 20.07).
 
@@ -229,7 +229,7 @@ agent: Стратег
 
 **Результат:** черновик WeekPlan (`status: draft`) с повесткой сессии в `current/`.
 
-> Следующий шаг: сессия стратегирования с пользователем → диспетчер `.claude/skills/strategy-session/SKILL.md` (`prompts/strategy-session.md` — устаревший, до разделения на weekly/monthly, не используется).
+> Следующий шаг: сессия стратегирования с пользователем → диспетчер `.qwen/skills/strategy-session/SKILL.md` (`prompts/strategy-session.md` — устаревший, до разделения на weekly/monthly, не используется).
 
 ---
 

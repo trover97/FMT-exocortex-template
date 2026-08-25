@@ -8,615 +8,615 @@
       "sha256": "40f8b3d924848fac222b26506975f69213d608924104ff0236a7bc26bd43994c"
     },
     {
-      "path": ".claude/agents/wp-sync-actualizer.md",
+      "path": ".qwen/agents/wp-sync-actualizer.md",
       "sha256": "224cdb263231374275c68fe46993d1be2fe2395fb10968e55de97546f828636d"
     },
     {
-      "path": ".claude/capture-config.sh.example",
+      "path": ".qwen/capture-config.sh.example",
       "sha256": "8915ae79beeaee8b83d23d804f16a043ca1a4e12868570ab22c524e846c9c48a"
     },
     {
-      "path": ".claude/config/capture-detectors.sh",
+      "path": ".qwen/config/capture-detectors.sh",
       "sha256": "57722f1f78369ef496843d2d2187ea7d434a0e6ccee2f40a0b63457d5cbf0efa"
     },
     {
-      "path": ".claude/detectors/README.md",
+      "path": ".qwen/detectors/README.md",
       "sha256": "29147a3593aa2d826546fa6745767d2303a05834992c0e25f3677294f3398984"
     },
     {
-      "path": ".claude/detectors/detector_decision.sh",
+      "path": ".qwen/detectors/detector_decision.sh",
       "sha256": "7dbf61a3fec906cb15b74a53cdba2dc94e0b67f153489d0adf8659f0e6d30368"
     },
     {
-      "path": ".claude/detectors/detector_incident.sh",
+      "path": ".qwen/detectors/detector_incident.sh",
       "sha256": "7a48ae3eada737d4db4afaa13c3dae050c0c9c07de0bda4ca6346bec486f37d0"
     },
     {
-      "path": ".claude/detectors/detector_pattern_awareness.sh",
+      "path": ".qwen/detectors/detector_pattern_awareness.sh",
       "sha256": "c0cb1995d05f7624cc3ec04413fd3237548409afb7fbea098d245230905d390e"
     },
     {
-      "path": ".claude/hooks/.orphan-allowlist",
+      "path": ".qwen/hooks/.orphan-allowlist",
       "sha256": "685bc9115f0ca88ef0979b6349a6beb725940d366cdcdf499cd778908563a701"
     },
     {
-      "path": ".claude/hooks/agent-trace-recorder.sh",
+      "path": ".qwen/hooks/agent-trace-recorder.sh",
       "sha256": "6ca087df68f9b14419fca158f9fe6e9941a54c5e25371b73ebbbf7fe23f84a9d"
     },
     {
-      "path": ".claude/hooks/agent-trace-uploader.sh",
+      "path": ".qwen/hooks/agent-trace-uploader.sh",
       "sha256": "240cebd285ecda22c3c4374c5f564853943f753a670f5e6fef43f6e6d0ccdc8f"
     },
     {
-      "path": ".claude/hooks/capture-bus.sh",
+      "path": ".qwen/hooks/capture-bus.sh",
       "sha256": "54bae311bfe6a014b9a9382f6cee18a30c052dfb6a12c86de3b2c0f8b2611dd3"
     },
     {
-      "path": ".claude/hooks/check-trash.sh",
+      "path": ".qwen/hooks/check-trash.sh",
       "sha256": "7378e1f310161a2103ab413c1d39d150c2fb88ef2ff0f4e76d8958e0a50c3921"
     },
     {
-      "path": ".claude/hooks/close-gate-reminder.sh",
+      "path": ".qwen/hooks/close-gate-reminder.sh",
       "sha256": "fedd8c93c4783608f25244cd9a4126160f10c2f592c2ab85fb64f1333f0ec549"
     },
     {
-      "path": ".claude/hooks/destructive-guard.sh",
+      "path": ".qwen/hooks/destructive-guard.sh",
       "sha256": "aaab111b500049cd078a86752e790083ff7a464c098eea5ab23cf5f3b4cdd3c5"
     },
     {
-      "path": ".claude/hooks/destructive-mcp-guard.sh",
+      "path": ".qwen/hooks/destructive-mcp-guard.sh",
       "sha256": "9012de5deeaae4c6fdbbbbc5c955e5554d5d20f374fb8c1c7fbfeaf2a939b068"
     },
     {
-      "path": ".claude/hooks/dry-run-gate.sh",
+      "path": ".qwen/hooks/dry-run-gate.sh",
       "sha256": "b4db8952fe634387388dfa59acf04bde612bc918291fbeba642b35dcb78547fe"
     },
     {
-      "path": ".claude/hooks/extensions-gate.sh",
+      "path": ".qwen/hooks/extensions-gate.sh",
       "sha256": "97ff533083afd493722299fb627a120f607656ef23159c9eea4b69aac8b2ba2e"
     },
     {
-      "path": ".claude/hooks/inject-code-style.sh",
+      "path": ".qwen/hooks/inject-code-style.sh",
       "sha256": "085b2d7d9dba02576ece94d92c63c051358ff5e29e205c824f5be5fa51452060"
     },
     {
-      "path": ".claude/hooks/inject-communication-style.sh",
+      "path": ".qwen/hooks/inject-communication-style.sh",
       "sha256": "5e2df1b36cd1729ab1a362310f4d5c133ad1fe88331d82e72a011271056edf3e"
     },
     {
-      "path": ".claude/hooks/inject-fault-profile.sh",
+      "path": ".qwen/hooks/inject-fault-profile.sh",
       "sha256": "e0c1f576c43fac12018a090121ed77ef9b03cbe5ec9ffda65ce7629ce9ba8712"
     },
     {
-      "path": ".claude/hooks/inject-role-prefixes.sh",
+      "path": ".qwen/hooks/inject-role-prefixes.sh",
       "sha256": "a7ef0667319e79e3da4b3aa16ca2e8bc3c0065794f0badade37e9c3e52d3e6f1"
     },
     {
-      "path": ".claude/hooks/lazy-context-loader.sh",
+      "path": ".qwen/hooks/lazy-context-loader.sh",
       "sha256": "03ebaa16a75b08414baeb816b16a0bb895fa2c14262fc2e117c5506754a970b2"
     },
     {
-      "path": ".claude/hooks/memory-exocortex-sync.sh",
+      "path": ".qwen/hooks/memory-exocortex-sync.sh",
       "sha256": "f1b639adc8fab3c92ef96c84f3d17caaa0e00c6190a4c7cd4037f4d235d1df49"
     },
     {
-      "path": ".claude/hooks/pack-creator-spf-guard.sh",
+      "path": ".qwen/hooks/pack-creator-spf-guard.sh",
       "sha256": "68be07adff21228a20ba39b7762d66f5619dd6ce3719b4e8ff82b2724d38d32a"
     },
     {
-      "path": ".claude/hooks/precompact-checkpoint.sh",
+      "path": ".qwen/hooks/precompact-checkpoint.sh",
       "sha256": "7d6f9904923f3173387d435e1e4e4f59f30a6ed1cd693e92df4045667facee9c"
     },
     {
-      "path": ".claude/hooks/protocol-artifact-validate.sh",
+      "path": ".qwen/hooks/protocol-artifact-validate.sh",
       "sha256": "64f250446dacc1967e722313f52a063bbb9feb02c79cf5f21d00b3b12fb67f15"
     },
     {
-      "path": ".claude/hooks/protocol-completion-reminder.sh",
+      "path": ".qwen/hooks/protocol-completion-reminder.sh",
       "sha256": "d6f242ac42a13a293a321454a6c9c17181f644ec5eb49ab2886e03fa3838cc99"
     },
     {
-      "path": ".claude/hooks/protocol-stop-gate.sh",
+      "path": ".qwen/hooks/protocol-stop-gate.sh",
       "sha256": "e6dee756c37e45edf95849f2fa083657eb28832b87c29ebc116c88ac5bc2fe2d"
     },
     {
-      "path": ".claude/hooks/pull-on-touch.sh",
+      "path": ".qwen/hooks/pull-on-touch.sh",
       "sha256": "ce00afb11193c91e7da9f1c6c3f8f92ac2ec8543aa38b1150c0054ac8ba7dc6c"
     },
     {
-      "path": ".claude/hooks/residency-gate-init.sh",
+      "path": ".qwen/hooks/residency-gate-init.sh",
       "sha256": "92781333c043afc60d952ab0f2114918e5da8248557e9868a272ac93df97038d"
     },
     {
-      "path": ".claude/hooks/residency-gate-lazy.sh",
+      "path": ".qwen/hooks/residency-gate-lazy.sh",
       "sha256": "4e6d6f71150d4fc283bd08ee1af632fe22da385740b5bd10feec83f559e0fb04"
     },
     {
-      "path": ".claude/hooks/residency-gate-skill-adapter.sh",
+      "path": ".qwen/hooks/residency-gate-skill-adapter.sh",
       "sha256": "f1069eba3df5a0cdf9e7a18ae15ecdeb82c4f0f4f5057212e8c25ed89b5f2e80"
     },
     {
-      "path": ".claude/hooks/response-clarity-hook.sh",
+      "path": ".qwen/hooks/response-clarity-hook.sh",
       "sha256": "094c904d9452b9067dfbbd867adf8902ed49c45296661a6aebdfa2690a9431e8"
     },
     {
-      "path": ".claude/hooks/rule-engine.sh",
+      "path": ".qwen/hooks/rule-engine.sh",
       "sha256": "4cd7b1c9856fa0153536b8fd443af2fcb28a7dd436bb33c0f492108099752c74"
     },
     {
-      "path": ".claude/hooks/session-end-status.sh",
+      "path": ".qwen/hooks/session-end-status.sh",
       "sha256": "07b157c5d7614939f027aa50080cabe4531aba4ebae8886038f167620daba6b9"
     },
     {
-      "path": ".claude/hooks/wp-gate-reminder.sh",
+      "path": ".qwen/hooks/wp-gate-reminder.sh",
       "sha256": "a6dfaee3ebc87432236f63b33a047c52fa1a117b4d44803689cf96ba2559a84d"
     },
     {
-      "path": ".claude/lib/behaviour-report.sh",
+      "path": ".qwen/lib/behaviour-report.sh",
       "sha256": "5f63abbcfe69ab6b72d3a28cf91a25d50e63e618b76578e48298db6a3b4283e3"
     },
     {
-      "path": ".claude/lib/capture_selftest.sh",
+      "path": ".qwen/lib/capture_selftest.sh",
       "sha256": "48021aed153e0195d589c64a740fcd92f3dd10636f7b599d6d56688a59934f35"
     },
     {
-      "path": ".claude/lib/capture_writer.sh",
+      "path": ".qwen/lib/capture_writer.sh",
       "sha256": "03ea07a993c104a4108dcbae63d7cb8a671f7c19928b716206d30fa6fb004aff"
     },
     {
-      "path": ".claude/lib/find-python3.sh",
+      "path": ".qwen/lib/find-python3.sh",
       "sha256": "b938fca2780186b9383f3174a6d21b218f3b5f3a50e5d411a38179d584689cdd"
     },
     {
-      "path": ".claude/lib/frontmatter.sh",
+      "path": ".qwen/lib/frontmatter.sh",
       "sha256": "184ab6e9df7c9ea8589a6a960ed91db4491e56944e04022b9b9478bc04cae5a9"
     },
     {
-      "path": ".claude/lib/iwe-env-bootstrap.sh",
+      "path": ".qwen/lib/iwe-env-bootstrap.sh",
       "sha256": "911c64488ac5508b2df448a7aae1367207f6828af26a1bbe876e8744caed52f7"
     },
     {
-      "path": ".claude/lib/log_formatter.sh",
+      "path": ".qwen/lib/log_formatter.sh",
       "sha256": "98b0b271e1d12b89f54764dd2ebcccb68ecaa3f5c60359b87bf9c2216873998a"
     },
     {
-      "path": ".claude/lib/residency-gate-run.sh",
+      "path": ".qwen/lib/residency-gate-run.sh",
       "sha256": "7f562bd647bdb5729d0d5c922970aeeba455a315afd09677ef62bd90ad1abf8a"
     },
     {
-      "path": ".claude/lib/resolve_target_repo.sh",
+      "path": ".qwen/lib/resolve_target_repo.sh",
       "sha256": "f0e32051430c4f5e1b6e9d3c6abf6b5866787ca9fb921103e0663ce9e37f4377"
     },
     {
-      "path": ".claude/parity-contract.yaml",
+      "path": ".qwen/parity-contract.yaml",
       "sha256": "490b6866cc1750a043bb9a62021656f0ee4b1fb768930d0ea8950d3a69703e17"
     },
     {
-      "path": ".claude/process-pattern-catalog.yaml",
+      "path": ".qwen/process-pattern-catalog.yaml",
       "sha256": "eb4d0e15c4dd438efae8a4bb193536384c4816f5e635a3738d1cab13cef5988e"
     },
     {
-      "path": ".claude/rules-lazy/blocking-rules-full.md",
+      "path": ".qwen/rules-lazy/blocking-rules-full.md",
       "sha256": "136cd2b0a4f9fb888be0b5ec99b443a5f8e6816c5ad24533c411c03fff3ffc69"
     },
     {
-      "path": ".claude/rules-lazy/drift-guard.md",
+      "path": ".qwen/rules-lazy/drift-guard.md",
       "sha256": "8099ecc27c790619169409236c470300ff249f9614828969cb1c7a71b92109da"
     },
     {
-      "path": ".claude/rules-lazy/hooks-bypass-gate.md",
+      "path": ".qwen/rules-lazy/hooks-bypass-gate.md",
       "sha256": "a9e0c81fc5b5f3097dcb419c2334fcb8a4a4d4a2ad57fdc56341b0718f1bcb46"
     },
     {
-      "path": ".claude/rules-lazy/integration-gate.md",
+      "path": ".qwen/rules-lazy/integration-gate.md",
       "sha256": "077cd9815d7e11644180ac78ec39d6495f36e91d04335f6c003fbc8b8eac715b"
     },
     {
-      "path": ".claude/rules-lazy/new-files-guard.md",
+      "path": ".qwen/rules-lazy/new-files-guard.md",
       "sha256": "f6f143427bbf4c7d8158e8df38c86010e913a6a3009c221fb50086e3efb46e8a"
     },
     {
-      "path": ".claude/rules-lazy/role-prefixes-full.md",
+      "path": ".qwen/rules-lazy/role-prefixes-full.md",
       "sha256": "971e2f2caf9b4d4a49d1c07fd6a64529d631cde896fbeff526b0a7cb9d5f77a3"
     },
     {
-      "path": ".claude/rules-lazy/state-transition-gate.md",
+      "path": ".qwen/rules-lazy/state-transition-gate.md",
       "sha256": "fc244080c1a1742eb75a83620a4d69ee627ad01cefc46b08d5750839a47f64f0"
     },
     {
-      "path": ".claude/rules-lazy/wp-stop-list.md",
+      "path": ".qwen/rules-lazy/wp-stop-list.md",
       "sha256": "33fa9411f59599ceca457041631f06ba026295e94a8682723157e66dd1dd485f"
     },
     {
-      "path": ".claude/rules/distinctions.md",
+      "path": ".qwen/rules/distinctions.md",
       "sha256": "92782bac92674f695a667af1890fbd2c8ba0684163038f63cff46a7ef91e1a77"
     },
     {
-      "path": ".claude/rules/formatting.md",
+      "path": ".qwen/rules/formatting.md",
       "sha256": "4c62ecae76ee6e6988ac3137e85370cc51d65fabddf1dac395185d975c62963d"
     },
     {
-      "path": ".claude/rules/role-prefixes.md",
+      "path": ".qwen/rules/role-prefixes.md",
       "sha256": "bf94b1e6a4536b873bdaa381f968686b9668a893998cf585afcbd1076b044edc"
     },
     {
-      "path": ".claude/rules/wp-scope.md",
+      "path": ".qwen/rules/wp-scope.md",
       "sha256": "8727d8c0c447afe12b46a5cfcc08d4cff6af9108721442e04f7e6570eeb266ce"
     },
     {
-      "path": ".claude/runtime-overlay.yaml",
+      "path": ".qwen/runtime-overlay.yaml",
       "sha256": "8a7a0cfcd3606ab80d76fbf3aaf8dec71c2079c01070130ad50913e9e1e30b36"
     },
     {
-      "path": ".claude/scripts/check-index-health.py",
+      "path": ".qwen/scripts/check-index-health.py",
       "sha256": "348db830188a04e76c2ff02ca6f2d52c93072f628290c1ac4f2818c2a264269a"
     },
     {
-      "path": ".claude/scripts/classify-workspace-copy.sh",
+      "path": ".qwen/scripts/classify-workspace-copy.sh",
       "sha256": "39e14176892023597366818e5d8afeba763a72403999da362c385e0235245cd5"
     },
     {
-      "path": ".claude/scripts/generate-rules-registry.py",
+      "path": ".qwen/scripts/generate-rules-registry.py",
       "sha256": "814607296a21ae1ce8a21f2484fce2c3e62be23f481da172fb55f920dfab793a"
     },
     {
-      "path": ".claude/scripts/load-extensions.sh",
+      "path": ".qwen/scripts/load-extensions.sh",
       "sha256": "1d3bd569180e65544e4aae650e3a4ec8e60aaec07460e8a4819498d39b86125d"
     },
     {
-      "path": ".claude/scripts/memory-drift-scan.py",
+      "path": ".qwen/scripts/memory-drift-scan.py",
       "sha256": "8c0b5d81add179ca03aa3e590a33a9b92c36b97b49d9030f0c2eba808a29fea0"
     },
     {
-      "path": ".claude/scripts/settings-merge-apply.sh",
+      "path": ".qwen/scripts/settings-merge-apply.sh",
       "sha256": "30c13a546e7d8178ffa186813fe1f56b88edd11ae74cb5c24c35588bff0984a4"
     },
     {
-      "path": ".claude/scripts/settings-merge-preview.py",
+      "path": ".qwen/scripts/settings-merge-preview.py",
       "sha256": "1736fa40d7229ad26c5b7a61ba5fdbb5b7b5844f6288a2e927c7f67137281dfb"
     },
     {
-      "path": ".claude/scripts/wp-sync-bundle.sh",
+      "path": ".qwen/scripts/wp-sync-bundle.sh",
       "sha256": "431bed387ac29e09d5e568de3f308815b3def0d23a8e6d566c0b1df0fee29266"
     },
     {
-      "path": ".claude/settings.json",
+      "path": ".qwen/settings.json",
       "sha256": "3540ae0f183610eb87f987c20d13b4262078b5c5f2454f598c5ee22f501aaf0b"
     },
     {
-      "path": ".claude/skills-catalog.yaml",
+      "path": ".qwen/skills-catalog.yaml",
       "sha256": "7eef8f33d8fd19d519d50e32c76eb343b135790c34f73fe5121aed8af7eb978c"
     },
     {
-      "path": ".claude/skills/SKILL-INDEX.yaml",
+      "path": ".qwen/skills/SKILL-INDEX.yaml",
       "sha256": "78858add8b00da17607fdc56db44622d127fa66d3fbde0cedfcd896bc47218fc"
     },
     {
-      "path": ".claude/skills/_template/SKILL.md",
+      "path": ".qwen/skills/_template/SKILL.md",
       "sha256": "23e26d108fbfdfaad178508b99e42855c835351ccf1cfb5a4b82c4f00eb77489"
     },
     {
-      "path": ".claude/skills/agent-fault/SKILL.md",
+      "path": ".qwen/skills/agent-fault/SKILL.md",
       "sha256": "d13cf21841ab0e7b72ae4e506dbd6a8b0d9ddaf9674e11e60b190addaef61dc2"
     },
     {
-      "path": ".claude/skills/apply-captures/SKILL.md",
+      "path": ".qwen/skills/apply-captures/SKILL.md",
       "sha256": "ec983de920f3814db2044afcb8072c9db229d9d39232d0b0343a0d164121d474"
     },
     {
-      "path": ".claude/skills/archgate/SKILL.md",
+      "path": ".qwen/skills/archgate/SKILL.md",
       "sha256": "07bdd193b77c1a63831655f7547928461dee7343cf7e6e68c8d26068984b1267"
     },
     {
-      "path": ".claude/skills/artifactor/SKILL.md",
+      "path": ".qwen/skills/artifactor/SKILL.md",
       "sha256": "71164815dcb5c5a8d09963600edb85300c88d5678836933e9e284baee98a558d"
     },
     {
-      "path": ".claude/skills/audit-docs/.audit-context.yaml.example",
+      "path": ".qwen/skills/audit-docs/.audit-context.yaml.example",
       "sha256": "cbaf7ca2d6fa8d7d18a02d1ea45dc52673f7fc1545dcfb8812a2cf7e1c30b718"
     },
     {
-      "path": ".claude/skills/audit-docs/SKILL.md",
+      "path": ".qwen/skills/audit-docs/SKILL.md",
       "sha256": "1b1d7bb57038953b8708fcf74ef43ec7a3bc6c8f7773e430ca93d5f668829dee"
     },
     {
-      "path": ".claude/skills/audit-installation/SKILL.md",
+      "path": ".qwen/skills/audit-installation/SKILL.md",
       "sha256": "35b4de61d8d83dc3e28c7d624e4b8d130598787365f07e6812c4dc30096f7b71"
     },
     {
-      "path": ".claude/skills/author-mode/SKILL.md",
+      "path": ".qwen/skills/author-mode/SKILL.md",
       "sha256": "f4c7162698f5b191dc90ef451958392e172eb2d58ae972c80173741779e7ecdf"
     },
     {
-      "path": ".claude/skills/bottleneck-pick/SKILL.md",
+      "path": ".qwen/skills/bottleneck-pick/SKILL.md",
       "sha256": "6011b7bf5a1b2c8f8f967acd9675ab442711751e521b88c3043006d56371ed34"
     },
     {
-      "path": ".claude/skills/check-secret/SKILL.md",
+      "path": ".qwen/skills/check-secret/SKILL.md",
       "sha256": "1a614d7a6fc460c50e6c9aa1573c1ef8bc0daa3938ab1a99c8d575f1bfa00164"
     },
     {
-      "path": ".claude/skills/check-secret/check.sh",
+      "path": ".qwen/skills/check-secret/check.sh",
       "sha256": "7c5dace7bf1e9bd8769c87d6115a7a917f837db872bc2069af64562d4744da5c"
     },
     {
-      "path": ".claude/skills/consent/SKILL.md",
+      "path": ".qwen/skills/consent/SKILL.md",
       "sha256": "c85f1a060c5074250aa2aa8cb2b7ccb6c32802814307ff63f8287f5e4b5543c7"
     },
     {
-      "path": ".claude/skills/day-close/SKILL.md",
+      "path": ".qwen/skills/day-close/SKILL.md",
       "sha256": "d70f99826094a25afff821a6c360216a8fbdddd42b47ceca95e5abe4da58039e"
     },
     {
-      "path": ".claude/skills/day-close/day-close-details.md",
+      "path": ".qwen/skills/day-close/day-close-details.md",
       "sha256": "713dc55f0a433eceb921d629e45680acb8156911e1bf2ac4dd36f0e5e74a4c5b"
     },
     {
-      "path": ".claude/skills/day-close/day-close/SKILL.md",
+      "path": ".qwen/skills/day-close/day-close/SKILL.md",
       "sha256": "95aa08ce8eec158f2851515a2ea1c949d6466af13958ef327d4b13855c1e5be2"
     },
     {
-      "path": ".claude/skills/day-open/SKILL.md",
+      "path": ".qwen/skills/day-open/SKILL.md",
       "sha256": "a328a261ab9f377526ad1ae5535b67e7475acfdf9758eca425fa8c40b1b0da84"
     },
     {
-      "path": ".claude/skills/day-open/day-open-details.md",
+      "path": ".qwen/skills/day-open/day-open-details.md",
       "sha256": "280c0f17b8ae166eb87763af1a48430da9e3e3ec29472d5d2b920f01b3dfd8ea"
     },
     {
-      "path": ".claude/skills/day-open/templates.md",
+      "path": ".qwen/skills/day-open/templates.md",
       "sha256": "c91e7acf0bb5106713891079a84076cb8a0782a16de26ada96eabc32e7811154"
     },
     {
-      "path": ".claude/skills/decompose/SKILL.md",
+      "path": ".qwen/skills/decompose/SKILL.md",
       "sha256": "21f9a08fb83184213b6a4e55553c8e960be41224922117122f3a90d371db920a"
     },
     {
-      "path": ".claude/skills/diagnose/SKILL.md",
+      "path": ".qwen/skills/diagnose/SKILL.md",
       "sha256": "9b5f55fee4692f841af68d92a76f44ef0eca7b7f304a0124654c5e6cfcb43f3d"
     },
     {
-      "path": ".claude/skills/discovery-session/SKILL.md",
+      "path": ".qwen/skills/discovery-session/SKILL.md",
       "sha256": "4e953e3cf0f98df3a50403790e9c90acc56bf3158121c4985da61d433265170d"
     },
     {
-      "path": ".claude/skills/extend/SKILL.md",
+      "path": ".qwen/skills/extend/SKILL.md",
       "sha256": "36405c8038f4dc6635b08536e73b9fcfc71f9e7c8f7d8a7d36f8bebcd3e6971c"
     },
     {
-      "path": ".claude/skills/fpf/SKILL.md",
+      "path": ".qwen/skills/fpf/SKILL.md",
       "sha256": "68e079768912713db1d2c105444a22d7e18f9b6f6c145b4996780e0dba69d092"
     },
     {
-      "path": ".claude/skills/integration-gate/SKILL.md",
+      "path": ".qwen/skills/integration-gate/SKILL.md",
       "sha256": "0d2a6d2a7b2ee04ffbb957854a6f6cdf19aa1abfe9de084f008378c505573bc4"
     },
     {
-      "path": ".claude/skills/iwe-bug-report/SKILL.md",
+      "path": ".qwen/skills/iwe-bug-report/SKILL.md",
       "sha256": "627aa06118e339999e7eb901ccf852730544160cf667b873b1ec50260215f7cf"
     },
     {
-      "path": ".claude/skills/iwe-restore/SKILL.md",
+      "path": ".qwen/skills/iwe-restore/SKILL.md",
       "sha256": "af636e1cc61d1be443f7ba8466533d701bb0a294f5df570efe138fe4cf583840"
     },
     {
-      "path": ".claude/skills/iwe-rules-review/SKILL.md",
+      "path": ".qwen/skills/iwe-rules-review/SKILL.md",
       "sha256": "1cf0ace972bfdfe248c392b35381f7a7a22138115bfc21139f4086e02a899920"
     },
     {
-      "path": ".claude/skills/iwe-update/SKILL.md",
+      "path": ".qwen/skills/iwe-update/SKILL.md",
       "sha256": "c953a13625aba4eb7930ba136e1c6167511556731cdd8958b7925a2f7e04f722"
     },
     {
-      "path": ".claude/skills/ke/SKILL.md",
+      "path": ".qwen/skills/ke/SKILL.md",
       "sha256": "b7927256507f165067a6611341c9f1ff452e5862474595a6ee9a44cec5468723"
     },
     {
-      "path": ".claude/skills/kimi-peer-writer/SKILL.md",
+      "path": ".qwen/skills/kimi-peer-writer/SKILL.md",
       "sha256": "50961a5c7ef49101dc594bfeb9a35164e1aef4468dfc9e3e48067b98c645bbb5"
     },
     {
-      "path": ".claude/skills/lesson-close/SKILL.md",
+      "path": ".qwen/skills/lesson-close/SKILL.md",
       "sha256": "cbb62662634ad282bc6773ba34a101542123be2f75ef4b62d0cec0aa7dca27d6"
     },
     {
-      "path": ".claude/skills/local-llm/SKILL.md",
+      "path": ".qwen/skills/local-llm/SKILL.md",
       "sha256": "90e6fb1909c12be4d1d95e681543603c73d92941cf7f19eca3df6407477af5f0"
     },
     {
-      "path": ".claude/skills/month-close/SKILL.md",
+      "path": ".qwen/skills/month-close/SKILL.md",
       "sha256": "bbda381fa73ac32cde79936b023cbbec2f379c80770455e60834c3ba8528254e"
     },
     {
-      "path": ".claude/skills/org-dev/SKILL.md",
+      "path": ".qwen/skills/org-dev/SKILL.md",
       "sha256": "826d26111e03ff7de4bf4a995af0724d3ebe193b3b4ddd1c21b243e6e93f32e0"
     },
     {
-      "path": ".claude/skills/org-dev/test_skill.sh",
+      "path": ".qwen/skills/org-dev/test_skill.sh",
       "sha256": "da55df9367a47a3623134716d806ff53e7649c0325fd67a52f2fc4a5a60e54df"
     },
     {
-      "path": ".claude/skills/pack-creator/SKILL.md",
+      "path": ".qwen/skills/pack-creator/SKILL.md",
       "sha256": "a6c3b4fb25f7bd7236d24f51a511181e65a3db28782c9e52ec3157472f67e47b"
     },
     {
-      "path": ".claude/skills/pack-creator/test_guard.sh",
+      "path": ".qwen/skills/pack-creator/test_guard.sh",
       "sha256": "443f3d1d0bde2e092305e5ddd06f31cdd9c49f0fe8a7719c5b8fe373cbc673b9"
     },
     {
-      "path": ".claude/skills/pack-new/SKILL.md",
+      "path": ".qwen/skills/pack-new/SKILL.md",
       "sha256": "8455fd33e71b08e93ccb3e55f83de45afaacb5a1e5737f90cb17803f1397b748"
     },
     {
-      "path": ".claude/skills/peer-conversation/SKILL.md",
+      "path": ".qwen/skills/peer-conversation/SKILL.md",
       "sha256": "b3d61c6491905c28a5f2a0eea0a8efd4960593a9941860711d1c3c6beea1090c"
     },
     {
-      "path": ".claude/skills/personal-guide-render/SKILL.md",
+      "path": ".qwen/skills/personal-guide-render/SKILL.md",
       "sha256": "a8b3cbf4b31dd603095e3b260cda86bf714f27628ae6fce4d8b40c1520765a26"
     },
     {
-      "path": ".claude/skills/personal-guide-render/templates/reflection-template.md",
+      "path": ".qwen/skills/personal-guide-render/templates/reflection-template.md",
       "sha256": "2e18d87006ea2f5fc2379ba8bbb32b3cf59bd33abd9d2b6da70aeec86749c3ad"
     },
     {
-      "path": ".claude/skills/personal-guide-start/SKILL.md",
+      "path": ".qwen/skills/personal-guide-start/SKILL.md",
       "sha256": "68782ad4332015d0c01d1877042e35459aec944c1327fe25e654f855778b10dd"
     },
     {
-      "path": ".claude/skills/platform-bottleneck/SKILL.md",
+      "path": ".qwen/skills/platform-bottleneck/SKILL.md",
       "sha256": "db3e8375e8a652a5add8c790a66d5cc8af66bd2101d4156a0169000c482704fe"
     },
     {
-      "path": ".claude/skills/residency-gate/__init__.py",
+      "path": ".qwen/skills/residency-gate/__init__.py",
       "sha256": "b4cbf3c22d18b3d501923e18d6d3a300f8fa0c1ff5025976ccda4efc08f2486b"
     },
     {
-      "path": ".claude/skills/residency-gate/lib/__init__.py",
+      "path": ".qwen/skills/residency-gate/lib/__init__.py",
       "sha256": "9bf8849a642e349752ff05394f729244dd399bfb36ab3df9021f19fa9c0b207f"
     },
     {
-      "path": ".claude/skills/residency-gate/lib/consent.py",
+      "path": ".qwen/skills/residency-gate/lib/consent.py",
       "sha256": "78baa048b36327319a0a95ebff6157a11813bc3f6890359636367e97c9a5b548"
     },
     {
-      "path": ".claude/skills/residency-gate/lib/parser.py",
+      "path": ".qwen/skills/residency-gate/lib/parser.py",
       "sha256": "71e2cb45b74dcb906f88622930a54443361c751a59dde13ba45cf64916184cb1"
     },
     {
-      "path": ".claude/skills/residency-gate/lib/state.py",
+      "path": ".qwen/skills/residency-gate/lib/state.py",
       "sha256": "e873f1e865a7075fe4d27261d7e315c297ac363ee0b3971670c57a706759df8c"
     },
     {
-      "path": ".claude/skills/residency-gate/pre-grant.yaml",
+      "path": ".qwen/skills/residency-gate/pre-grant.yaml",
       "sha256": "0781b77830593c9aad4fb2801c7a393be78c01a32a62337d9214256432bc77ea"
     },
     {
-      "path": ".claude/skills/residency-gate/residency-gate.py",
+      "path": ".qwen/skills/residency-gate/residency-gate.py",
       "sha256": "b5f2dd8484a1c9e0c5a5cf4e53903a0141072cf22ff99e603d319ff2082d1e28"
     },
     {
-      "path": ".claude/skills/residency-gate/tests/test_parser.py",
+      "path": ".qwen/skills/residency-gate/tests/test_parser.py",
       "sha256": "03a3b7cbe31ec6c104925273671c6512eade341d3984f86f4bcc249bd458d724"
     },
     {
-      "path": ".claude/skills/residency-gate/tests/test_pre_grant.py",
+      "path": ".qwen/skills/residency-gate/tests/test_pre_grant.py",
       "sha256": "f09e190f5389f0b58c5978db89ccd233da237c616f99a14d7fd8eb1da9413c6d"
     },
     {
-      "path": ".claude/skills/restore-exocortex/SKILL.md",
+      "path": ".qwen/skills/restore-exocortex/SKILL.md",
       "sha256": "8d60c8468653a9cf5f1ab4428e12ba678265e3e30c3191fcb30d751fa6f50e27"
     },
     {
-      "path": ".claude/skills/run-protocol/SKILL.md",
+      "path": ".qwen/skills/run-protocol/SKILL.md",
       "sha256": "4e1cf3cb33c20d1f10c15ca81fb4ba842da7716d4b16fd50fa0af17ea8afd387"
     },
     {
-      "path": ".claude/skills/setup-wakatime/SKILL.md",
+      "path": ".qwen/skills/setup-wakatime/SKILL.md",
       "sha256": "0df0e6e859aed5d4394b2e646896abc77aec777b17be303f332e812297e9458d"
     },
     {
-      "path": ".claude/skills/skill-creator/SKILL.md",
+      "path": ".qwen/skills/skill-creator/SKILL.md",
       "sha256": "c492e3b80ee28196d50eac8c7858d9044ebe74fcb9ad7ed05c31c9bc6c21c0b8"
     },
     {
-      "path": ".claude/skills/skill-creator/assets/skill-scaffold-full.md",
+      "path": ".qwen/skills/skill-creator/assets/skill-scaffold-full.md",
       "sha256": "5f18c84abe018fd99a5bbd2ba8231153a53a1d09b6ae56f5b1f1fe7b5210f694"
     },
     {
-      "path": ".claude/skills/skill-creator/assets/skill-scaffold-minimal.md",
+      "path": ".qwen/skills/skill-creator/assets/skill-scaffold-minimal.md",
       "sha256": "9011870f63fde09f59cf313b8f21cc7865df713793085f67deb695d104cc9d4a"
     },
     {
-      "path": ".claude/skills/skill-creator/scripts/batch-fix-skills.py",
+      "path": ".qwen/skills/skill-creator/scripts/batch-fix-skills.py",
       "sha256": "15da4adc8ef3c27ad05c2ba53b1aa80dbee356973680d9a1fac01632d89ec7e8"
     },
     {
-      "path": ".claude/skills/skill-creator/scripts/content-audit.sh",
+      "path": ".qwen/skills/skill-creator/scripts/content-audit.sh",
       "sha256": "a67c3ea12f8e47b36bdef058356887f5aea29601c3f33595d0058e9735ce0a8a"
     },
     {
-      "path": ".claude/skills/skill-creator/scripts/scaffold-init.sh",
+      "path": ".qwen/skills/skill-creator/scripts/scaffold-init.sh",
       "sha256": "6997b0b4db9841602eda66d62196cf0979cb9ae51e43507a67ad70cc43b00b69"
     },
     {
-      "path": ".claude/skills/skill-creator/scripts/verify-skill.sh",
+      "path": ".qwen/skills/skill-creator/scripts/verify-skill.sh",
       "sha256": "8cd3a28578ad22530d9ba905ab65b8475057cb2850afaa13def5375582695d58"
     },
     {
-      "path": ".claude/skills/strategy-session/SKILL.md",
+      "path": ".qwen/skills/strategy-session/SKILL.md",
       "sha256": "e2967c9df1fa2cf6e4bffa1ccb6f0fc8829a3409f36b0b7490dc6a10d80a5d0f"
     },
     {
-      "path": ".claude/skills/think/SKILL.md",
+      "path": ".qwen/skills/think/SKILL.md",
       "sha256": "77d0582389ae731c5fb613d22752a6f2e303e5860e0acbb16d9edcaf916a88ad"
     },
     {
-      "path": ".claude/skills/transcribe/SKILL.md",
+      "path": ".qwen/skills/transcribe/SKILL.md",
       "sha256": "1b7aea1ead4ed4891e5eb8306de77a3bcf7aba80c4815e9fac17c8ad3cb37636"
     },
     {
-      "path": ".claude/skills/vdv/SKILL.md",
+      "path": ".qwen/skills/vdv/SKILL.md",
       "sha256": "901dd20fe0f7360d712c1c0b6b7de9a862a82f8154e4be1ecbbe0fa8da70b8a2"
     },
     {
-      "path": ".claude/skills/vdv/test_cases.md",
+      "path": ".qwen/skills/vdv/test_cases.md",
       "sha256": "44543834e5de3faad3b5180b250c545dcad49f7465118e3a60ebb52a6fecadb0"
     },
     {
-      "path": ".claude/skills/verify-hypotheses/SKILL.md",
+      "path": ".qwen/skills/verify-hypotheses/SKILL.md",
       "sha256": "781eea21f39f56eb0025d7042098f335b9e7ec519b280d3ac6620fe0114e6586"
     },
     {
-      "path": ".claude/skills/verify/SKILL.md",
+      "path": ".qwen/skills/verify/SKILL.md",
       "sha256": "e09e16a9969eff2446842e7e197cccbf6b971134b73f06e089aee29e63d40ba1"
     },
     {
-      "path": ".claude/skills/verify/verify-fpf-subsection.md",
+      "path": ".qwen/skills/verify/verify-fpf-subsection.md",
       "sha256": "962c450b881832034e4d81bb3de3e06a6c53aaa99decdf6ea7c2baeff6694e71"
     },
     {
-      "path": ".claude/skills/verify/verify-pack-adequacy-subsection.md",
+      "path": ".qwen/skills/verify/verify-pack-adequacy-subsection.md",
       "sha256": "fd105286bcba402aed001d4c13cf93661ed225927d26219fda55e391c321d015"
     },
     {
-      "path": ".claude/skills/verify/verify-pedagogy-subsection.md",
+      "path": ".qwen/skills/verify/verify-pedagogy-subsection.md",
       "sha256": "851505f5be6305ea43e4a1efee1489792665b59eedc495ed7332324f2795bf19"
     },
     {
-      "path": ".claude/skills/w-reflection/SKILL.md",
+      "path": ".qwen/skills/w-reflection/SKILL.md",
       "sha256": "63656d44602a9d09f39292d9b2385f46d4b9db04bf86fe998507fc6cbfcc86b3"
     },
     {
-      "path": ".claude/skills/week-close-pilot/SKILL.md",
+      "path": ".qwen/skills/week-close-pilot/SKILL.md",
       "sha256": "5b0ff7a1f2d462722aa0dfb006c82842fe8c87da5c12f7600d55854784d86757"
     },
     {
-      "path": ".claude/skills/week-close/SKILL.md",
+      "path": ".qwen/skills/week-close/SKILL.md",
       "sha256": "c5e6bae7e7a974fb1e54ccf8df5027c15d149de7565d1435ce53fd336838e484"
     },
     {
-      "path": ".claude/skills/week-close/week-close/SKILL.md",
+      "path": ".qwen/skills/week-close/week-close/SKILL.md",
       "sha256": "efcda66de3b2a902d5d0d8cac7734c2a6117ac46a113cf9fabca9c81e0e9dd84"
     },
     {
-      "path": ".claude/skills/wp-new/SKILL.md",
+      "path": ".qwen/skills/wp-new/SKILL.md",
       "sha256": "02d6265b087f452adf7c3a71c4122caec1f6f833de84f7b062fc3e61c021639a"
     },
     {
-      "path": ".claude/styles/p05-core.md",
+      "path": ".qwen/styles/p05-core.md",
       "sha256": "f4a15383059df6ade9026a99aa83dc7dd61521b15e953ee8c35a570b959717a8"
     },
     {
-      "path": ".claude/styles/s0-core.md",
+      "path": ".qwen/styles/s0-core.md",
       "sha256": "2dd9ee45fcbfed74d1614da1723c45e2731b0ac174003449c2f4e0dd2e33af3b"
     },
     {
-      "path": ".claude/sync-manifest.yaml",
+      "path": ".qwen/sync-manifest.yaml",
       "sha256": "d4d1fddfce286cb7db3300b421a1bc0552210dd8e9356aafb7e3b84765a20cc7"
     },
     {
-      "path": ".claude/templates/drr-template.md",
+      "path": ".qwen/templates/drr-template.md",
       "sha256": "001aae991a6afc5fa75dd7c338b72fb53aff8bd4c4469c94da5f9deb78b060f3"
     },
     {
@@ -672,7 +672,7 @@
       "sha256": "05f871db855238fcfaf6da8deca36ff0333077c23d0bf72760ac164f22321951"
     },
     {
-      "path": "CLAUDE.md",
+      "path": "QWEN.md",
       "sha256": "7051cbfb4b12e88c196a014967e5bd860ab68bdc04a787acb9f13717aedd57fa"
     },
     {
@@ -2882,11 +2882,11 @@
       "reason": "hub-and-spoke antipattern removed in WP-283 2026-05-11"
     },
     {
-      "path": ".claude/hooks/wakatime-heartbeat.sh",
+      "path": ".qwen/hooks/wakatime-heartbeat.sh",
       "reason": "removed from platform in v0.34 — user-installed hook only"
     },
     {
-      "path": ".claude/skills/peer-conversation/modes.md",
+      "path": ".qwen/skills/peer-conversation/modes.md",
       "reason": "removed from platform — moved to peer-conversation skill internals"
     },
     {

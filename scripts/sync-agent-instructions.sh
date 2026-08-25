@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 # routing: utility  deterministic=true
 # see WP-394 Ф4.2, DP.SC.159
-# sync-agent-instructions.sh — генерация AGENTS.md из единого ядра CLAUDE.md + agent-blocks
+# sync-agent-instructions.sh — генерация AGENTS.md из единого ядра QWEN.md + agent-blocks
 #
 # Single-source инструкций агентов (WP-394 Ф4.2). Устраняет молчаливую дивергенцию
-# между CLAUDE.md (Claude), AGENTS.md (Kimi) и инструкциями Hermes.
+# между QWEN.md (Claude), AGENTS.md (Kimi) и инструкциями Hermes.
 #
 # Сборка (полная регенерация, НЕ маркерная вставка):
-#   AGENTS.md = [header] + [SYNC-CORE из CLAUDE.md] + [AGENTS-agent-blocks.md]
+#   AGENTS.md = [header] + [SYNC-CORE из QWEN.md] + [AGENTS-agent-blocks.md]
 #
 # Источники (в $IWE_ROOT, default $HOME/IWE):
-#   CLAUDE.md             — секция между <!-- SYNC-CORE-START --> и <!-- SYNC-CORE-END -->
+#   QWEN.md             — секция между <!-- SYNC-CORE-START --> и <!-- SYNC-CORE-END -->
 #   AGENTS-agent-blocks.md — агент-специфика (commit attribution, MCP, instructions level)
 #
 # Использование:
@@ -24,13 +24,13 @@
 #   IWE_ROOT            — корень рабочего пространства (default $HOME/IWE)
 #   HERMES_RUNTIME_DIR  — каталог рантайма Hermes для --with-hermes (default $HOME/.hermes)
 #
-# Инвариант: CLAUDE.md SYNC-CORE — source-of-truth общего ядра. AGENTS.md derived, не править руками.
+# Инвариант: QWEN.md SYNC-CORE — source-of-truth общего ядра. AGENTS.md derived, не править руками.
 
 set -euo pipefail
 # Load unified environment: WORKSPACE_DIR, IWE_ROOT, IWE_SCRIPTS, etc.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/../.claude/lib/iwe-env-bootstrap.sh" || exit 1
-CLAUDE_MD="$IWE_ROOT/CLAUDE.md"
+source "$SCRIPT_DIR/../.qwen/lib/iwe-env-bootstrap.sh" || exit 1
+CLAUDE_MD="$IWE_ROOT/QWEN.md"
 BLOCKS_MD="$IWE_ROOT/AGENTS-agent-blocks.md"
 OUT_MD="$IWE_ROOT/AGENTS.md"
 HERMES_DIR="${HERMES_RUNTIME_DIR:-$HOME/.hermes}"
@@ -94,7 +94,7 @@ build_agents() {
 # AGENTS.md
 
 > **Сгенерировано `scripts/sync-agent-instructions.sh` (WP-394 Ф4.2). НЕ РЕДАКТИРОВАТЬ ВРУЧНУЮ.**
-> Общее ядро → блок `<!-- SYNC-CORE -->` в `CLAUDE.md`. Агент-специфика → `AGENTS-agent-blocks.md`.
+> Общее ядро → блок `<!-- SYNC-CORE -->` в `QWEN.md`. Агент-специфика → `AGENTS-agent-blocks.md`.
 
 HEADER
   extract_core
@@ -115,7 +115,7 @@ case "$MODE" in
       echo "Синхронизация: OK (AGENTS.md соответствует ядру)"
       exit 0
     else
-      echo "[DRIFT] AGENTS.md расходится с ядром CLAUDE.md + agent-blocks. Запусти --force." >&2
+      echo "[DRIFT] AGENTS.md расходится с ядром QWEN.md + agent-blocks. Запусти --force." >&2
       exit 1
     fi
     ;;

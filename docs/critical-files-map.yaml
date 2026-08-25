@@ -157,7 +157,7 @@ categories:
     note: >
       README/LICENSE/CONTRIBUTING и т.п. — мета репозитория, пользователю
       не нужна повторная синхронизация. params.yaml/params.yaml.example,
-      .claude/settings.local.json, extensions/day-close.after.md,
+      .qwen/settings.local.json, extensions/day-close.after.md,
       extensions/mcp-user.json — пользовательское пространство, защищено
       от перезаписи is_protected_user_file() (update.sh) даже если когда-
       нибудь попадёт в files[]. См. special_routes: params.yaml не
@@ -185,7 +185,7 @@ special_routes:
       срабатывает, это не косметика).
     proof_of_delivery: manifest_sha
 
-  - path: "CLAUDE.md"
+  - path: "QWEN.md"
     category: delivered-default
     note: >
       Не прямая перезапись — трёхстороннее слияние через .claude.md.base
@@ -193,11 +193,11 @@ special_routes:
       оставляет маркеры и НЕ считается тихим успехом (issue #226/#254/#336).
     proof_of_delivery: "manifest_sha + ci:test-update-issue-226.sh (Сценарий A)"
 
-  - path: ".claude/skills/*/SKILL.md"
+  - path: ".qwen/skills/*/SKILL.md"
     category: delivered-default
     note: >
       USER-SPACE блок (между маркерами) извлекается перед перезаписью и
-      возвращается после — как CLAUDE.md, но своя (более лёгкая) механика.
+      возвращается после — как QWEN.md, но своя (более лёгкая) механика.
     proof_of_delivery: manifest_sha
 
   - path: "params.yaml"

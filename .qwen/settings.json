@@ -1,0 +1,219 @@
+{
+  "permissions": {
+    "defaultMode": "default",
+    "allow": [
+      "Edit(/.qwen/skills/**)",
+      "Edit(/.qwen/skills/day-open/**)"
+    ],
+    "additionalDirectories": []
+  },
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "$QWEN_PROJECT_DIR/.qwen/hooks/wp-gate-reminder.sh"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "$QWEN_PROJECT_DIR/.qwen/hooks/close-gate-reminder.sh"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "$QWEN_PROJECT_DIR/.qwen/hooks/inject-role-prefixes.sh"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "$QWEN_PROJECT_DIR/.qwen/hooks/lazy-context-loader.sh"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "$QWEN_PROJECT_DIR/.qwen/hooks/inject-communication-style.sh"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "$QWEN_PROJECT_DIR/.qwen/hooks/inject-fault-profile.sh"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "(Edit|edit|Write.*|write_file|MultiEdit)",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "$QWEN_PROJECT_DIR/.qwen/hooks/extensions-gate.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "(Bash|Shell|run_shell_command)",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "$QWEN_PROJECT_DIR/.qwen/hooks/destructive-guard.sh"
+          },
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "$QWEN_PROJECT_DIR/.qwen/hooks/protocol-artifact-validate.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "(Edit|edit|Write.*|write_file|MultiEdit)",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "$QWEN_PROJECT_DIR/.qwen/hooks/capture-bus.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "(Edit|edit|Write.*|write_file|MultiEdit|NotebookEdit|notebook_edit|Bash|Shell|run_shell_command|mcp__.*)",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "$QWEN_PROJECT_DIR/.qwen/hooks/dry-run-gate.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "(Edit|edit|Write.*|write_file|MultiEdit)",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "$QWEN_PROJECT_DIR/.qwen/hooks/inject-code-style.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "$QWEN_PROJECT_DIR/.qwen/hooks/destructive-mcp-guard.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "(Read.*|read_file|Skill)",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "$QWEN_PROJECT_DIR/.qwen/hooks/protocol-completion-reminder.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "(Edit|edit|Write.*|write_file|MultiEdit|Bash|Shell|run_shell_command)",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "$QWEN_PROJECT_DIR/.qwen/hooks/memory-exocortex-sync.sh"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "$QWEN_PROJECT_DIR/.qwen/hooks/response-clarity-hook.sh"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "$QWEN_PROJECT_DIR/.qwen/hooks/protocol-stop-gate.sh"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "$QWEN_PROJECT_DIR/.qwen/hooks/capture-bus.sh"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "$QWEN_PROJECT_DIR/.qwen/hooks/precompact-checkpoint.sh"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "$QWEN_PROJECT_DIR/.qwen/hooks/check-trash.sh"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "$QWEN_PROJECT_DIR/.qwen/hooks/session-end-status.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

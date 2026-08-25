@@ -190,7 +190,7 @@ artifact_url: https://github.com/aisystant/DS-principles-curriculum/blob/main/sp
 
 ## 9. ArchGate — ЭМОГССБ (conjunctive screening)
 
-> DP.ARCH.001 §7. Один ❌ → пересмотр архитектуры. CLAUDE.md §5: блокирующее.
+> DP.ARCH.001 §7. Один ❌ → пересмотр архитектуры. QWEN.md §5: блокирующее.
 
 | Характеристика | Оценка | Обоснование |
 |----------------|--------|-------------|
@@ -206,7 +206,7 @@ artifact_url: https://github.com/aisystant/DS-principles-curriculum/blob/main/sp
 
 ## 10. IntegrationGate — шаги 1-3
 
-> CLAUDE.md §2. Перед реализацией — обещание (DP.SC), сценарии, роль (DP.ROLE).
+> QWEN.md §2. Перед реализацией — обещание (DP.SC), сценарии, роль (DP.ROLE).
 
 ### Шаг 1. Обещание
 

@@ -172,7 +172,7 @@ data_domains:
     maturity: planned
     notes: "confidential — планы часто содержат рабочую информацию об идентифицируемых третьих лицах (команда, партнёры), не только о владельце"
 
-# L1/L2/L3 — секции внутри CLAUDE.md шаблона (платформа/staging/авторское), не отдельные
+# L1/L2/L3 — секции внутри QWEN.md шаблона (платформа/staging/авторское), не отдельные
 # репозитории (другой уровень гранулярности). Sensitivity не применяется — это конфигурационные
 # слои платформы, не данные.
 governance_layers:
@@ -180,7 +180,7 @@ governance_layers:
     type: "layer"
     tempo: cold
     allowed_flows: ["read-any"]
-    homes: ["CLAUDE.md, секции платформы"]
+    homes: ["QWEN.md, секции платформы"]
     enforcement: "update.sh"
     maturity: planned
 
@@ -188,7 +188,7 @@ governance_layers:
     type: "layer"
     tempo: warm
     allowed_flows: ["read-any"]
-    homes: ["CLAUDE.md, секция staging"]
+    homes: ["QWEN.md, секция staging"]
     enforcement: "none"
     maturity: planned
 
@@ -196,6 +196,6 @@ governance_layers:
     type: "layer"
     tempo: hot
     allowed_flows: ["read-any"]
-    homes: ["CLAUDE.md, авторская секция"]
+    homes: ["QWEN.md, авторская секция"]
     enforcement: "none"
     maturity: planned

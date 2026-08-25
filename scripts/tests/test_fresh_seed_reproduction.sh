@@ -34,7 +34,7 @@ trap 'rm -rf "$TMPDIR"' EXIT
 cp -R "$TEMPLATE_ROOT/seed/strategy" "$TMPDIR/strategy"
 
 required=(
-  CLAUDE.md
+  QWEN.md
   REPO-TYPE.md
   docs/WP-REGISTRY.md
   docs/Strategy.md
@@ -209,16 +209,16 @@ cmp -s "$WORKSPACE/.exocortex.env" "$SETUP_TMP/exocortex-env.pristine" ||
 # and $HOME/ before writing this list — not guessed).
 for artifact in \
   "$WORKSPACE/.iwe-runtime" \
-  "$WORKSPACE/CLAUDE.md" \
+  "$WORKSPACE/QWEN.md" \
   "$WORKSPACE/memory" \
-  "$WORKSPACE/.claude" \
+  "$WORKSPACE/.qwen" \
   "$WORKSPACE/.mcp.json" \
   "$WORKSPACE/.iwe-paths" \
   "$WORKSPACE/DS-strategy" \
   "$WORKSPACE/ZP" \
   "$WORKSPACE/FPF" \
   "$WORKSPACE/SPF" \
-  "$SETUP_TMP/home/.claude"
+  "$SETUP_TMP/home/.qwen"
 do
   [ ! -e "$artifact" ] ||
     { echo "FAIL: setup.sh --dry-run created $artifact" >&2; exit 1; }

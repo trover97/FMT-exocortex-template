@@ -2,7 +2,7 @@ name: IWE Cloud Scheduler (базовый)
 
 # Облачный планировщик IWE — базовый уровень (без LLM).
 # Выполняет задачи, которые не требуют Claude API:
-# - Backup memory/ в exocortex/ (CLAUDE.md — НЕ здесь, см. #172: корневой CLAUDE.md бэкапит day-close.sh локально)
+# - Backup memory/ в exocortex/ (QWEN.md — НЕ здесь, см. #172: корневой QWEN.md бэкапит day-close.sh локально)
 # - Health check ночной автоматики
 #
 # Для пользователей шаблона FMT-exocortex-template.
@@ -96,10 +96,10 @@ jobs:
             echo "✓ Memory files backed up"
           fi
 
-          # CLAUDE.md НЕ копируется из облака (#172). Слот exocortex/CLAUDE.md семантически =
-          # бэкап КОРНЕВОГО CLAUDE.md рабочей папки: restore-from-exocortex.sh разворачивает его
-          # в $WORKSPACE_DIR/CLAUDE.md. Облако клонирует только STRATEGY_REPO и физически не видит
-          # корневой CLAUDE.md (в слоёной топологии он не лежит ни в одном репо), а CLAUDE.md самого
+          # QWEN.md НЕ копируется из облака (#172). Слот exocortex/QWEN.md семантически =
+          # бэкап КОРНЕВОГО QWEN.md рабочей папки: restore-from-exocortex.sh разворачивает его
+          # в $WORKSPACE_DIR/QWEN.md. Облако клонирует только STRATEGY_REPO и физически не видит
+          # корневой QWEN.md (в слоёной топологии он не лежит ни в одном репо), а QWEN.md самого
           # STRATEGY_REPO уже под git в этом же репо. Корневой бэкапит day-close.sh локально —
           # это единственно возможное место. Не возвращать копирование сюда (затрёт локальный бэкап).
 

@@ -3,8 +3,8 @@
 # see DP.SC.159, DP.ROLE.059
 # coverage-skills.sh — детектор B12a/B12b/B12c/B12d (promotion coverage)
 #
-# Three-way detector: author/.claude/skills/ vs FMT/.claude/skills/ vs
-# FMT/.claude/skills-catalog.yaml. Закрывает классы:
+# Three-way detector: author/.qwen/skills/ vs FMT/.qwen/skills/ vs
+# FMT/.qwen/skills-catalog.yaml. Закрывает классы:
 # - B12b Missing: скилл в author, нет в FMT
 # - B12a Catalog: скилл в FMT, нет в FMT catalog
 # - B12d Deletion: скилл в FMT, удалён в author (dead code)
@@ -22,9 +22,9 @@ set -uo pipefail
 
 IWE="${IWE_WORKSPACE:-$HOME/IWE}"
 FMT_DIR="${IWE_TEMPLATE:-$IWE/FMT-exocortex-template}"
-AUTHOR_SKILLS="$IWE/.claude/skills"
-FMT_SKILLS="$FMT_DIR/.claude/skills"
-FMT_CATALOG="$FMT_DIR/.claude/skills-catalog.yaml"
+AUTHOR_SKILLS="$IWE/.qwen/skills"
+FMT_SKILLS="$FMT_DIR/.qwen/skills"
+FMT_CATALOG="$FMT_DIR/.qwen/skills-catalog.yaml"
 
 check_mode=false
 only=""
@@ -95,7 +95,7 @@ if [[ -f "$FMT_CATALOG" ]]; then
         fi
     done
 else
-    echo "[WARN] FMT/.claude/skills-catalog.yaml отсутствует — все FMT-скиллы помечены B12a"
+    echo "[WARN] FMT/.qwen/skills-catalog.yaml отсутствует — все FMT-скиллы помечены B12a"
     for s in $fmt_list; do
         [[ "$s" == "_template" ]] && continue
         b12a_catalog+=("$s")

@@ -1,7 +1,7 @@
 # Каталог скриптов IWE
 
 > Автогенерировано `scripts/generate-catalogs.py` · 2026-08-10 · НЕ редактировать вручную.
-> Источник: `scripts/*.sh`, `.claude/scripts/*.{sh,py}`. Это вспомогательные скрипты (хелперы, утилиты, серверы), не скиллы.
+> Источник: `scripts/*.sh`, `.qwen/scripts/*.{sh,py}`. Это вспомогательные скрипты (хелперы, утилиты, серверы), не скиллы.
 
 | Скрипт | Путь | Что делает |
 |--------|------|------------|
@@ -17,9 +17,9 @@
 | `changelog-flush.sh` | `scripts/changelog-flush.sh` | переименовывает [Unreleased] → конкретную версию в CHANGELOG.md |
 | `check-component-parity.sh` | `scripts/check-component-parity.sh` | asserts setup.sh (fresh install) and update.sh |
 | `check-dirty-repos.sh` | `scripts/check-dirty-repos.sh` | Скан всех IWE репо на незакоммиченные изменения |
-| `check-index-health.py` | `.claude/scripts/check-index-health.py` | Детектор раздутых индекс-файлов. |
+| `check-index-health.py` | `.qwen/scripts/check-index-health.py` | Детектор раздутых индекс-файлов. |
 | `check-open-sessions.sh` | `scripts/check-open-sessions.sh` | WP-358 Ф10 — детектор незакрытых external-сессий. |
-| `check-orphan-hooks.sh` | `scripts/check-orphan-hooks.sh` | каждый хук в .claude/hooks/ действительно вызывается |
+| `check-orphan-hooks.sh` | `scripts/check-orphan-hooks.sh` | каждый хук в .qwen/hooks/ действительно вызывается |
 | `check-platform-compat.sh` | `scripts/check-platform-compat.sh` | enforces docs/PLATFORM-COMPAT.md as a CI gate, |
 | `check-script-collisions.sh` | `scripts/check-script-collisions.sh` | проверить коллизии скриптов между авторской зоной и FMT-шаблоном. |
 | `check-seed-drift.sh` | `scripts/check-seed-drift.sh` | seed/strategy/scripts/ снапшоты не разъехались с scripts/ |
@@ -43,7 +43,7 @@
 | `fmt-critical-alert.sh` | `scripts/fmt-critical-alert.sh` | MVP-механизм обнаружения критических FMT issues. |
 | `gate-metrics.sh` | `scripts/gate-metrics.sh` | - WP-436: measure reflex/passthrough/llm routing from gate-decisions.jsonl |
 | `generate-hot-files-list.sh` | `scripts/generate-hot-files-list.sh` | regenerates hot-files.list from install config (WP-450 S-50) |
-| `generate-rules-registry.py` | `.claude/scripts/generate-rules-registry.py` | generate-rules-registry.py — собрать rules-registry.yaml из PACK-agent-rules/rules/AR.NNN.md. |
+| `generate-rules-registry.py` | `.qwen/scripts/generate-rules-registry.py` | generate-rules-registry.py — собрать rules-registry.yaml из PACK-agent-rules/rules/AR.NNN.md. |
 | `generate-skills-catalog.sh` | `scripts/generate-skills-catalog.sh` | генератор skills-catalog.yaml |
 | `git-dirty-guard.sh` | `scripts/git-dirty-guard.sh` | protects a repo's periodic pull from a dirty working tree. |
 | `guide-kit-sync.sh` | `scripts/guide-kit-sync.sh` | vendor a tagged release of iwesys/guide-kit into the |
@@ -54,7 +54,7 @@
 | `iwe-backup-check.sh` | `scripts/iwe-backup-check.sh` | Проверка здоровья системы резервного копирования IWE |
 | `iwe-bug-report.sh` | `scripts/iwe-bug-report.sh` | обёртка для скилла /iwe-bug-report |
 | `iwe-consent.sh` | `scripts/iwe-consent.sh` | iwe-consent.sh |
-| `iwe-drift.sh` | `scripts/iwe-drift.sh` | MVP drift-отчёт по .claude/sync-manifest.yaml |
+| `iwe-drift.sh` | `scripts/iwe-drift.sh` | MVP drift-отчёт по .qwen/sync-manifest.yaml |
 | `iwe-grep-secret.sh` | `scripts/iwe-grep-secret.sh` | Secret Drift Detector (WP-315) |
 | `iwe-transcribe.sh` | `scripts/iwe-transcribe.sh` | транскрипция аудио/видео через MLX Whisper (Apple Silicon) |
 | `iwe-w-reflection.sh` | `scripts/iwe-w-reflection.sh` | iwe-w-reflection.sh |
@@ -68,10 +68,10 @@
 | `kimi-whisper-safe.sh` | `scripts/kimi-whisper-safe.sh` | безопасная обёртка для whisper с защитой от |
 | `lesson-close.sh` | `scripts/lesson-close.sh` | закрыть занятие в дневном файле (lesson/<date>.md) |
 | `llm-proxy-launcher.sh` | `scripts/llm-proxy-launcher.sh` | обёртка для запуска llm-proxy.py с OpenRouter secrets (WP-366 Ф4.A) |
-| `load-extensions.sh` | `.claude/scripts/load-extensions.sh` | unified loader для suffix extensions (R4.4 fix, WP-273 Этап 2). |
+| `load-extensions.sh` | `.qwen/scripts/load-extensions.sh` | unified loader для suffix extensions (R4.4 fix, WP-273 Этап 2). |
 | `memory-active-wp-update.sh` | `scripts/memory-active-wp-update.sh` | обновление секции «Текущие РП» в MEMORY.md |
 | `memory-bleed.sh` | `scripts/memory-bleed.sh` | детектор нарушений memory/ (WP-217 Ф10.2) |
-| `memory-drift-scan.py` | `.claude/scripts/memory-drift-scan.py` | Детектор дрейфа статусов между MEMORY.md и WP-context. |
+| `memory-drift-scan.py` | `.qwen/scripts/memory-drift-scan.py` | Детектор дрейфа статусов между MEMORY.md и WP-context. |
 | `memory-health.sh` | `scripts/memory-health.sh` | метрики здоровья memory/ (WP-217 Ф10.2) |
 | `memory-migrate.sh` | `scripts/memory-migrate.sh` | добавление отсутствующих frontmatter-полей (WP-217 Ф10.2/Ф10.4) |
 | `memory-validate.sh` | `scripts/memory-validate.sh` | валидация frontmatter memory/*.md (WP-217 Ф10.2) |
@@ -91,7 +91,7 @@
 | `server-calendar.sh` | `scripts/server-calendar.sh` | кросс-платформенная замена mcp__ext-google-calendar для server-mode |
 | `server-news.sh` | `scripts/server-news.sh` | кросс-платформенная замена WebSearch для server-mode |
 | `session-guard.sh` | `scripts/session-guard.sh` | единый gate open/close/audit для всех агентов (Claude, Kimi, Hermes) |
-| `settings-promote.sh` | `scripts/settings-promote.sh` | регистрация хука в .claude/settings.json шаблона |
+| `settings-promote.sh` | `scripts/settings-promote.sh` | регистрация хука в .qwen/settings.json шаблона |
 | `setup-extractor-feeders.sh` | `scripts/setup-extractor-feeders.sh` | Onboarding скрипт для активации feeder-системы |
 | `skill-promote.sh` | `scripts/skill-promote.sh` | промоция скилла в платформенный шаблон IWE (v2.1) |
 | `skills-pull.sh` | `scripts/skills-pull.sh` | синхронизация L1 скиллов из FMT в личный IWE |
@@ -99,7 +99,7 @@
 | `staging-audit.sh` | `scripts/staging-audit.sh` | детектор B12e Decay drift в STAGING.md |
 | `style-check-post-run.sh` | `scripts/style-check-post-run.sh` | проверка стиля ответа Kimi после peer-сессии (WP-388 Ф9) |
 | `style-promote.sh` | `scripts/style-promote.sh` | промоция файла-снимка стиля в платформенный шаблон IWE |
-| `sync-agent-instructions.sh` | `scripts/sync-agent-instructions.sh` | генерация AGENTS.md из единого ядра CLAUDE.md + agent-blocks |
+| `sync-agent-instructions.sh` | `scripts/sync-agent-instructions.sh` | генерация AGENTS.md из единого ядра QWEN.md + agent-blocks |
 | `sync-version-badge.sh` | `scripts/sync-version-badge.sh` | синхронизация version badge в README.md с CHANGELOG.md |
 | `test-route-task.sh` | `scripts/test-route-task.sh` | 10 кейсов для route-task.sh (WP-350 Ф14) |
 | `validate-fmt-scripts.sh` | `scripts/validate-fmt-scripts.sh` | проверка FMT на личные хардкоды и нарушения конвенций |
@@ -109,7 +109,7 @@
 | `verify-template-integrity.sh` | `scripts/verify-template-integrity.sh` | local mirror of the CI template-integrity gate. |
 | `week-draft-append.sh` | `scripts/week-draft-append.sh` | обновить метрики текущего дня в черновике недельного поста. |
 | `week-draft-init.sh` | `scripts/week-draft-init.sh` | создать пустой черновик недельного поста для новой недели. |
-| `wp-sync-bundle.sh` | `.claude/scripts/wp-sync-bundle.sh` | детерминированный bundler контекста РП для sync-фазы WP Gate |
+| `wp-sync-bundle.sh` | `.qwen/scripts/wp-sync-bundle.sh` | детерминированный bundler контекста РП для sync-фазы WP Gate |
 | `wp499-agent-coordination-test.sh` | `scripts/wp499-agent-coordination-test.sh` | Воспроизводимый координационный тест N агентов IWE (WP-499 Ф7/Ф11, расширен Ф17 п.3-4, |
 
 _Всего скриптов: 106_

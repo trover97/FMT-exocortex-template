@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = ROOT / ".claude" / "scripts" / "settings-merge-preview.py"
+SCRIPT = ROOT / ".qwen" / "scripts" / "settings-merge-preview.py"
 
 
 def load_module():
@@ -21,11 +21,11 @@ def load_module():
 def test_same_script_old_and_new_path_form_dedupes(tmp_path: Path):
     module = load_module()
     report = {"conflicts": [], "hooks_added_from_template": 0, "hooks_deduped": 0}
-    user = [{"matcher": "Bash", "hooks": [{"type": "command", "command": ".claude/hooks/destructive-guard.sh"}]}]
+    user = [{"matcher": "Bash", "hooks": [{"type": "command", "command": ".qwen/hooks/destructive-guard.sh"}]}]
     template = [
         {
             "matcher": "Bash",
-            "hooks": [{"type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/destructive-guard.sh"}],
+            "hooks": [{"type": "command", "command": "$QWEN_PROJECT_DIR/.qwen/hooks/destructive-guard.sh"}],
         }
     ]
     merged, added, deduped = module.merge_hook_entries(user, template, report, "PreToolUse")
@@ -40,13 +40,13 @@ def test_wider_template_matcher_replaces_narrower_user_matcher(tmp_path: Path):
     user = [
         {
             "matcher": "Write|Edit|MultiEdit",
-            "hooks": [{"type": "command", "command": ".claude/hooks/memory-exocortex-sync.sh"}],
+            "hooks": [{"type": "command", "command": ".qwen/hooks/memory-exocortex-sync.sh"}],
         }
     ]
     template = [
         {
             "matcher": "Write|Edit|MultiEdit|Bash",
-            "hooks": [{"type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/memory-exocortex-sync.sh"}],
+            "hooks": [{"type": "command", "command": "$QWEN_PROJECT_DIR/.qwen/hooks/memory-exocortex-sync.sh"}],
         }
     ]
     merged, added, deduped = module.merge_hook_entries(user, template, report, "PreToolUse")
@@ -103,7 +103,7 @@ def test_end_to_end_preview_matches_issue_469_scenario(tmp_path: Path):
                     "PreToolUse": [
                         {
                             "matcher": "Bash",
-                            "hooks": [{"type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/destructive-guard.sh"}],
+                            "hooks": [{"type": "command", "command": "$QWEN_PROJECT_DIR/.qwen/hooks/destructive-guard.sh"}],
                         }
                     ]
                 }
@@ -113,7 +113,7 @@ def test_end_to_end_preview_matches_issue_469_scenario(tmp_path: Path):
     )
     workspace_path.write_text(
         json.dumps(
-            {"hooks": {"PreToolUse": [{"matcher": "Bash", "hooks": [{"type": "command", "command": ".claude/hooks/destructive-guard.sh"}]}]}}
+            {"hooks": {"PreToolUse": [{"matcher": "Bash", "hooks": [{"type": "command", "command": ".qwen/hooks/destructive-guard.sh"}]}]}}
         ),
         encoding="utf-8",
     )

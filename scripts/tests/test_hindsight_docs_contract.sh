@@ -5,7 +5,7 @@ set -euo pipefail
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)
 DOC="$ROOT/docs/hindsight-setup.md"
-SKILL="$ROOT/.claude/skills/week-close/SKILL.md"
+SKILL="$ROOT/.qwen/skills/week-close/SKILL.md"
 
 require_text() {
     local file="$1"
@@ -158,7 +158,7 @@ for adapter in scripts/kimi-peer-adapter.sh scripts/codex-peer-adapter.sh; do
     }
 done
 
-if grep -R --include='*.json' -Fq 'hindsight_trigger.py' "$ROOT/.claude"; then
+if grep -R --include='*.json' -Fq 'hindsight_trigger.py' "$ROOT/.qwen"; then
     echo "FAIL: default Claude configuration registers hindsight_trigger.py" >&2
     exit 1
 fi
@@ -166,7 +166,7 @@ fi
 # #522: Obsidian is an optional editor for the narrow governance vault. Every
 # onboarding surface must reject the unsafe workspace-root vault explicitly.
 README="$ROOT/README.md"
-CLAUDE="$ROOT/CLAUDE.md"
+CLAUDE="$ROOT/QWEN.md"
 LEARNING_PATH="$ROOT/docs/LEARNING-PATH.md"
 SETUP_GUIDE="$ROOT/docs/SETUP-GUIDE.md"
 

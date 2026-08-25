@@ -42,15 +42,15 @@ data_needs:
 
 ## Шаг 2. Интегрировать Point A в startup
 
-**Скилл, вызываемый через Claude Code (Skill tool) — ничего интегрировать не нужно.** С 09.08.2026 хук `residency-gate-skill-adapter.sh` (PreToolUse, matcher `Skill`) проверяет `data_needs` из `SKILL.md` автоматически, до того как код скилла запустится — достаточно объявить блок в Шаге 1. Раньше эта проверка была когнитивной (автор мог забыть вставить `source`), теперь она механическая: тест чистой установки — `scripts/tests/test_residency_gate_skill_adapter.py`.
+**Скилл, вызываемый через Qwen Code (Skill tool) — ничего интегрировать не нужно.** С 09.08.2026 хук `residency-gate-skill-adapter.sh` (PreToolUse, matcher `Skill`) проверяет `data_needs` из `SKILL.md` автоматически, до того как код скилла запустится — достаточно объявить блок в Шаге 1. Раньше эта проверка была когнитивной (автор мог забыть вставить `source`), теперь она механическая: тест чистой установки — `scripts/tests/test_residency_gate_skill_adapter.py`.
 
-Если функция работает **вне Claude Code** (day-open pipeline на launchd, bot handler, любой процесс, который Claude Code не запускает) — Claude Code не видит её старт, автоматической проверки нет, интегрируйте вручную:
+Если функция работает **вне Qwen Code** (day-open pipeline на launchd, bot handler, любой процесс, который Qwen Code не запускает) — Qwen Code не видит её старт, автоматической проверки нет, интегрируйте вручную:
 
 ```bash
 #!/bin/bash
 
 # В начале скрипта: проверка согласия
-source ~/.claude/hooks/residency-gate-init.sh "day-open" "$HOME/.claude/skills/day-open/SKILL.md"
+source ~/.qwen/hooks/residency-gate-init.sh "day-open" "$HOME/.qwen/skills/day-open/SKILL.md"
 
 # Если согласие дано — продолжать
 # Если нет — скрипт вернёт 1 и выведет причину
@@ -66,7 +66,7 @@ source ~/.claude/hooks/residency-gate-init.sh "day-open" "$HOME/.claude/skills/d
 #!/bin/bash
 
 # При попытке чтения данных:
-bash ~/.claude/hooks/residency-gate-lazy.sh "render-guides" "2.1" "inbound" "digital-twin"
+bash ~/.qwen/hooks/residency-gate-lazy.sh "render-guides" "2.1" "inbound" "digital-twin"
 
 # Если exit code = 0 → доступ разрешён
 # Если exit code = 1 → доступ запрещён
@@ -79,33 +79,33 @@ bash ~/.claude/hooks/residency-gate-lazy.sh "render-guides" "2.1" "inbound" "dig
 ### Выдать согласие
 
 ```bash
-python3 ~/.claude/skills/residency-gate/residency-gate.py grant \
+python3 ~/.qwen/skills/residency-gate/residency-gate.py grant \
   <function_id> <type> <flow_direction> <name>
 ```
 
 Пример:
 ```bash
-python3 ~/.claude/skills/residency-gate/residency-gate.py grant \
+python3 ~/.qwen/skills/residency-gate/residency-gate.py grant \
   day-open 2.2 inbound daily-summary
 ```
 
 ### Отозвать согласие
 
 ```bash
-python3 ~/.claude/skills/residency-gate/residency-gate.py revoke \
+python3 ~/.qwen/skills/residency-gate/residency-gate.py revoke \
   <function_id> <type> <flow_direction> <name> "reason"
 ```
 
 ### Список всех согласий
 
 ```bash
-python3 ~/.claude/skills/residency-gate/residency-gate.py list
+python3 ~/.qwen/skills/residency-gate/residency-gate.py list
 ```
 
 ### Для конкретной функции
 
 ```bash
-python3 ~/.claude/skills/residency-gate/residency-gate.py list day-open
+python3 ~/.qwen/skills/residency-gate/residency-gate.py list day-open
 ```
 
 ---
@@ -157,9 +157,9 @@ functions:
 
 ```bash
 #!/bin/bash
-# ~/.claude/hooks/day-open-main.sh
+# ~/.qwen/hooks/day-open-main.sh
 
-source ~/.claude/hooks/residency-gate-init.sh "day-open" "$HOME/.claude/skills/day-open/SKILL.md"
+source ~/.qwen/hooks/residency-gate-init.sh "day-open" "$HOME/.qwen/skills/day-open/SKILL.md"
 
 # Если мы здесь — согласие дано, продолжаем
 # ...rest of day-open logic...
@@ -176,7 +176,7 @@ def get_digital_twin():
     
     result = subprocess.run([
         "bash", 
-        "~/.claude/hooks/residency-gate-lazy.sh",
+        "~/.qwen/hooks/residency-gate-lazy.sh",
         "render-guides", "2.1", "inbound", "digital-twin"
     ], capture_output=True)
     
@@ -215,7 +215,7 @@ def get_digital_twin():
 Полная история согласий:
 
 ```bash
-python3 ~/.claude/skills/residency-gate/residency-gate.py list render-guides | jq .
+python3 ~/.qwen/skills/residency-gate/residency-gate.py list render-guides | jq .
 ```
 
 Возвращает:

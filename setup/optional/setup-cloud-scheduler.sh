@@ -1,4 +1,11 @@
 #!/bin/bash
+# === OFFLINE / NO-SCHEDULER GUARD (qwen-windows-offline) ===
+# Эта ветка: Windows + git bash, без планировщика (launchd/cron/systemd).
+# Установка задач по расписанию невозможна. Рабочие скрипты роли запускаются
+# ВРУЧНУЮ — см. MANUAL-JOBS.md в корне репозитория.
+echo "[$(basename "$(dirname "$0")")] Планировщик недоступен (offline/Windows). Запуск задач — вручную, см. MANUAL-JOBS.md" >&2
+exit 0
+# === /GUARD ===
 # Настройка Cloud Scheduler (GitHub Actions) для IWE
 # DP.SC.019 — Автономная работа IWE (базовый уровень)
 #

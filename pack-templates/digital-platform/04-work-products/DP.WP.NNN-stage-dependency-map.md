@@ -66,7 +66,7 @@ stage_dependency_map:
   target: WP-NNN | project-name | rcs-profile:<account_id>
   constraint_ref: "<ссылка на Constraint Brief>"
   generated_at: YYYY-MM-DD
-  generated_by: <твой DP.ROLE.NNN> / .claude/skills/bottleneck-pick
+  generated_by: <твой DP.ROLE.NNN> / .qwen/skills/bottleneck-pick
 
   stages:
     - id: stage_1
@@ -185,4 +185,4 @@ Sequencing: Аналитик (куда смотреть) → Артефакто�
 - `DP.ROLE.NNN` Аналитик ограничений — создатель формата (в твоём Pack)
 - `DP.ROLE.NNN` Артефактор — потребитель формата
 - `DP.SC.NNN` Constraint Analysis — обещание анализа ограничения
-- `.claude/skills/bottleneck-pick/SKILL.md` — инструмент-носитель алгоритма
+- `.qwen/skills/bottleneck-pick/SKILL.md` — инструмент-носитель алгоритма

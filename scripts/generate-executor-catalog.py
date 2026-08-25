@@ -2,7 +2,7 @@
 """
 generate-executor-catalog.py — собрать executor-catalog.yaml из routing: секций SKILL.md.
 
-Читает все SKILL.md из ~/.claude/skills/, извлекает routing: блок,
+Читает все SKILL.md из ~/.qwen/skills/, извлекает routing: блок,
 генерирует executor-catalog.yaml для Маршрутизатора (DP.ROLE.059, WP-350 Ф8).
 
 Запуск:
@@ -92,7 +92,7 @@ def process_skill(skill_dir: Path) -> Optional[dict]:
     return {
         "name": name,
         "type": "skill",
-        "path": f".claude/skills/{skill_dir.name}/SKILL.md",
+        "path": f".qwen/skills/{skill_dir.name}/SKILL.md",
         "slash": extract_triggers(fm_content),
         "description": extract_description(fm_content),
         "routing": routing,
@@ -154,7 +154,7 @@ def build_catalog(skills_dir: Path) -> dict:
     return {
         "schema_version": "1.0",
         "generated_at": now,
-        "source": ".claude/skills/*/SKILL.md",
+        "source": ".qwen/skills/*/SKILL.md",
         "generator": "scripts/generate-executor-catalog.py",
         "wp": "WP-350",
         "total_entries": len(entries),
@@ -200,7 +200,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--skills-dir",
         type=Path,
-        default=workspace / ".claude" / "skills",
+        default=workspace / ".qwen" / "skills",
         help="Directory containing skill subdirectories",
     )
     parser.add_argument(

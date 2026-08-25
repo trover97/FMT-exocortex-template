@@ -14,7 +14,7 @@
 # 4. MEMORY.md — скелет (мало строк в РП-таблице)                 [pristine only]
 # 5. Обязательные файлы существуют                                [pristine + installed]
 # 6. Нет хардкод-путей к FMT/scripts|roles в протоколах (WP-219)  [pristine + installed]
-# 7. settings.json hooks ↔ .claude/hooks/ cross-ref (issue #13)   [pristine + installed]
+# 7. settings.json hooks ↔ .qwen/hooks/ cross-ref (issue #13)   [pristine + installed]
 # 8. Нет устаревших семантических ссылок FPF                     [pristine + staged]
 
 set -euo pipefail
@@ -45,11 +45,11 @@ TEMPLATE_DIR="${TEMPLATE_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
 FAIL=0
 
 # Guard: post-setup state + default pristine mode → подсказать installed-режим и выйти.
-# Детектор стабильный: {{HOME_DIR}} в pristine FMT/CLAUDE.md гарантирован (используется в §4 Memory + §9 Авторское).
+# Детектор стабильный: {{HOME_DIR}} в pristine FMT/QWEN.md гарантирован (используется в §4 Memory + §9 Авторское).
 if [ "$MODE" = "pristine" ] \
-   && [ -f "$TEMPLATE_DIR/CLAUDE.md" ] \
-   && ! grep -q '{{HOME_DIR}}' "$TEMPLATE_DIR/CLAUDE.md" 2>/dev/null; then
-    echo "ВНИМАНИЕ: FMT обработан setup.sh (плейсхолдер {{HOME_DIR}} в CLAUDE.md уже подставлен)."
+   && [ -f "$TEMPLATE_DIR/QWEN.md" ] \
+   && ! grep -q '{{HOME_DIR}}' "$TEMPLATE_DIR/QWEN.md" 2>/dev/null; then
+    echo "ВНИМАНИЕ: FMT обработан setup.sh (плейсхолдер {{HOME_DIR}} в QWEN.md уже подставлен)."
     echo ""
     echo "Pristine-режим (default) применим к:"
     echo "  • CI (.github/workflows/validate-template.yml)"
@@ -59,7 +59,7 @@ if [ "$MODE" = "pristine" ] \
     echo "Для проверки установленного workspace используйте один из:"
     echo "  bash setup.sh --validate                              # env + структурные чеки (делегат)"
     echo "  bash setup/validate-template.sh --mode=installed      # явно installed (4 универсальных чека)"
-    echo "  /audit-installation                                   # полный аудит (Claude Code skill)"
+    echo "  /audit-installation                                   # полный аудит (Qwen Code skill)"
     exit 0
 fi
 
@@ -150,7 +150,7 @@ for pattern in "tserentserenov" "PACK-MIM" "aist_bot_newarchitecture" \
     fi
 done
 
-# Protocol-only — запрет в протоколах/скиллах/хуках/CLAUDE.md (разрешено в README/docs/onboarding как упоминание продукта)
+# Protocol-only — запрет в протоколах/скиллах/хуках/QWEN.md (разрешено в README/docs/onboarding как упоминание продукта)
 for pattern in "@aist_me_bot" "digital-twin" "content-pipeline" \
                "knowledge-mcp" "gateway-mcp" "DS-agent-workspace/scheduler"; do
     if [ "$MODE" = "staged" ]; then
@@ -158,7 +158,7 @@ for pattern in "@aist_me_bot" "digital-twin" "content-pipeline" \
         hits=""
         while IFS= read -r f; do
             case "$f" in
-                .claude/skills/*|.claude/hooks/*|.claude/rules/*|memory/*|CLAUDE.md) ;;
+                .qwen/skills/*|.qwen/hooks/*|.qwen/rules/*|memory/*|QWEN.md) ;;
                 *) continue ;;
             esac
             case "$(basename "$f")" in CHANGELOG.md) continue ;; esac
@@ -170,7 +170,7 @@ for pattern in "@aist_me_bot" "digital-twin" "content-pipeline" \
         done <<< "$STAGED_FILES"
     else
         count=$(cd "$TEMPLATE_DIR" && grep -rn "$pattern" \
-                .claude/skills .claude/hooks .claude/rules memory CLAUDE.md 2>/dev/null \
+                .qwen/skills .qwen/hooks .qwen/rules memory QWEN.md 2>/dev/null \
                 | grep -v 'CHANGELOG.md' | wc -l | tr -d ' ' || true)
     fi
     if [ "$count" -gt 0 ]; then
@@ -180,7 +180,7 @@ for pattern in "@aist_me_bot" "digital-twin" "content-pipeline" \
             echo "$hits" | head -3 || true
         else
             (cd "$TEMPLATE_DIR" && grep -rn "$pattern" \
-                .claude/skills .claude/hooks .claude/rules memory CLAUDE.md 2>/dev/null | head -3) || true
+                .qwen/skills .qwen/hooks .qwen/rules memory QWEN.md 2>/dev/null | head -3) || true
         fi
         CHECK1_FAIL=1
         FAIL=1
@@ -291,7 +291,7 @@ elif [ "$MODE" = "staged" ]; then
     # The shipped resolver copies are sanctioned exceptions (WP-529 F6,
     # #453/#463): their job is enumerating STANDARD system Python locations
     # (/opt/homebrew is stock macOS Apple Silicon), not an author-machine leak.
-    count=$(hardcode_scan_staged '/opt/homebrew' '/usr/local/bin.*:/opt/homebrew' "$TMPDIR_CHECK3_HITS_FILE" '^README\.md$|^docs/PLATFORM-COMPAT\.md$|^\.github/workflows/validate-template\.yml$|^\.claude/lib/find-python3\.sh$|^scripts/lib/find-python3\.sh$|^seed/strategy/scripts/lib/find-python3\.sh$|^scripts/tests/test_issue_463_setup_reuses_resolved_python3\.sh$')
+    count=$(hardcode_scan_staged '/opt/homebrew' '/usr/local/bin.*:/opt/homebrew' "$TMPDIR_CHECK3_HITS_FILE" '^README\.md$|^docs/PLATFORM-COMPAT\.md$|^\.github/workflows/validate-template\.yml$|^\.qwen/lib/find-python3\.sh$|^scripts/lib/find-python3\.sh$|^seed/strategy/scripts/lib/find-python3\.sh$|^scripts/tests/test_issue_463_setup_reuses_resolved_python3\.sh$')
     if [ "$count" -gt 0 ]; then
         echo "FAIL ($count hits)"
         head -3 "$TMPDIR_CHECK3_HITS_FILE" || true
@@ -351,7 +351,7 @@ fi
 # 5. Обязательные файлы
 echo -n "[5/5] Required files... "
 MISSING=0
-for f in CLAUDE.md ONTOLOGY.md README.md \
+for f in QWEN.md ONTOLOGY.md README.md \
          memory/MEMORY.md memory/hard-distinctions.md \
          memory/protocol-open.md memory/protocol-close.md \
          memory/navigation.md \
@@ -380,7 +380,7 @@ for pattern in 'FMT-exocortex-template/scripts' \
                'bash (~|\$HOME)/IWE/scripts/'; do
     hits=$(grep -rnE "$pattern" \
             "$TEMPLATE_DIR/memory" \
-            "$TEMPLATE_DIR/.claude/skills" \
+            "$TEMPLATE_DIR/.qwen/skills" \
             --include="*.md" 2>/dev/null \
             | grep -v '\$IWE_' || true)
     if [ -n "$hits" ]; then
@@ -397,22 +397,22 @@ else
     echo "PASS"
 fi
 
-# 7. settings.json hooks ↔ .claude/hooks/ cross-ref (issue #13)
+# 7. settings.json hooks ↔ .qwen/hooks/ cross-ref (issue #13)
 # Проверка в обе стороны:
-#   (a) FAIL: hook упомянут в settings.json, но файла нет в .claude/hooks/
-#   (b) WARN: hook есть в .claude/hooks/, но не упомянут ни в одном settings.json
+#   (a) FAIL: hook упомянут в settings.json, но файла нет в .qwen/hooks/
+#   (b) WARN: hook есть в .qwen/hooks/, но не упомянут ни в одном settings.json
 #       (может быть вызываем напрямую, например wakatime-heartbeat.sh)
-echo -n "[7/7] Hooks cross-ref (settings.json ↔ .claude/hooks/)... "
+echo -n "[7/7] Hooks cross-ref (settings.json ↔ .qwen/hooks/)... "
 CHECK7_FAIL=0
-HOOKS_DIR="$TEMPLATE_DIR/.claude/hooks"
+HOOKS_DIR="$TEMPLATE_DIR/.qwen/hooks"
 SETTINGS_FILES=()
-[ -f "$TEMPLATE_DIR/.claude/settings.json" ] && SETTINGS_FILES+=("$TEMPLATE_DIR/.claude/settings.json")
-[ -f "$TEMPLATE_DIR/.claude/settings.local.json" ] && SETTINGS_FILES+=("$TEMPLATE_DIR/.claude/settings.local.json")
+[ -f "$TEMPLATE_DIR/.qwen/settings.json" ] && SETTINGS_FILES+=("$TEMPLATE_DIR/.qwen/settings.json")
+[ -f "$TEMPLATE_DIR/.qwen/settings.local.json" ] && SETTINGS_FILES+=("$TEMPLATE_DIR/.qwen/settings.local.json")
 
 if [ ${#SETTINGS_FILES[@]} -eq 0 ] || [ ! -d "$HOOKS_DIR" ]; then
     echo "SKIP (no settings.json or hooks/ dir)"
 else
-    REFERENCED=$(grep -hoE '\.claude/hooks/[a-zA-Z0-9_-]+\.sh' "${SETTINGS_FILES[@]}" 2>/dev/null | sort -u || true)
+    REFERENCED=$(grep -hoE '\.qwen/hooks/[a-zA-Z0-9_-]+\.sh' "${SETTINGS_FILES[@]}" 2>/dev/null | sort -u || true)
     for ref in $REFERENCED; do
         if [ ! -f "$TEMPLATE_DIR/$ref" ]; then
             [ "$CHECK7_FAIL" -eq 0 ] && echo "FAIL"
@@ -422,7 +422,7 @@ else
         fi
     done
 
-    # Hooks intentionally user-deployed (installed to ~/.claude/hooks/ via skill,
+    # Hooks intentionally user-deployed (installed to ~/.qwen/hooks/ via skill,
     # registered in user settings.local.json — not project settings.json by design).
     USER_DEPLOYED_HOOKS=("wakatime-heartbeat.sh")
 
@@ -435,11 +435,11 @@ else
         # контракт в собственной шапке. Новый неклассифицированный файл всё
         # равно даст warning и потребует решения владельца.
         grep -q '^# claude-hook: false — ' "$hook" && continue
-        # Skip known user-deployed hooks (see .claude/skills/setup-wakatime/SKILL.md)
+        # Skip known user-deployed hooks (see .qwen/skills/setup-wakatime/SKILL.md)
         skip=0
         for ud in "${USER_DEPLOYED_HOOKS[@]}"; do [ "$name" = "$ud" ] && skip=1 && break; done
         [ "$skip" -eq 1 ] && continue
-        if ! grep -q "\.claude/hooks/$name" "${SETTINGS_FILES[@]}" 2>/dev/null; then
+        if ! grep -q "\.qwen/hooks/$name" "${SETTINGS_FILES[@]}" 2>/dev/null; then
             if [ "$ORPHAN_WARN" -eq 0 ]; then
                 [ "$CHECK7_FAIL" -eq 0 ] && echo "PASS (with warnings)"
                 ORPHAN_WARN=1
@@ -465,7 +465,7 @@ else
     if [ "$MODE" = "staged" ]; then
         while IFS= read -r f; do
             case "$f" in
-                memory/*.md|.claude/*.md|.claude/*/*.md|.claude/*/*/*.md|docs/*.md)
+                memory/*.md|.qwen/*.md|.qwen/*/*.md|.qwen/*/*/*.md|docs/*.md)
                     hits=$(git -C "$TEMPLATE_DIR" show ":$f" 2>/dev/null \
                         | grep -niE "$FPF_STALE_PATTERN" \
                         | sed "s#^#$f:#" || true)
@@ -475,7 +475,7 @@ else
         done <<<"$STAGED_FILES"
     else
         FPF_STALE_HITS=$(grep -rniE "$FPF_STALE_PATTERN" \
-            "$TEMPLATE_DIR/memory" "$TEMPLATE_DIR/.claude" "$TEMPLATE_DIR/docs" \
+            "$TEMPLATE_DIR/memory" "$TEMPLATE_DIR/.qwen" "$TEMPLATE_DIR/docs" \
             --include='*.md' 2>/dev/null || true)
     fi
 

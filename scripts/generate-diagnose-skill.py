@@ -17,7 +17,7 @@ import yaml
 
 REPO_ROOT = pathlib.Path(__file__).parent.parent
 YAML_PATH = REPO_ROOT / "shared" / "rubrics" / "form-089.yaml"
-SKILL_PATH = REPO_ROOT / ".claude" / "skills" / "diagnose" / "SKILL.md"
+SKILL_PATH = REPO_ROOT / ".qwen" / "skills" / "diagnose" / "SKILL.md"
 
 
 def check():

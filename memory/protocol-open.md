@@ -13,11 +13,11 @@ description: "Протокол ОРЗ — пошаговые инструкци�
 # Протокол Open (ОРЗ-фрактал)
 
 > **Два масштаба:** День и Сессия. Триггер определяет масштаб.
-> **Источник:** CLAUDE.md § 2 (slim) → этот файл. **CGUS (WP-481 Ф5):** порядок шагов ниже = порядок удержания внимания, НЕ порядок исполнения. `[[gate]]`/`[[gate:AR.NNN]]` = предусловие «без этого работы нет» (блокирует); `[[narrative]]` = демонстрационный порядок (skippable). Вход «с середины» штатен, если все gate соблюдены.
+> **Источник:** QWEN.md § 2 (slim) → этот файл. **CGUS (WP-481 Ф5):** порядок шагов ниже = порядок удержания внимания, НЕ порядок исполнения. `[[gate]]`/`[[gate:AR.NNN]]` = предусловие «без этого работы нет» (блокирует); `[[narrative]]` = демонстрационный порядок (skippable). Вход «с середины» штатен, если все gate соблюдены.
 
 ## § Масштаб: День → skill `/day-open`
 
-> **Триггер:** «открывай» / «открывай день». Полный алгоритм → `.claude/skills/day-open/SKILL.md`. **Исполнение:** пошагово через TodoWrite (каждый шаг = задача, блокирующее). Аналогично Close.
+> **Триггер:** «открывай» / «открывай день». Полный алгоритм → `.qwen/skills/day-open/SKILL.md`. **Исполнение:** пошагово через TodoWrite (каждый шаг = задача, блокирующее). Аналогично Close.
 
 > **Вчерашний WakaTime (pending-мультипликатор):** в шаге 1 «Вчера» — проверить наличие `day_close` записи за вчера в Neon (`domain_event WHERE event_type='day_close' AND external_id='day-close-{вчера}'`). Если отсутствует: запросить WakaTime API `summaries?start={вчера}&end={вчера}` → пересчитать мультипликатор → дозаписать в domain_event. Причина: `--today` CLI не даёт данных за прошлый день (WP-299 Ф4 п.3).
 
@@ -72,22 +72,22 @@ python3 "${IWE_SCRIPTS:-$HOME/IWE/scripts}/artifactor.py" "$REQUEST"
    строку. [[gate]]
 3. **Sync Gate (актуализация контекста РП).** Прочитать контекст РП и связанных РП → синхронизировать открытые фазы с тем, что фактически сделано. **Цель:** исключить дублирование работы, ложные блокеры, неверные оценки в Ритуале. [[gate]]
 
-   **Race-guard:** если state-файл `.claude/state/wp-sync-<N>.done` существует И его mtime моложе 8 часов — пропустить (sync уже выполнен в этой сессии). Если файл есть, но mtime старше 8h — считать stale: `rm -f` и продолжить заново. Проверка: `find .claude/state/wp-sync-<N>.done -mmin -480 2>/dev/null` (пустой вывод = нет файла или stale → запускать; непустой = свежий → пропускать).
+   **Race-guard:** если state-файл `.qwen/state/wp-sync-<N>.done` существует И его mtime моложе 8 часов — пропустить (sync уже выполнен в этой сессии). Если файл есть, но mtime старше 8h — считать stale: `rm -f` и продолжить заново. Проверка: `find .qwen/state/wp-sync-<N>.done -mmin -480 2>/dev/null` (пустой вывод = нет файла или stale → запускать; непустой = свежий → пропускать).
 
    **Шаг 3a — Bundle.** Запустить детерминированный сборщик контекста:
    ```bash
-   bash "${IWE_WORKSPACE:-$HOME/IWE}/.claude/scripts/wp-sync-bundle.sh" WP-N > /tmp/wp-sync-bundle-$$.md
+   bash "${IWE_WORKSPACE:-$HOME/IWE}/.qwen/scripts/wp-sync-bundle.sh" WP-N > /tmp/wp-sync-bundle-$$.md
    ```
    Exit 0 → читать вывод. Exit 1 → РП не найден → перейти к Ритуалу с пометкой «контекст не найден». Exit 2 → ошибка парсинга → перейти к Ритуалу, поднять stderr в «Требует внимания».
 
-   **Шаг 3b — Override (опционально).** `bash .claude/scripts/load-extensions.sh protocol-open sync` — exit 0 → `Read` файлы (alphabetic), они переопределяют дефолтное поведение шага 3c. Exit 1 → дефолт.
+   **Шаг 3b — Override (опционально).** `bash .qwen/scripts/load-extensions.sh protocol-open sync` — exit 0 → `Read` файлы (alphabetic), они переопределяют дефолтное поведение шага 3c. Exit 1 → дефолт.
 
    **Шаг 3c — Дефолтное поведение по веткам (если 3b не override'нул):**
    - **Ветка A — тривиальный случай** (≤1 связанных РП И drift-сигналов нет): главный агент сам читает контекст текущего РП и патчит маркеры (`[ ]` → `[x]` для подзадач, ссылающихся на закрытые связанные РП).
    - **Ветка B — нетривиальный** (≥2 связанных РП ИЛИ есть drift-сигналы): делегировать через Task tool sub-agent'у `wp-sync-actualizer` (Sonnet 4.6, context isolation). Передать в prompt: номер WP-N + содержимое bundle. Sub-agent возвращает unified diff в формате `---ORIGINAL---`/`---REPLACEMENT---`. Главный агент применяет через Edit.
    - **Ветка C — противоречие** (sub-agent вернул раздел «Требует внимания» вместо diff'а, или нашёл «PASS» в одном связанном vs «FAIL» в другом по той же метрике): НЕ применять автоматически, поднять в «Требует внимания» Ритуала.
 
-   **Шаг 3d — Очистка:** `rm -f /tmp/wp-sync-bundle-$$.md`, `touch .claude/state/wp-sync-<N>.done`.
+   **Шаг 3d — Очистка:** `rm -f /tmp/wp-sync-bundle-$$.md`, `touch .qwen/state/wp-sync-<N>.done`.
 
 4. → Ритуал.
 
@@ -148,7 +148,7 @@ python3 "${IWE_SCRIPTS:-$HOME/IWE/scripts}/artifactor.py" "$REQUEST"
 
 **Шаг 4.5. Артефактор (автоматический).** Если класс ∈ {open-loop, problem-framing} И оценка ≥3h → выполнить `/artifactor` inline (без вопроса пользователю). Этапную карту вставить в WP context file (секция `## Этапы` в конец файла). Если класс trivial/closed-loop ИЛИ оценка <3h → пропустить молча. [[narrative]]
 
-**EXTENSION POINT (protocol-open after):** `bash .claude/scripts/load-extensions.sh protocol-open after` — exit 0 → `Read` каждый файл из вывода (alphabetic) → выполнить. Exit 1 → пропустить. Поддерживает `extensions/protocol-open.after.md` И `extensions/protocol-open.after.<suffix>.md`. [[gate]]
+**EXTENSION POINT (protocol-open after):** `bash .qwen/scripts/load-extensions.sh protocol-open after` — exit 0 → `Read` каждый файл из вывода (alphabetic) → выполнить. Exit 1 → пропустить. Поддерживает `extensions/protocol-open.after.md` И `extensions/protocol-open.after.<suffix>.md`. [[gate]]
 
 > Продолжение работы над тем же РП — повторный Ритуал не нужен.
 

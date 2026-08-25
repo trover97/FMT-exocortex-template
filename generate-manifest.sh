@@ -81,7 +81,7 @@ EXCLUDED_EXACT=(
 # === Исключения из files, но не в excluded_paths (пользовательское пространство) ===
 FILES_EXCLUDE_PATTERNS=(
     "seed/"
-    ".claude/settings.local.json"
+    ".qwen/settings.local.json"
 )
 
 FILES_EXCLUDE_EXACT=(

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""check-claude-md-links.py — every backtick path in shipped CLAUDE.md must resolve.
+"""check-claude-md-links.py — every backtick path in shipped QWEN.md must resolve.
 
 issue #291: platform section (start .. SYNC-CORE-END) is what update.sh delivers
 to every user via §1-7 + Agent Core — a path in backticks that doesn't exist in
@@ -15,17 +15,17 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-CLAUDE_MD = ROOT / "CLAUDE.md"
+CLAUDE_MD = ROOT / "QWEN.md"
 END_MARKER = "<!-- SYNC-CORE-END -->"
 
 PATH_RE = re.compile(r"`([\w./{}-]+\.[a-zA-Z]{2,5}(?:\s+§?[\w.]*)?)`")
 
 # Explicitly documented as author-only / not shipped right at the point of
-# reference in CLAUDE.md itself (see the surrounding sentence) — flagging them
+# reference in QWEN.md itself (see the surrounding sentence) — flagging them
 # again here would just be noise, not a new finding.
 ALLOWLIST = {
     "PACK-agent-rules/rules/AR.NNN.md",
-    ".claude/rules-registry.yaml",
+    ".qwen/rules-registry.yaml",
     "archive/wp-contexts/WP-457/CONCEPT-user-states.md",
 }
 
@@ -50,7 +50,7 @@ for m in PATH_RE.finditer(platform_text):
     dead.append((m.start(), candidate))
 
 if dead:
-    print(f"❌ {len(dead)} dead link(s) in CLAUDE.md platform section (start..SYNC-CORE-END):")
+    print(f"❌ {len(dead)} dead link(s) in QWEN.md platform section (start..SYNC-CORE-END):")
     for _, candidate in dead:
         print(f"   {candidate}")
     if "--strict" in sys.argv:

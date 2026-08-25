@@ -439,7 +439,7 @@ if [ "$CMD" = "open" ]; then
     # recorded a pid at all, so sweep_orphaned_semaphores()'s dead-pid check —
     # the only auto-detection left since age-based quarantine was retired
     # 04.08 — had nothing to grab onto; abandoned semaphores just hung open
-    # forever (48 found live 08.08). $CLAUDE_PID is the long-lived Claude Code
+    # forever (48 found live 08.08). $CLAUDE_PID is the long-lived Qwen Code
     # process (stable for the whole session, verified live) — NOT $$, which
     # is session-guard.sh's own transient subprocess, already dead the moment
     # this script returns (verified live: recorded pid was dead within the
@@ -795,7 +795,7 @@ fi
 # Codex peer sessions call this same script for open/close/note-file already
 # (its own header: "единый gate ... для всех агентов"), so a lock here is the
 # one place that can actually be cross-agent. A PreToolUse:Edit hook would only
-# ever see Claude Code's own edits -- today's collisions came from a mix of
+# ever see Qwen Code's own edits -- today's collisions came from a mix of
 # agent types, so a Claude-only mechanism would have caught a fraction of them.
 # Enforcement is cognitive for Kimi/Codex until their own instructions call it
 # (same class as several findings in GateEnforcement-Audit) -- the FMT hook
@@ -1187,7 +1187,7 @@ EOF
     echo "  git restore --staged <file>" >&2
     # Emit AR.216 warn to rule-engine session warn log
     _SESSION_ID="${CLAUDE_SESSION_ID:-default}"
-    _WARN_LOG="$HOME/.claude/state/session-${_SESSION_ID}-warns.jsonl"
+    _WARN_LOG="$HOME/.qwen/state/session-${_SESSION_ID}-warns.jsonl"
     mkdir -p "$(dirname "$_WARN_LOG")" 2>/dev/null || true
     printf '{"ts":"%s","event":"pre-commit","rule":"AR.216","verdict":"warn","reason":"Scope gate: staged files outside active session — use git add <specific-path>"}\n' \
       "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$_WARN_LOG" 2>/dev/null || true
