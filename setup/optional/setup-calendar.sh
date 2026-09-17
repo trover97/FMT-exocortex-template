@@ -1,4 +1,11 @@
 #!/bin/bash
+# === OFFLINE / NO-SCHEDULER GUARD (qwen-windows-offline) ===
+# Эта ветка: Windows + git bash, без планировщика (launchd/cron/systemd).
+# Установка задач по расписанию невозможна. Рабочие скрипты роли запускаются
+# ВРУЧНУЮ — см. MANUAL-JOBS.md в корне репозитория.
+echo "[$(basename "$(dirname "$0")")] Планировщик недоступен (offline/Windows). Запуск задач — вручную, см. MANUAL-JOBS.md" >&2
+exit 0
+# === /GUARD ===
 # Google Calendar MCP — подключение за 1 минуту
 # Использует Shared OAuth App проекта IWE
 #
@@ -17,7 +24,7 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 WORKSPACE_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 # If running from workspace root directly
-if [ -f "$WORKSPACE_DIR/CLAUDE.md" ] && [ ! -d "$WORKSPACE_DIR/memory" ] 2>/dev/null; then
+if [ -f "$WORKSPACE_DIR/QWEN.md" ] && [ ! -d "$WORKSPACE_DIR/memory" ] 2>/dev/null; then
     WORKSPACE_DIR="$(dirname "$WORKSPACE_DIR")"
 fi
 # Use WORKSPACE_DIR from env if set, otherwise detect
@@ -127,6 +134,6 @@ echo "  Календарь подключён!"
 echo "========================================"
 echo ""
 echo "Проверка:"
-echo "  1. Перезапустите Claude Code (чтобы MCP подхватился)"
+echo "  1. Перезапустите Qwen Code (чтобы MCP подхватился)"
 echo "  2. Скажите: «покажи мои события на сегодня»"
 echo ""

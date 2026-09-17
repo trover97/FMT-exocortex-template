@@ -16,7 +16,7 @@
 
 ```bash
 # Проверить наличие skill
-SKILL="${IWE_WORKSPACE:-$HOME/IWE}/.claude/skills/month-close/SKILL.md"
+SKILL="${IWE_WORKSPACE:-$HOME/IWE}/.qwen/skills/month-close/SKILL.md"
 if [ -f "$SKILL" ]; then
   # Делегировать выполнение skill /month-close
   echo "Делегирую в skills/month-close/SKILL.md"
@@ -63,7 +63,7 @@ Git: закоммичен и запушен ✅
 
 ## Источники
 
-- **Skill (primary):** `{{WORKSPACE_DIR}}/.claude/skills/month-close/SKILL.md`
+- **Skill (primary):** `{{WORKSPACE_DIR}}/.qwen/skills/month-close/SKILL.md`
 - **WeekPlans:** `{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/archive/week-plans/WeekPlan W*.md`
 - **Strategy:** `{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/docs/Strategy.md`
 - **MEMORY:** `{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/memory/MEMORY.md`

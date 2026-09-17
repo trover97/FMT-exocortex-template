@@ -2,7 +2,7 @@
 
 ## Добавление нового skill
 
-1. Создать директорию `.claude/skills/<name>/`
+1. Создать директорию `.qwen/skills/<name>/`
 2. Написать `SKILL.md` с frontmatter:
    ```yaml
    ---
@@ -32,7 +32,7 @@ python3 scripts/generate-diagnose-skill.py --check
 # Если ошибка — обнови SKILL.md вручную, чтобы вопросы совпадали с YAML
 
 # 3. Закоммитить оба файла вместе
-git add shared/rubrics/form-089.yaml .claude/skills/diagnose/SKILL.md
+git add shared/rubrics/form-089.yaml .qwen/skills/diagnose/SKILL.md
 git commit -m "feat(diagnose): update rubrics"
 ```
 

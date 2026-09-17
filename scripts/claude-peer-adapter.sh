@@ -21,7 +21,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/peer-adapter-common.sh
 source "$SCRIPT_DIR/lib/peer-adapter-common.sh"
 
-# Claude Code can access its macOS Keychain credentials only outside Codex's
+# Qwen Code can access its macOS Keychain credentials only outside Codex's
 # seatbelt. Running the adapter inside that sandbox produced intermittent blank
 # output that looked like success. A caller must use the approved external
 # route (`sandbox_permissions=require_escalated` in Codex); do not retry this
@@ -108,7 +108,7 @@ TEXT_ONLY_HINT="All tools are disabled for this call by the caller. Do not attem
 # `--no-session-persistence` prevents this ephemeral reviewer from leaving a
 # resumable conversation. --add-dir remains forbidden above.
 #
-# This is still a Claude Code policy boundary, not an OS sandbox. Sensitive
+# This is still a Qwen Code policy boundary, not an OS sandbox. Sensitive
 # material requires a separately isolated runner and explicit pilot approval.
 #
 # Deadline protects the *whole* CLI process group, not only the launcher.  The
@@ -185,7 +185,7 @@ CLAUDE_OUTPUT=$(run_with_deadline "$IWE_PEER_TIMEOUT_SECONDS" \
 
 # Auth-failure detection (peer-session 2026-08-04-08-wp7-f44-sandbox-review):
 # macOS Keychain can be unreachable from a sandboxed child process (e.g. a
-# Codex workspace-write sandbox) even when the pilot's own Claude Code login
+# Codex workspace-write sandbox) even when the pilot's own Qwen Code login
 # is valid — that surfaces as literal "Not logged in" text, not necessarily a
 # non-zero exit. stderr is checked unconditionally (diagnostic channel);
 # stdout only when the process itself also exited non-zero, so a genuine

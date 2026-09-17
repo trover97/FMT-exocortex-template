@@ -1,16 +1,16 @@
 // Syncthing exclusions for IWE (Intellectual Work Environment)
-// Prevents noise during Claude Code sessions.
+// Prevents noise during Qwen Code sessions.
 //
-// Claude Code writes continuously to .claude/projects/ during sessions
+// Qwen Code writes continuously to .qwen/projects/ during sessions
 // (conversation transcripts, task outputs) — syncing these is wasteful
 // and triggers hundreds of change events per minute.
 
-// Claude Code session data (most noisy — kilobytes written every few seconds)
-.claude/projects/
+// Qwen Code session data (most noisy — kilobytes written every few seconds)
+.qwen/projects/
 
-// Claude Code ephemeral state
-.claude/state/
-.claude/.cache/
+// Qwen Code ephemeral state
+.qwen/state/
+.qwen/.cache/
 
 // Rule-engine classifier logs (written every session + hourly)
 logs/rule-engine/

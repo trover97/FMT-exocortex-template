@@ -14,7 +14,7 @@
 #    - другой domain → pending-review (неизвестная категория).
 # 2. Secondary (для разрешённых domain):
 #    - Объём тела (без frontmatter) ≤30 строк
-#    - Нет regex-матчей по путям: `.claude/`, `scripts/`, `extensions/`, `memory/feedback_*.md`
+#    - Нет regex-матчей по путям: `.qwen/`, `scripts/`, `extensions/`, `memory/feedback_*.md`
 #    Оба условия → auto-accept. Иначе → pending-review.
 #
 # Вывод stdout одной строкой:
@@ -67,8 +67,8 @@ if [ "$BODY_LINES" -gt 30 ]; then
 fi
 
 # Regex по путям к коду/feedback
-if grep -qE '\.claude/|scripts/|extensions/|memory/feedback_' "$FILE"; then
-  MATCHES=$(grep -oE '\.claude/[^[:space:]]*|scripts/[^[:space:]]*|extensions/[^[:space:]]*|memory/feedback_[^[:space:]]*' "$FILE" | head -2 | tr '\n' ' ')
+if grep -qE '\.qwen/|scripts/|extensions/|memory/feedback_' "$FILE"; then
+  MATCHES=$(grep -oE '\.qwen/[^[:space:]]*|scripts/[^[:space:]]*|extensions/[^[:space:]]*|memory/feedback_[^[:space:]]*' "$FILE" | head -2 | tr '\n' ' ')
   echo "PENDING_REVIEW: contains code/feedback paths ($MATCHES)"
   exit 1
 fi

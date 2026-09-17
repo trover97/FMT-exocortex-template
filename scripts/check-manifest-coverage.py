@@ -65,7 +65,7 @@ _ALWAYS_EXCLUDED_NAMES = frozenset({
 
 # Точные пути для исключения.
 _EXCLUDED_EXACT_PATHS = frozenset({
-    ".claude/settings.local.json",
+    ".qwen/settings.local.json",
     ".github/PULL_REQUEST_TEMPLATE.md",
     ".github/workflows/aisystant-sync.yml",
     ".github/workflows/release.yml",

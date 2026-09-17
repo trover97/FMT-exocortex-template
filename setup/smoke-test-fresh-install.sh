@@ -186,35 +186,35 @@ else
     fail "$LEFTOVER_COUNT файлов в runtime содержат {{...}}"
 fi
 
-# === Test 6d: meta-detector — все .claude/*/ каталоги учтены в update.sh:609 (WP-293) ===
-echo "[6d] все .claude/*/ каталоги в update.sh:609 паттерне..."
-# Контракт: при добавлении нового подкаталога в .claude/X/ его обязаны добавить в паттерн
-# на строке `case "$f" in .claude/skills/*|...` в update.sh, иначе файлы X не попадут
-# в workspace при `update.sh` (баг 0.29.28: .claude/scripts/* пропущен).
-PATTERN_LINE=$(grep -E 'case "\$f" in \.claude/skills/' "$TEMPLATE_DIR/update.sh" 2>/dev/null | head -1)
+# === Test 6d: meta-detector — все .qwen/*/ каталоги учтены в update.sh:609 (WP-293) ===
+echo "[6d] все .qwen/*/ каталоги в update.sh:609 паттерне..."
+# Контракт: при добавлении нового подкаталога в .qwen/X/ его обязаны добавить в паттерн
+# на строке `case "$f" in .qwen/skills/*|...` в update.sh, иначе файлы X не попадут
+# в workspace при `update.sh` (баг 0.29.28: .qwen/scripts/* пропущен).
+PATTERN_LINE=$(grep -E 'case "\$f" in \.qwen/skills/' "$TEMPLATE_DIR/update.sh" 2>/dev/null | head -1)
 MISSING_DIRS=""
-for dir in "$TEMPLATE_DIR"/.claude/*/; do
+for dir in "$TEMPLATE_DIR"/.qwen/*/; do
     [ -d "$dir" ] || continue
     dirname=$(basename "$dir")
     case "$dirname" in
         projects|context-cache|logs|worktrees) continue ;; # workspace-local / runtime-only, не propagate
     esac
-    if ! echo "$PATTERN_LINE" | grep -q "\.claude/$dirname/\*"; then
+    if ! echo "$PATTERN_LINE" | grep -q "\.qwen/$dirname/\*"; then
         MISSING_DIRS="$MISSING_DIRS $dirname"
     fi
 done
 if [ -z "$MISSING_DIRS" ]; then
-    pass "все .claude/*/ каталоги учтены в update.sh:609 паттерне"
+    pass "все .qwen/*/ каталоги учтены в update.sh:609 паттерне"
 else
     fail "не учтены в update.sh:609 (файлы не попадут в workspace):$MISSING_DIRS"
 fi
-# Sanity: load-extensions.sh существует и в .claude/scripts/ паттерн в update.sh:609.
-if [ ! -f "$TEMPLATE_DIR/.claude/scripts/load-extensions.sh" ]; then
-    fail ".claude/scripts/load-extensions.sh отсутствует в FMT"
-elif ! echo "$PATTERN_LINE" | grep -q '\.claude/scripts/\*'; then
-    fail ".claude/scripts/* отсутствует в update.sh:609 паттерне (баг 0.29.28)"
+# Sanity: load-extensions.sh существует и в .qwen/scripts/ паттерн в update.sh:609.
+if [ ! -f "$TEMPLATE_DIR/.qwen/scripts/load-extensions.sh" ]; then
+    fail ".qwen/scripts/load-extensions.sh отсутствует в FMT"
+elif ! echo "$PATTERN_LINE" | grep -q '\.qwen/scripts/\*'; then
+    fail ".qwen/scripts/* отсутствует в update.sh:609 паттерне (баг 0.29.28)"
 else
-    pass ".claude/scripts/load-extensions.sh попадает в workspace при update.sh"
+    pass ".qwen/scripts/load-extensions.sh попадает в workspace при update.sh"
 fi
 
 # === Test 6c: prompts substituted РЕАЛЬНЫМ substituted runner'ом (R6.1** regression) ===
@@ -294,7 +294,7 @@ fi
 
 # === Test 7: load-extensions.sh wildcard suffix contract (R5.5) ===
 echo "[7/7] load-extensions.sh wildcard suffix contract..."
-LOAD_EXT="$TEMPLATE_DIR/.claude/scripts/load-extensions.sh"
+LOAD_EXT="$TEMPLATE_DIR/.qwen/scripts/load-extensions.sh"
 EXT_TEST_WS="$TEST_WS/ext-loader-test"
 mkdir -p "$EXT_TEST_WS/extensions"
 
@@ -346,7 +346,7 @@ E2E_WS="/tmp/iwe-smoke-e2e-$$"
 # HOME isolation обязательна — иначе install-iwe-paths.sh перезатрёт реальный $HOME/.iwe-paths
 # автора smoke-test путём /tmp/iwe-smoke-e2e-* (collateral pollution, баг 0.7.x).
 E2E_HOME="$E2E_WS/home"
-E2E_MEM="$E2E_HOME/.claude/projects/$(echo "$E2E_WS" | tr '/' '-')/memory"
+E2E_MEM="$E2E_HOME/.qwen/projects/$(echo "$E2E_WS" | tr '/' '-')/memory"
 mkdir -p "$E2E_WS" "$E2E_HOME"
 E2E_RC=0
 E2E_OUT=$(HOME="$E2E_HOME" SETUP_CI=1 GITHUB_USER=smoke-e2e WORKSPACE_DIR="$E2E_WS" \
@@ -359,12 +359,12 @@ else
     pass "e2e setup.sh --core exit 0"
     # Проверяем обязательные файлы в workspace
     for f in \
-        ".claude/scripts/load-extensions.sh" \
-        ".claude/agents" \
-        ".claude/skills" \
-        ".claude/hooks" \
-        ".claude/rules" \
-        "CLAUDE.md"; do
+        ".qwen/scripts/load-extensions.sh" \
+        ".qwen/agents" \
+        ".qwen/skills" \
+        ".qwen/hooks" \
+        ".qwen/rules" \
+        "QWEN.md"; do
         if [ -e "$E2E_WS/$f" ]; then
             pass "e2e workspace: $f доставлен"
         else
@@ -419,14 +419,14 @@ fi
 rm -rf "$E2E_WS10" "$E2E_HOME10" 2>/dev/null || true
 
 # === Test 8: setup.sh delivery completeness (meta-detector, баг 08e4803) ===
-# Евгений нашёл два delivery gap: .claude/scripts/ и memory/*.yaml не копировались при fresh install.
-# Этот тест — статический анализ setup.sh: проверяет что все .claude/*/ субдиректории
+# Евгений нашёл два delivery gap: .qwen/scripts/ и memory/*.yaml не копировались при fresh install.
+# Этот тест — статический анализ setup.sh: проверяет что все .qwen/*/ субдиректории
 # и memory/*.yaml перечислены в командах копирования step 4b и step 3.
-echo "[8a] setup.sh step 4b копирует все .claude/*/ субдиректории..."
+echo "[8a] setup.sh step 4b копирует все .qwen/*/ субдиректории..."
 SETUP_SH="$TEMPLATE_DIR/setup.sh"
 SUBDIR_LINE=$(grep -E '^[[:space:]]*for subdir in ' "$SETUP_SH" | head -1)
 SETUP8A_MISS=""
-for dir in "$TEMPLATE_DIR"/.claude/*/; do
+for dir in "$TEMPLATE_DIR"/.qwen/*/; do
     [ -d "$dir" ] || continue
     dirname=$(basename "$dir")
     case "$dirname" in
@@ -437,7 +437,7 @@ for dir in "$TEMPLATE_DIR"/.claude/*/; do
     fi
 done
 if [ -z "$SETUP8A_MISS" ]; then
-    pass "setup.sh step 4b: все .claude/*/ субдиректории включены"
+    pass "setup.sh step 4b: все .qwen/*/ субдиректории включены"
 else
     fail "setup.sh step 4b: не включены в for-loop (не будут скопированы при fresh install):$SETUP8A_MISS"
 fi

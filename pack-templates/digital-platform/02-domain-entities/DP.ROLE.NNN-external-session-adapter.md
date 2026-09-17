@@ -6,7 +6,7 @@ name_en: External Session Adapter
 type: role
 status: draft
 layer: L4-Platform
-summary: "Мост между внешним каналом (Telegram) и локальным исполнителем (Claude Code). Поддерживает multi-turn диалог: каждый ход дописывается в SESSION-thread, Egress запускает Claude Code с полным контекстом. Capability scope: код+git, calendar, WP, IWE-знания. Две sub-responsibility: Ingress (cloud) и Egress (local)."
+summary: "Мост между внешним каналом (Telegram) и локальным исполнителем (Qwen Code). Поддерживает multi-turn диалог: каждый ход дописывается в SESSION-thread, Egress запускает Qwen Code с полным контекстом. Capability scope: код+git, calendar, WP, IWE-знания. Две sub-responsibility: Ingress (cloud) и Egress (local)."
 owner_role: R14 Заказчик (пилот) — как потребитель; DP.ROLE.045 Диспетчер — как смежная роль в inbox
 created: 2026-05-27
 updated: 2026-05-27
@@ -25,7 +25,7 @@ wp: WP-358
 
 ## Назначение
 
-Мост между внешним каналом (Telegram) и локальным исполнителем (Claude Code).
+Мост между внешним каналом (Telegram) и локальным исполнителем (Qwen Code).
 
 **Ключевые принципы:**
 - Не выполняет задачу — только маршрутизирует ходы сессии между каналами
@@ -77,7 +77,7 @@ wp: WP-358
 3. Вызвать Session Memory Injector (DP.SC.161) для pre-flight обогащения контекста
 4. Запустить `claude -p` с полным `SESSION-<id>-thread.md` + capability-инструкциями как stdin
 5. Heartbeat self-check: ping в SQLite каждые 30с; miss >90с → `failed` + TG alert
-6. Получить ответ Claude Code (stdout)
+6. Получить ответ Qwen Code (stdout)
 7. Дописать ответ в thread: `[turn:N+1-response, ts:<ISO>] Claude: <ответ>`
 8. Зафиксировать domain event (activity tracking): `activity_log` + WakaTime heartbeat
 9. Отправить ответ в Telegram через `send_telegram_message`
@@ -85,17 +85,17 @@ wp: WP-358
 
 **Полномочия:** read/write `inbox/agent/sessions/`, read/write `~/.iwe/sessions.db`, запуск `claude -p` CLI, использовать `send_telegram_message`, доступ к capability-инструментам (calendar MCP, `create-wp.sh`, `knowledge_search`).
 
-**НЕ делает:** не выбирает содержание ответа — это задача Claude Code.
+**НЕ делает:** не выбирает содержание ответа — это задача Qwen Code.
 
 ---
 
 ## Capability scope
 
-Egress передаёт Claude Code доступ к следующим инструментам:
+Egress передаёт Qwen Code доступ к следующим инструментам:
 
 | Capability | Инструмент | Примеры запросов |
 |-----------|-----------|-----------------|
-| Код + git | Claude Code native | фиксы, коммиты, создание файлов |
+| Код + git | Qwen Code native | фиксы, коммиты, создание файлов |
 | Календарь | Google Calendar MCP | «поставь встречу с Андреем завтра в 15:00» |
 | Создание РП | `create-wp.sh` | «сформируй новый РП: ...» |
 | IWE-знания | `knowledge_search` MCP | «найди в IWE информацию про ...» |

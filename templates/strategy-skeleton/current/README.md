@@ -14,7 +14,7 @@
 
 ## Шаблоны
 
-Шаблоны лежат в `~/IWE/.claude/skills/day-open/` и `.../strategy-session/` — не дублируем здесь.
+Шаблоны лежат в `~/IWE/.qwen/skills/day-open/` и `.../strategy-session/` — не дублируем здесь.
 
 ---
 

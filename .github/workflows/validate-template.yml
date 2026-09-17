@@ -165,7 +165,7 @@ jobs:
       # Корень бага (май 2026): detector ловил legitimate uses (template identity,
       # python fallback, env override) как false positives. Исправлено в validate-fmt-scripts.sh.
       # Гейт: прогоняем в CI, чтобы не полагаться только на pre-commit (который зовётся
-      # только при staged .claude/settings.json) и ручной запуск.
+      # только при staged .qwen/settings.json) и ручной запуск.
       - name: Run validate-fmt-scripts (author-specific hardcodes & conventions)
         run: bash scripts/validate-fmt-scripts.sh
 
@@ -235,7 +235,7 @@ jobs:
           # Прогон хука: имитируем PreToolUse с git commit DayPlan
           INPUT=$(jq -n --arg cmd "git add DS-strategy/current/DayPlan\\ 2026-04-22.md && git commit -m test" \
                   '{tool_name: "Bash", tool_input: {command: $cmd}}')
-          RESULT=$(echo "$INPUT" | bash .claude/hooks/protocol-artifact-validate.sh)
+          RESULT=$(echo "$INPUT" | bash .qwen/hooks/protocol-artifact-validate.sh)
           DECISION=$(echo "$RESULT" | jq -r '.decision // "allow"')
 
           if [ "$DECISION" = "block" ]; then

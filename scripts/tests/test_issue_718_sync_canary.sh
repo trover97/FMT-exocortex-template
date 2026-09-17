@@ -53,7 +53,7 @@ status: in_progress
 EOF
 
 good_out=$(IWE_WORKSPACE="$WORKSPACE" IWE_GOVERNANCE_REPO="$GOV" \
-    bash "$ROOT/.claude/scripts/wp-sync-bundle.sh" --self-test 10 2>&1)
+    bash "$ROOT/.qwen/scripts/wp-sync-bundle.sh" --self-test 10 2>&1)
 good_status=$?
 if [ "$good_status" -eq 0 ] && echo "$good_out" | grep -q "registry_status: 🔄 in_progress"; then
     pass "self-test WP-10 (file + registry row present) exits 0"
@@ -62,7 +62,7 @@ else
 fi
 
 orphan_out=$(IWE_WORKSPACE="$WORKSPACE" IWE_GOVERNANCE_REPO="$GOV" \
-    bash "$ROOT/.claude/scripts/wp-sync-bundle.sh" --self-test 11 2>&1)
+    bash "$ROOT/.qwen/scripts/wp-sync-bundle.sh" --self-test 11 2>&1)
 orphan_status=$?
 if [ "$orphan_status" -ne 0 ] && echo "$orphan_out" | grep -q "Canary FAILED"; then
     pass "self-test WP-11 (file present, registry row missing) exits non-zero — old self-test would have reported OK here"
@@ -88,7 +88,7 @@ eval "$(awk '
 EXIT_CANARY_FAILED=5
 WORKSPACE_DIR="$TMP/rsc-workspace"
 SCRIPT_DIR="$TMP/rsc-template"
-mkdir -p "$WORKSPACE_DIR" "$SCRIPT_DIR/.claude/scripts"
+mkdir -p "$WORKSPACE_DIR" "$SCRIPT_DIR/.qwen/scripts"
 
 # SCRIPT_DIR always ships its own wp-sync-bundle.sh (it's the template
 # install, not a bare directory) — a real one, so this fixture exercises the
@@ -100,8 +100,8 @@ mkdir -p "$WORKSPACE_DIR" "$SCRIPT_DIR/.claude/scripts"
 # run_sync_canary fell through to actually invoking wp-sync-bundle.sh, which
 # hard-exits 1 on a missing WP-REGISTRY.md — reported as a canary FAILURE
 # instead of the "not configured yet" SKIP it actually is.
-cp "$ROOT/.claude/scripts/wp-sync-bundle.sh" "$SCRIPT_DIR/.claude/scripts/wp-sync-bundle.sh"
-chmod +x "$SCRIPT_DIR/.claude/scripts/wp-sync-bundle.sh"
+cp "$ROOT/.qwen/scripts/wp-sync-bundle.sh" "$SCRIPT_DIR/.qwen/scripts/wp-sync-bundle.sh"
+chmod +x "$SCRIPT_DIR/.qwen/scripts/wp-sync-bundle.sh"
 
 # No governance repo configured at all -> SKIP (exit 0), not FAIL.
 ENV_GOVERNANCE_REPO=""
@@ -120,14 +120,14 @@ fi
 # mask it.
 # shellcheck disable=SC2034  # read by effective_governance_repo(), eval'd above
 ENV_GOVERNANCE_REPO="gov"
-mkdir -p "$WORKSPACE_DIR/gov/.claude/scripts" "$WORKSPACE_DIR/gov/docs"
+mkdir -p "$WORKSPACE_DIR/gov/.qwen/scripts" "$WORKSPACE_DIR/gov/docs"
 touch "$WORKSPACE_DIR/gov/docs/WP-REGISTRY.md"
-cat >"$WORKSPACE_DIR/gov/.claude/scripts/wp-sync-bundle.sh" <<'EOF'
+cat >"$WORKSPACE_DIR/gov/.qwen/scripts/wp-sync-bundle.sh" <<'EOF'
 #!/usr/bin/env bash
 echo "simulated registry failure"
 exit 1
 EOF
-chmod +x "$WORKSPACE_DIR/gov/.claude/scripts/wp-sync-bundle.sh"
+chmod +x "$WORKSPACE_DIR/gov/.qwen/scripts/wp-sync-bundle.sh"
 
 rsc_out=$(run_sync_canary 2>&1)
 rsc_status=$?

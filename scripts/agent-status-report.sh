@@ -5,7 +5,7 @@
 # платформенный реестр indicators.agent_status, КОГДА агент-LLM не отчитался сам.
 #
 # Это FAIL-SAFE, не primary. Primary write-path = поведенческий вызов MCP-инструмента
-# agent_status_update самим агентом (см. Agent Core в CLAUDE.md/AGENTS.md). Этот helper
+# agent_status_update самим агентом (см. Agent Core в QWEN.md/AGENTS.md). Этот helper
 # пишет напрямую в БД (degraded-путь) — осознанное исключение для надёжности, т.к. OAuth
 # у Claude/Kimi не рефрешится как у Hermes-runtime, а dashboard должен видеть статус даже
 # если LLM забыл позвать инструмент (fault-profile ~15-20%).

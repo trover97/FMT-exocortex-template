@@ -2,7 +2,7 @@
 
 > Краткая справка по Intellectual Work Environment (IWE) для поиска и ответов бота.
 > Полная установка: [SETUP-GUIDE.md](SETUP-GUIDE.md)
-> Не на macOS или не Claude Code? → **[PORTABILITY.md](PORTABILITY.md)**
+> Не на macOS или не Qwen Code? → **[PORTABILITY.md](PORTABILITY.md)**
 >
 > **Source-of-truth:** Pack-сущности платформы (доступны через Gateway `iwe-knowledge`):
 > - `DP.IWE.001` — что такое IWE, зачем, архитектура
@@ -19,7 +19,7 @@ IWE (Intellectual Work Environment) — интеллектуальная раб�
 
 | Вид | Что | Примеры |
 |-----|-----|---------|
-| **Системы** | Программы с 4D-границами | Claude Code, Telegram-бот, MCP-серверы, WakaTime, Git, экзокортекс (файлы), Neon DB |
+| **Системы** | Программы с 4D-границами | Qwen Code, Telegram-бот, MCP-серверы, WakaTime, Git, экзокортекс (файлы), Neon DB |
 | **Описания** | Знания, загружаемые в системы | FPF/SPF/ZP, Pack-сущности, промпты ролей, содержимое экзокортекса |
 | **Роли** | Функция, не исполнитель | Стратег (R1) ← Claude, Экстрактор (R2), Синхронизатор (R8), Пользователь ← Человек |
 | **Методы** | Процедуры «как делать» | Протокол ОРЗ, Capture-to-Pack, ArchGate, KE, Note-Review |
@@ -35,11 +35,11 @@ IWE (Intellectual Work Environment) — интеллектуальная раб�
 - macOS, Linux или Windows (через Git Bash — WSL не обязателен, не проверено вживую на реальном Windows, см. [SETUP-GUIDE.md § Windows](SETUP-GUIDE.md#00-windows-без-wsl))
 - Git + GitHub аккаунт + GitHub CLI (`gh`)
 - Node.js v18+ и npm
-- Claude Code CLI (`npm install -g @anthropic-ai/claude-code`)
+- Qwen Code CLI (`npm install -g @anthropic-ai/claude-code`)
 - Подписка Anthropic: **Claude Pro** ($20/мес) — рекомендуется для старта. При необходимости — **Claude Max** (~$100/мес) для работы без ограничений на количество сообщений.
 
 ### Опционально
-- VS Code (рекомендуется) или любой другой редактор с терминалом. Claude Code — CLI, работает в любом терминале (Terminal.app, iTerm2 и др.). VS Code удобен: редактор + терминал + расширение Claude Code в одном окне
+- VS Code (рекомендуется) или любой другой редактор с терминалом. Qwen Code — CLI, работает в любом терминале (Terminal.app, iTerm2 и др.). VS Code удобен: редактор + терминал + расширение Qwen Code в одном окне
 - Telegram (@aist_me_bot) — для заметок
 - WakaTime — трекинг рабочего времени
 
@@ -53,7 +53,7 @@ IWE (Intellectual Work Environment) — интеллектуальная раб�
 
 Результат установки:
 - Форк шаблона экзокортекса в твой GitHub
-- CLAUDE.md и memory/ — настроенные под тебя
+- QWEN.md и memory/ — настроенные под тебя
 - Стратег (ИИ-агент) — в автоматическом расписании
 - DS-strategy — приватный репо для планирования
 
@@ -61,7 +61,7 @@ IWE (Intellectual Work Environment) — интеллектуальная раб�
 
 ## Доступ к знаниям (MCP)
 
-MCP (Model Context Protocol) — протокол, через который Claude Code подключается к базе знаний платформы. Один Gateway-сервер агрегирует все бэкенды:
+MCP (Model Context Protocol) — протокол, через который Qwen Code подключается к базе знаний платформы. Один Gateway-сервер агрегирует все бэкенды:
 
 | Сервер | Что даёт | Инструменты |
 |--------|---------|-------------|
@@ -69,7 +69,7 @@ MCP (Model Context Protocol) — протокол, через который Cla
 
 > Поиск по руководствам: `knowledge_search("запрос", source_type="guides")`.
 
-MCP подключается через https://claude.ai/settings/connectors (см. SETUP-GUIDE §1.3b). Проверка: `/mcp` в Claude Code → серверы Connected. Попроси «Найди документы про принципы» — Claude использует `knowledge_search`.
+MCP подключается через https://claude.ai/settings/connectors (см. SETUP-GUIDE §1.3b). Проверка: `/mcp` в Qwen Code → серверы Connected. Попроси «Найди документы про принципы» — Claude использует `knowledge_search`.
 
 ---
 
@@ -102,7 +102,7 @@ bash ~/IWE/FMT-exocortex-template/roles/strategist/scripts/strategist.sh day-pla
 
 ## Протокол ОРЗ (ежедневная работа)
 
-Каждая сессия в Claude Code — три стадии:
+Каждая сессия в Qwen Code — три стадии:
 
 **Открытие.** Даёшь задание → Claude проверяет WP Gate (есть ли в плане недели?). Если нет — предлагает добавить. Объявляет роль, метод, оценку.
 
@@ -117,7 +117,7 @@ bash ~/IWE/FMT-exocortex-template/roles/strategist/scripts/strategist.sh day-pla
 | Слой | Файл | Когда загружается |
 |------|------|-------------------|
 | Оперативная | `memory/MEMORY.md` | Всегда (авто-контекст) |
-| Правила | `CLAUDE.md` | Всегда (авто-контекст) |
+| Правила | `QWEN.md` | Всегда (авто-контекст) |
 | Справочная | `memory/*.md` | По запросу |
 
 MEMORY.md — личные (текущие задачи, РП недели). Редактируется каждую сессию.
@@ -143,7 +143,7 @@ bash update.sh --check  # проверить без применения
 трассировка, дополнительные заголовки, конфигурация и файлы вывода блокируются
 до сетевого запроса; пользовательский `.curlrc` для такого запроса отключён.
 
-Обновляются: CLAUDE.md, memory/ (кроме MEMORY.md), промпты ролей, скрипты.
+Обновляются: QWEN.md, memory/ (кроме MEMORY.md), промпты ролей, скрипты.
 НЕ трогаются: MEMORY.md, DS-strategy/, routing.md, личные настройки.
 
 ---
@@ -160,17 +160,17 @@ bash update.sh --check  # проверить без применения
 
 ## Частые проблемы
 
-**Claude Code не запускается** — проверь подписку Anthropic и `claude --version`. Начинать можно с Pro plan ($20/мес). При необходимости — Max (~$100/мес).
+**Qwen Code не запускается** — проверь подписку Anthropic и `claude --version`. Начинать можно с Pro plan ($20/мес). При необходимости — Max (~$100/мес).
 
 **Стратег не формирует план** — macOS: `launchctl list | grep strategist`. Linux: `systemctl --user list-timers | grep strategist`. Если нет — `bash roles/strategist/install.sh`.
 
-**MEMORY.md не загружается** — проверь путь: `~/.claude/projects/-Users-<username>-IWE/memory/MEMORY.md`. Имя директории = путь к workspace через дефисы.
+**MEMORY.md не загружается** — проверь путь: `~/.qwen/projects/-Users-<username>-IWE/memory/MEMORY.md`. Имя директории = путь к workspace через дефисы.
 
 **DS-strategy не создан** — вручную: `mkdir -p ~/IWE/DS-strategy/{current,inbox,docs,archive} && cd ~/IWE/DS-strategy && git init`.
 
 **Заметки не приходят из Telegram** — проверь подписку в @aist_me_bot. Формат: точка + текст (`.Моя заметка`).
 
-**MCP не работает (Claude не ищет по базе)** — проверь подключение: `/mcp` в Claude Code. Серверы должны быть Connected. Если их нет — добавь через https://claude.ai/settings/connectors (см. SETUP-GUIDE §1.3b).
+**MCP не работает (Claude не ищет по базе)** — проверь подключение: `/mcp` в Qwen Code. Серверы должны быть Connected. Если их нет — добавь через https://claude.ai/settings/connectors (см. SETUP-GUIDE §1.3b).
 
 **Как настроить уведомления в Telegram** — создай `~/.config/aist/env`:
 ```bash
@@ -185,7 +185,7 @@ export TELEGRAM_CHAT_ID="your-id"
 | Термин | Значение |
 |--------|---------|
 | IWE | Intellectual Work Environment — интеллектуальная рабочая среда |
-| Экзокортекс | Подсистема памяти IWE (CLAUDE.md + MEMORY.md + memory/) |
+| Экзокортекс | Подсистема памяти IWE (QWEN.md + MEMORY.md + memory/) |
 | Pack | Предметная база знаний (source-of-truth для домена) |
 | DS-strategy | Личный стратегический хаб (приватный репо) |
 | WP Gate | Проверка: есть ли задача в плане недели? |
@@ -195,7 +195,7 @@ export TELEGRAM_CHAT_ID="your-id"
 | User-space | Личные файлы, никогда не затираются |
 | Routing | Таблица маршрутизации знаний (куда класть captures) |
 | Marp | Инструмент для создания слайдов из Markdown. Workflow: `.md` → предпросмотр (VS Code) → PDF/HTML (`marp --pdf`). Используется для слайдоментов |
-| MCP | Model Context Protocol — доступ Claude Code к внешним базам знаний |
+| MCP | Model Context Protocol — доступ Qwen Code к внешним базам знаний |
 | iwe-knowledge | Gateway MCP-сервер (`mcp.aisystant.com/mcp`): поиск по Pack, руководствам, DS + цифровой двойник |
 
 ---
@@ -211,7 +211,7 @@ Pack — репозиторий с формализованными знания
 - Хочешь, чтобы Claude знал термины и паттерны твоей области
 - Устал повторять контекст в каждой сессии
 
-**Как создать:** написать `/pack-new` в Claude Code.
+**Как создать:** написать `/pack-new` в Qwen Code.
 
 Скилл проведёт: выбор домена → имя Pack → структура → дорожная карта наполнения.
 

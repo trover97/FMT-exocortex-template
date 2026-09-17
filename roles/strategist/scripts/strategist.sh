@@ -1,6 +1,6 @@
 #!/bin/bash
 # Strategist (Стратег) Agent Runner
-# Запускает Claude Code с заданным сценарием
+# Запускает Qwen Code с заданным сценарием
 
 set -e
 
@@ -243,14 +243,14 @@ ${prompt}"
 
     cd "$WORKSPACE"
 
-    # Запуск Claude Code с содержимым команды как промпт (с timeout-защитой)
+    # Запуск Qwen Code с содержимым команды как промпт (с timeout-защитой)
     local rc=0
     local model_args=()
     if [ -n "$model_override" ]; then
         model_args=(--model "$model_override")
         log "Model override: $model_override"
     fi
-    # NB: --dangerously-skip-permissions не используется — Claude Code блокирует флаг
+    # NB: --dangerously-skip-permissions не используется — Qwen Code блокирует флаг
     # под root/sudo (Linux cron). --allowedTools задаёт явный whitelist, чего достаточно.
     # Календарный коннектор в whitelist (issue #581): без него morning-прогон не видит
     # встречи дня ни при какой конфигурации. Имя сервера зависит от установки —
@@ -259,7 +259,7 @@ ${prompt}"
     # whitelist безвредны — просто никогда не совпадут.
     local calendar_mcp="${IWE_CALENDAR_MCP_SERVERS:-mcp__claude_ai_Google_Calendar}"
     # AR.293: AI_CLI_EXTRA_FLAGS — точка подмены на случай, когда AI_CLI указывает
-    # не на Claude Code (--model/--allowedTools — его флаги, не переносимы как есть).
+    # не на Qwen Code (--model/--allowedTools — его флаги, не переносимы как есть).
     # Дефолт воспроизводит прежнее поведение один в один.
     local extra_flags
     if [ -n "${AI_CLI_EXTRA_FLAGS:-}" ]; then
@@ -388,7 +388,7 @@ acquire_captures_write_lock() {
 }
 
 # Читаем strategy_day из конфига (L4 Personal)
-# issue #729: раньше единственным источником был auto-memory Claude Code по
+# issue #729: раньше единственным источником был auto-memory Qwen Code по
 # литеральному пути "-Users-$(whoami)-IWE" — ломается молча, если workspace
 # не буквально ~/IWE (симлинк или другой путь на Linux/WSL), а fallback на
 # monday ничем не сигнализировал об ошибке. Governance-репо копия — тот же
@@ -399,17 +399,17 @@ resolve_rhythm_config() {
     local ws="$1" iwe_workspace="$2"
     local rhythm_config="$ws/exocortex/day-rhythm-config.yaml"
     if [ ! -f "$rhythm_config" ]; then
-        # Fallback: auto-memory Claude Code, путь выводим из РЕАЛЬНОГО workspace
+        # Fallback: auto-memory Qwen Code, путь выводим из РЕАЛЬНОГО workspace
         # (pwd -P разворачивает симлинки), не из literal "~/IWE".
         local ws_real
         ws_real="$(cd "${iwe_workspace:-$HOME/IWE}" 2>/dev/null && pwd -P || true)"
         if [ -n "$ws_real" ]; then
-            # tr '/_.' '-', не sed 's#/#-#g': Claude Code слугифицирует путь,
+            # tr '/_.' '-', не sed 's#/#-#g': Qwen Code слугифицирует путь,
             # заменяя на "-" также "_" и "." (см. memory-exocortex-sync.sh) —
             # sed-only вариант молча ломался бы для workspace-путей с "." или "_".
             local ws_slug
             ws_slug="$(printf '%s' "$ws_real" | tr '/_.' '-')"
-            rhythm_config="$HOME/.claude/projects/${ws_slug}/memory/day-rhythm-config.yaml"
+            rhythm_config="$HOME/.qwen/projects/${ws_slug}/memory/day-rhythm-config.yaml"
         fi
     fi
     printf '%s\n' "$rhythm_config"

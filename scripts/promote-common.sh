@@ -15,7 +15,7 @@
 
 # record_promotion — append запись в promotion-status.yaml (идемпотентный для незавершённых SHA)
 # Параметры:
-#   $1 artifact_path    — относительный путь от FMT_DIR (например: .claude/skills/bottleneck-pick)
+#   $1 artifact_path    — относительный путь от FMT_DIR (например: .qwen/skills/bottleneck-pick)
 #   $2 type             — skill|script|hook|rule|protocol|catalog
 #   $3 source_sha       — git short SHA из автора (если есть, иначе "")
 #   $4 fmt_sha          — git short SHA из FMT (предполагается, что коммит уже сделан)

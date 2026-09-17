@@ -21,12 +21,12 @@ set -eu
 # frontmatter.sh source below still resolves relative to THIS script (issue #229).
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 _MEMORY_HEALTH_DIR="$SCRIPT_DIR"
-source "$SCRIPT_DIR/../.claude/lib/iwe-env-bootstrap.sh" || exit 1
+source "$SCRIPT_DIR/../.qwen/lib/iwe-env-bootstrap.sh" || exit 1
 # issue #658: was a private get_field() unaware of the `metadata:`-nested
 # frontmatter dialect (issue #281) — memory-validate.sh/memory-bleed.sh
 # already source the shared reader; this closes the gap for the two scripts
 # that still had their own copy.
-source "$_MEMORY_HEALTH_DIR/../.claude/lib/frontmatter.sh" || exit 1
+source "$_MEMORY_HEALTH_DIR/../.qwen/lib/frontmatter.sh" || exit 1
 MEMORY_DIR="$IWE_ROOT/memory"
 HOT_LIMIT=150
 MODE="full"

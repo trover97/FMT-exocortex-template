@@ -1,0 +1,14 @@
+{
+  "description": "Fork-local exclusions for qwen-windows-offline. Maintainer tooling that must never be delivered to an end-user installation by update.sh. Survives update.sh, which replaces update-manifest.json wholesale (step 6e).",
+  "excluded_paths": [
+    "scripts/adapt-to-qwen-offline.sh",
+    "scripts/link-memory.sh",
+    "scripts/template-sync.sh",
+    ".gitattributes",
+    ".qwen/owned-baseline.tsv",
+    "MANUAL-JOBS.md",
+    "MIGRATION.md",
+    "UPDATE.md",
+    "setup-offline.sh"
+  ]
+}

@@ -46,4 +46,4 @@ class TestRenderOnboardingCtas:
     def test_includes_iwe_setup_step(self):
         appendix = render_onboarding_ctas({})
         assert "setup.sh" in appendix
-        assert "Claude Code" in appendix
+        assert "Qwen Code" in appendix

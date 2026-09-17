@@ -33,7 +33,7 @@ export CFG="$IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/exocortex/day-rhythm-config
 export HOME
 export IWE
 
-# Same convention as .claude/scripts/load-extensions.sh: single file
+# Same convention as .qwen/scripts/load-extensions.sh: single file
 # `day-open.checks.md` or split files `day-open.checks.*.md` (issue #466 —
 # the old hardcoded single path made the split convention invisible here).
 CHECKS_FILES=$(find_day_open_hook_files "$EXT_DIR" "checks")

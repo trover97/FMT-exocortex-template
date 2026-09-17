@@ -23,7 +23,7 @@ set -eu
 # frontmatter.sh source below still resolves relative to THIS script (issue #229).
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 _MEMORY_MIGRATE_DIR="$SCRIPT_DIR"
-source "$SCRIPT_DIR/../.claude/lib/iwe-env-bootstrap.sh" || exit 1
+source "$SCRIPT_DIR/../.qwen/lib/iwe-env-bootstrap.sh" || exit 1
 # issue #658: was a private get_field() unaware of the `metadata:`-nested
 # frontmatter dialect (issue #281) — every already-nested scalar field
 # (type/horizon/status/owner/valid_from/...) read back as empty, which made
@@ -32,7 +32,7 @@ source "$SCRIPT_DIR/../.claude/lib/iwe-env-bootstrap.sh" || exit 1
 # reader fixes scalar fields; `domains:` written as a columnar YAML list is
 # a separate, deferred fix (frontmatter.sh itself doesn't parse `- item`
 # lists yet — same pre-existing limitation noted in its own comment).
-source "$_MEMORY_MIGRATE_DIR/../.claude/lib/frontmatter.sh" || exit 1
+source "$_MEMORY_MIGRATE_DIR/../.qwen/lib/frontmatter.sh" || exit 1
 MEMORY_DIR="$IWE_ROOT/memory"
 DRY_RUN=0
 ALL=0

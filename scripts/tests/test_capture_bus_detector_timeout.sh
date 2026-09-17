@@ -10,7 +10,7 @@
 # test then "passed" only because the resulting fast exit-1 happened to be
 # under the elapsed-time threshold, not because timeout logic ever ran (found
 # 03.08: this stderr line was visible in the old run: ".../T/lib/iwe-env-
-# bootstrap.sh: No such file or directory"). Now uses the same real .claude/
+# bootstrap.sh: No such file or directory"). Now uses the same real .qwen/
 # tree fixture as test_capture_bus_contract.sh, so the timeout path is what's
 # actually exercised.
 
@@ -43,7 +43,7 @@ cat > "$TMPDIR/detectors/after.sh" <<EOF
 EOF
 chmod +x "$TMPDIR"/detectors/*.sh
 
-cat > "$TMPDIR/.claude/config/capture-detectors.sh" <<'EOF'
+cat > "$TMPDIR/.qwen/config/capture-detectors.sh" <<'EOF'
 CAPTURE_COST_LEVEL=free
 CAPTURE_DETECTOR_TIMEOUT_SECONDS=2
 DETECTORS=(
@@ -55,7 +55,7 @@ EOF
 INPUT='{"hook_event_name":"PostToolUse","session_id":"timeout","tool_name":"Write","cwd":"/tmp","tool_input":{"file_path":"x"}}'
 
 START=$(date +%s)
-printf '%s\n' "$INPUT" | bash "$TMPDIR/.claude/hooks/capture-bus.sh"
+printf '%s\n' "$INPUT" | bash "$TMPDIR/.qwen/hooks/capture-bus.sh"
 ELAPSED=$(( $(date +%s) - START ))
 
 echo "Elapsed: ${ELAPSED}s"

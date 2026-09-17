@@ -1,6 +1,6 @@
 #!/bin/bash
 # Knowledge Extractor Agent Runner
-# Запускает Claude Code с заданным процессом KE
+# Запускает Qwen Code с заданным процессом KE
 #
 # Использование:
 #   extractor.sh inbox-check     # headless: обработка inbox (launchd)
@@ -162,7 +162,7 @@ check_auth() {
     if status_out=$("$AI_CLI" auth status --json 2>&1); then
         return 0
     fi
-    log "ERROR: проверка входа Claude Code не прошла — headless-запуск невозможен. Ответ 'claude auth status': $(printf '%s' "$status_out" | tr -s '[:space:]' ' ')"
+    log "ERROR: проверка входа Qwen Code не прошла — headless-запуск невозможен. Ответ 'claude auth status': $(printf '%s' "$status_out" | tr -s '[:space:]' ' ')"
     log "Если это не сетевой/временный сбой, а подписка правда не подключена: bash \$IWE_TEMPLATE/roles/extractor/scripts/connect.sh"
     return 1
 }

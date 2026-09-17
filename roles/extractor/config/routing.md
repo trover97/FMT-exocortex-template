@@ -29,8 +29,8 @@
 | Failure mode | `fm` | `05-failure-modes/` | Отдельный файл |
 | Характеристика | `chr` | `06-characteristics/` | Отдельный файл |
 | SoTA-аннотация | `sota` | `08-sota/` | Отдельный файл |
-| Правило (глобальное) | `rule` | `{{WORKSPACE_DIR}}/CLAUDE.md` | Строки |
-| Правило (локальное) | `rule` | `<repo>/CLAUDE.md` | Строки |
+| Правило (глобальное) | `rule` | `{{WORKSPACE_DIR}}/QWEN.md` | Строки |
+| Правило (локальное) | `rule` | `<repo>/QWEN.md` | Строки |
 | Правило (урок) | `rule` | `memory/<topic>.md` | Строки |
 
 ## 3. Именование файлов

@@ -39,7 +39,7 @@ wp: WP-358
 
 6. **Cleanup.** SESSION-файл и thread-файл архивируются в `inbox/agent/sessions/archive/` через 24ч после последнего хода или немедленно при `/close`. Папка `sessions/` не является постоянным хранилищем.
 
-7. **Multi-turn continuity.** Каждое последующее сообщение пилота в том же Telegram-чате (без явного `/close`) считается следующим ходом той же сессии и дописывается в `SESSION-<id>-thread.md`. Claude Code запускается с полным контекстом thread. Идентификация сессии: `(tg_chat_id, active_session_id)` из SQLite.
+7. **Multi-turn continuity.** Каждое последующее сообщение пилота в том же Telegram-чате (без явного `/close`) считается следующим ходом той же сессии и дописывается в `SESSION-<id>-thread.md`. Qwen Code запускается с полным контекстом thread. Идентификация сессии: `(tg_chat_id, active_session_id)` из SQLite.
 
 **Failure mode:** VS Code не открыт или диспетчер не запущен → TG уведомление «Среда не запущена, запустите VS Code». Тихий fail запрещён.
 
@@ -53,7 +53,7 @@ wp: WP-358
 
 **Что получит:**
 - Acknowledgment в Telegram ≤10с (подтверждение, что ход принят)
-- Ответ Claude Code — в том же Telegram-чате, с сохранением контекста предыдущих ходов
+- Ответ Qwen Code — в том же Telegram-чате, с сохранением контекста предыдущих ходов
 - Поддержка capability-запросов: `→ Календарь`, `→ РП`, `→ IWE-знания` (см. §Capability scope)
 - Трекинг активности: все ходы пишутся как domain events (WakaTime + activity_log)
 - Audit trail — SESSION-thread в git (если не `--private`)
@@ -131,10 +131,10 @@ Claude: inbox/WP-361.md создан с Ф1 IntegrationGate (~2h): SC + Role + s
 
 | Тип | Инструмент | Примеры |
 |-----|-----------|---------|
-| **Код и РП** | Claude Code + git | фиксы, коммиты, создание файлов, review |
+| **Код и РП** | Qwen Code + git | фиксы, коммиты, создание файлов, review |
 | **Календарь** | Google Calendar MCP | создание / обновление / удаление событий, поиск свободного окна |
 | **Создание РП** | `create-wp.sh` | новый РП в REGISTRY + WeekPlan + inbox + Linear |
-| **IWE-знания** | `knowledge_search` MCP | поиск по Pack, CLAUDE.md, memory/ |
+| **IWE-знания** | `knowledge_search` MCP | поиск по Pack, QWEN.md, memory/ |
 | **Telegram** | `send_telegram_message` | отправка ответа обратно пилоту |
 
 Расширение scope через новые MCP-инструменты не требует изменения SC.162 — только обновления DP.ROLE.NNN §Capability.
@@ -146,7 +146,7 @@ Claude: inbox/WP-361.md создан с Ф1 IntegrationGate (~2h): SC + Role + s
 | Компонент | Роль | Что делает |
 |-----------|------|-----------|
 | Ingress Adapter (aist-bot, cloud) | DP.ROLE.NNN §Ingress | Принять сообщение, авторизовать, дописать в SESSION-thread |
-| Egress Adapter (dispatcher, local) | DP.ROLE.NNN §Egress | Обнаружить новый ход, запустить Claude Code с полным thread, вернуть ответ |
+| Egress Adapter (dispatcher, local) | DP.ROLE.NNN §Egress | Обнаружить новый ход, запустить Qwen Code с полным thread, вернуть ответ |
 | Session Memory Injector | DP.SC.161 | Pre-flight каждого хода: инжектировать контекст из iwe_memory.db |
 | Agent Inbox | DP.SC.135 | Смежный сервис — НЕ смешивать (разный контракт) |
 
@@ -161,8 +161,8 @@ Claude: inbox/WP-361.md создан с Ф1 IntegrationGate (~2h): SC + Role + s
 | 3 | Дописать ход в `SESSION-<id>-thread.md` через GitHub API | Ingress Adapter | Новый ход в thread |
 | 4 | Ответить «Работаю…» в Telegram | Ingress Adapter | Acknowledgment ≤10с |
 | 5 | git pull каждые 15с → новый ход в thread обнаружен | launchd → Egress Adapter | Trigger хода |
-| 6 | Инжектировать Session Memory, запустить Claude Code с полным thread | Egress Adapter | Сессия активна |
-| 7 | Claude Code выполняет работу (код/calendar/РП/IWE) | Claude Code | Transcript хода |
+| 6 | Инжектировать Session Memory, запустить Qwen Code с полным thread | Egress Adapter | Сессия активна |
+| 7 | Qwen Code выполняет работу (код/calendar/РП/IWE) | Qwen Code | Transcript хода |
 | 8 | Записать ответ в thread, отправить в Telegram, трекинг активности | Egress Adapter | Ответ пилоту + domain event |
 
 ---

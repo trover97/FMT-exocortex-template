@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # routing: helper  skill=iwe-rules-review  called-by=haiku  deterministic=true
 # see DP.SC.159, DP.ROLE.059
-# iwe-drift.sh — MVP drift-отчёт по .claude/sync-manifest.yaml
+# iwe-drift.sh — MVP drift-отчёт по .qwen/sync-manifest.yaml
 #
 # WP-217 Ф3b, черновик 2026-04-10.
 # НЕ переносить в scripts/ до ревью владельца.
@@ -39,8 +39,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # save this script's own directory under a distinct name before sourcing (issue #259).
 IWE_DRIFT_SCRIPT_DIR="$SCRIPT_DIR"
 # shellcheck source=/dev/null
-source "$SCRIPT_DIR/../.claude/lib/iwe-env-bootstrap.sh" || exit 1
-MANIFEST="${MANIFEST:-$IWE_ROOT/.claude/sync-manifest.yaml}"
+source "$SCRIPT_DIR/../.qwen/lib/iwe-env-bootstrap.sh" || exit 1
+MANIFEST="${MANIFEST:-$IWE_ROOT/.qwen/sync-manifest.yaml}"
 MODE="all"
 TOP_N=0
 

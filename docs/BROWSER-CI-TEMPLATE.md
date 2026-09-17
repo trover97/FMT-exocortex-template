@@ -55,4 +55,4 @@ Do not suggest skills more than once every 5 turns. If the user declines, do not
 - Multi-agent coordination via local-gateway
 - VS Code extensions (WakaTime, etc.)
 
-For these, use VS Code with Claude Code.
+For these, use VS Code with Qwen Code.

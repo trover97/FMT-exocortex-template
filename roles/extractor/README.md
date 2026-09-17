@@ -18,7 +18,7 @@
 ## Когда подключать
 
 - Создал первый Pack (PACK-{твоя-область})
-- Работаешь с Claude Code регулярно (≥3 сессии/неделю)
+- Работаешь с Qwen Code регулярно (≥3 сессии/неделю)
 - Хочешь автоматически фиксировать знания
 
 ## Установка
@@ -35,7 +35,7 @@
 
 ### 2. Подключи Экстрактор к своей подписке (нужно для Headless-сценариев)
 
-Headless-сценарии (Inbox-Check, launchd/systemd) запускают Claude Code без интерактивного логина — нужен долгоживущий токен вашей подписки Claude Code (Pro/Max/Team/Enterprise):
+Headless-сценарии (Inbox-Check, launchd/systemd) запускают Qwen Code без интерактивного логина — нужен долгоживущий токен вашей подписки Qwen Code (Pro/Max/Team/Enterprise):
 
 ```bash
 bash "$IWE_TEMPLATE/roles/extractor/scripts/connect.sh"
@@ -45,7 +45,7 @@ bash "$IWE_TEMPLATE/roles/extractor/scripts/connect.sh"
 
 Токен со временем может протухнуть (срок жизни официально не документирован) — если Inbox-Check начал падать, `extractor.sh` покажет в логе подсказку перезапустить `connect.sh`. Проверить сохранённый токен без нового входа: `connect.sh --check`.
 
-Интерактивные сценарии (Session-Close, On-Demand) подключения не требуют — они выполняются внутри вашей уже открытой сессии Claude Code.
+Интерактивные сценарии (Session-Close, On-Demand) подключения не требуют — они выполняются внутри вашей уже открытой сессии Qwen Code.
 
 ### 3. (Опционально) Установи автоматический inbox-check
 

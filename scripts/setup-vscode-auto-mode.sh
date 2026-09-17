@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # routing: utility  deterministic=true
 # see DP.SC.159, DP.ROLE.059
-# setup-vscode-auto-mode.sh — default the VS Code Claude Code extension to
+# setup-vscode-auto-mode.sh — default the VS Code Qwen Code extension to
 # Auto permission mode for a fresh install (WP-406, VS Code onboarding track).
 #
 # Without this, every new VS Code window starts in Manual (ask before each

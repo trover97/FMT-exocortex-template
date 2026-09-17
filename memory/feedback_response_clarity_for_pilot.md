@@ -133,7 +133,7 @@ schema_version: 1
 ## Связанные файлы
 
 - [communication-style-base.md](communication-style-base.md) — базовый разговорный стиль: русские описания перед кодами, готовые переводы терминов, итоговые сводки на русском (вобрал три прежних файла: explanations_no_codes, russian_clear, response_language_russian — issue #514)
-- [CLAUDE.md §9 «Режим «на пальцах» (S-37)»](../../../IWE/CLAUDE.md) — триггеры, детектор канала, базовое правило режима
+- [QWEN.md §9 «Режим «на пальцах» (S-37)»](../../../IWE/QWEN.md) — триггеры, детектор канала, базовое правило режима
 
 ---
 

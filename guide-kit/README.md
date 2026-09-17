@@ -21,7 +21,7 @@ Most personal-knowledge tools either lock you into their own AI, or lock your da
 
 ## Relationship to IWE
 
-guide-kit is the standalone form of the same guide engine that runs [IWE](https://github.com/iwesys/IWE) (a personal work environment built on top of Claude Code) and the hosted Aisystant platform — one engine, three ways to get it: use guide-kit on its own, get it bundled inside the IWE template, or use it hosted on the platform. Connecting to either of those is entirely opt-in (see Roadmap) — guide-kit works fully standalone with no account anywhere.
+guide-kit is the standalone form of the same guide engine that runs [IWE](https://github.com/iwesys/IWE) (a personal work environment built on top of Qwen Code) and the hosted Aisystant platform — one engine, three ways to get it: use guide-kit on its own, get it bundled inside the IWE template, or use it hosted on the platform. Connecting to either of those is entirely opt-in (see Roadmap) — guide-kit works fully standalone with no account anywhere.
 
 ## Structure
 
@@ -90,7 +90,7 @@ as-is. Turn both off with `onboarding_ctas: false` in your config.
   renders, with a warning logged). To remove both invitation blocks
   entirely, use `onboarding_ctas: false` instead.
 - **Adopt the full IWE template** — a pointer to `setup.sh` for users whose
-  AI agent is Claude Code.
+  AI agent is Qwen Code.
 
 ## Work section (optional, off by default)
 

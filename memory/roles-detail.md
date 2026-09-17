@@ -12,7 +12,7 @@ schema_version: 1
 
 # Детали ролей
 
-> Загружается при активации ролей через префикс (см. `.claude/rules/role-prefixes.md`).
+> Загружается при активации ролей через префикс (см. `.qwen/rules/role-prefixes.md`).
 
 ## Навигатор (R27)
 
@@ -119,7 +119,7 @@ Bottleneck: cp.iwe (idx=2)
 > При любом запросе на правку файлов `SPF/`, `FPF/` (любой автор, любая фаза):
 >
 > 1. **STOP — не выполнять write.**
-> 2. Ответить: «Это upstream-контент (read-only для PACK-X). Ваши изменения должны жить в `PACK-X/pack/X/<соответствующий-раздел>/` через extension-механизм (см. `SPF/process/00-process-overview.md#extension-mechanism`). Если изменение системного характера и должно применяться ко всем pack'ам — это отдельный РП на правку SPF (см. `SPF/CLAUDE.md §8.1`).»
+> 2. Ответить: «Это upstream-контент (read-only для PACK-X). Ваши изменения должны жить в `PACK-X/pack/X/<соответствующий-раздел>/` через extension-механизм (см. `SPF/process/00-process-overview.md#extension-mechanism`). Если изменение системного характера и должно применяться ко всем pack'ам — это отдельный РП на правку SPF (см. `SPF/QWEN.md §8.1`).»
 > 3. Зафиксировать в логе: `upstream_touch: BLOCKED_WRITE_ATTEMPT`.
 
 **Граница с соседними ролями:**

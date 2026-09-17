@@ -37,7 +37,7 @@ cat > "$TMPDIR/detectors/last.sh" <<EOF
 EOF
 chmod +x "$TMPDIR"/detectors/*.sh
 
-cat > "$TMPDIR/.claude/config/capture-detectors.sh" <<'EOF'
+cat > "$TMPDIR/.qwen/config/capture-detectors.sh" <<'EOF'
 CAPTURE_COST_LEVEL=free
 CAPTURE_DETECTOR_TIMEOUT_SECONDS=2
 DETECTORS=(
@@ -53,7 +53,7 @@ run_dispatcher() {
   START=$(date +%s)
   set +e
   printf '%s\n' "$INPUT" |
-    bash "$TMPDIR/.claude/hooks/capture-bus.sh" >"$TMPDIR/stdout" 2>"$TMPDIR/stderr"
+    bash "$TMPDIR/.qwen/hooks/capture-bus.sh" >"$TMPDIR/stdout" 2>"$TMPDIR/stderr"
   RC=$?
   set -e
   ELAPSED=$(( $(date +%s) - START ))

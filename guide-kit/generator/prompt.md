@@ -234,7 +234,7 @@ In every lesson, add `it_scaffolding` — a nudge toward the next IT level:
 | 0 | «Это можно сохранить в заметку — скоро покажем как в VS Code» |
 | 1 | «Можешь записать в файл: создай `[тема].md` в VS Code» |
 | 2 | «Запиши в inbox IWE: открой экзокортекс и создай заметку» |
-| 3 | «Используй Claude Code для анализа своего прогресса по [теме]» |
+| 3 | «Используй Qwen Code для анализа своего прогресса по [теме]» |
 
 **6.4 Adaptation to the dominant role**
 

@@ -24,8 +24,8 @@ schema_version: 1
 | Триггер | Аргумент | Skill |
 |---------|---------|-------|
 | «закрываю сессию» / «всё» / «закрывай» | `close` или `close session` | Quick Close (ниже, inline) |
-| «закрываю день» / «итоги дня» | `close day` | `.claude/skills/day-close/SKILL.md` — **шаг 6: WakaTime + Мультипликатор IWE** |
-| «закрываю неделю» / «итоги недели» | `week-close` | `.claude/skills/week-close/SKILL.md` |
+| «закрываю день» / «итоги дня» | `close day` | `.qwen/skills/day-close/SKILL.md` — **шаг 6: WakaTime + Мультипликатор IWE** |
+| «закрываю неделю» / «итоги недели» | `week-close` | `.qwen/skills/week-close/SKILL.md` |
 
 > **`close` без уточнения** → Quick Close (сессия) по умолчанию.
 
@@ -72,7 +72,7 @@ fi
 
 ### 1. Pre-commit checks → Commit + Push (шаги `precommit-checks` → `commit-push` → `commit-push-check`) [[gate:AR.005]]
 
-**1a. Pre-commit checks (БЛОКИРУЮЩЕЕ).** `bash .claude/scripts/load-extensions.sh protocol-close checks` — exit 0 → `Read` каждый файл из вывода (alphabetic) → выполнить. Exit 1 → пропустить. **При ❌ commit запрещён** — исправить, повторить checks.
+**1a. Pre-commit checks (БЛОКИРУЮЩЕЕ).** `bash .qwen/scripts/load-extensions.sh protocol-close checks` — exit 0 → `Read` каждый файл из вывода (alphabetic) → выполнить. Exit 1 → пропустить. **При ❌ commit запрещён** — исправить, повторить checks.
 
 **1b. Commit + Push (БЛОКИРУЮЩЕЕ, шаг `commit-push`, вход `{"commits":[{"repo","paths","message"}, ...]}`).** `git status --short` по ВСЕМ репо, которых касалась сессия. Незафиксированные изменения → `git add <specific paths>` → commit → push. При доступном раннере использовать его хендлер и не обходить `blocked-push-failed`; в ручном режиме провал push так же блокирует переход к следующему шагу.
 
@@ -108,7 +108,7 @@ fi
    - Source: peer-сессия [2026-07-09-17-close-actualization-gap](../DS-strategy/sessions/2026-07/2026-07-09-17-close-actualization-gap/report.md) — разрыв не в том, что Close «забывает» актуализировать, а в том, что требование факт-чека не было явным/проверяемым.
 
 **6. KE (шаг `ke-routing` — ai-контракт: вход `[what_learned]`, выход `[routed_to]`)** — прочитать поле «Что узнали» в «Осталось». Маршрутизировать: [[gate]]
-   - правило (1-3 строки) → `CLAUDE.md` или `distinctions.md`
+   - правило (1-3 строки) → `QWEN.md` или `distinctions.md`
    - доменное знание → Pack (конкретный файл)
    - урок → `memory/lessons_*.md` + строка в MEMORY.md
    - нет нового знания → пропустить молча
@@ -148,7 +148,7 @@ fi
 **Длительность:** N мин, M ходов (из gather-session-facts.duration_min, turns)
 **Git:** K коммитов в J репо, запушено ✅ (из commit-push.commits, посчитать repo/count)
 **Рефлексия:** [ответ на вопрос §18, если задавался] / — (порог не пройден)
-**EXTENSION POINT (protocol-close after):** `bash .claude/scripts/load-extensions.sh protocol-close after` — exit 0 → `Read` каждый файл из вывода (alphabetic) → выполнить. Exit 1 → пропустить. Поддерживает `extensions/protocol-close.after.md` И `extensions/protocol-close.after.<suffix>.md`.
+**EXTENSION POINT (protocol-close after):** `bash .qwen/scripts/load-extensions.sh protocol-close after` — exit 0 → `Read` каждый файл из вывода (alphabetic) → выполнить. Exit 1 → пропустить. Поддерживает `extensions/protocol-close.after.md` И `extensions/protocol-close.after.<suffix>.md`.
 **Handoff:** → WP context «Осталось» обновлён / done
 **Фон:** [если status=in_progress_background] «можно закрывать сессию, доработаю и пришлю итог в Telegram» (канал есть) / «доработаю при следующем открытии, сейчас можно продолжать или закрыть — но фоново ничего не идёт» (канала нет)
 ```
@@ -157,7 +157,7 @@ fi
 
 > Условный шаг: если `params.yaml → verify_quick_close: false` → пропустить.
 > Исключения: сессия ≤15 мин, сессия-вопрос без изменений файлов.
-> **Trace-satisfaction (WP-481 Ф5.1):** перед запуском R23 — `bash .claude/hooks/rule-engine.sh check-trace-satisfaction --section "Quick Close"` (без `--section` гейты Week Close и Exit Protocol из этого же файла попадают в проверку тоже — блок гарантирован, они не выполняются за 3-минутную сессию). Набор gate — строки с `[[gate…]]` внутри секции, ключи через `list-gates --section "Quick Close"`; исполненные отмечать `mark-gate <key>` по ходу Close. Verdict block → вернуться на незакрытый gate, потом R23. JSON вердикта приложить к вводу R23.
+> **Trace-satisfaction (WP-481 Ф5.1):** перед запуском R23 — `bash .qwen/hooks/rule-engine.sh check-trace-satisfaction --section "Quick Close"` (без `--section` гейты Week Close и Exit Protocol из этого же файла попадают в проверку тоже — блок гарантирован, они не выполняются за 3-минутную сессию). Набор gate — строки с `[[gate…]]` внутри секции, ключи через `list-gates --section "Quick Close"`; исполненные отмечать `mark-gate <key>` по ходу Close. Verdict block → вернуться на незакрытый gate, потом R23. JSON вердикта приложить к вводу R23.
 
 Запустить sub-agent Haiku в роли R23 (context isolation). Передать: чеклист, WP context «Осталось», `git diff --name-only`, краткое резюме сессии (что делали/что нашли).
 
@@ -184,17 +184,17 @@ fi
 ## Week Close (Неделя)
 
 > **Роль:** R1 Стратег. **Бюджет:** ~20-30 мин. **Триггер:** «закрываю неделю» / `/week-close`.
-> Выполняется через `.claude/skills/week-close/SKILL.md` + платформенные шаги.
+> Выполняется через `.qwen/skills/week-close/SKILL.md` + платформенные шаги.
 
 ### Шаги Week Close
 
-> **Trace-satisfaction (WP-481 Ф5.1):** `bash .claude/hooks/rule-engine.sh check-trace-satisfaction --protocol memory/protocol-close.md --section "Week Close"` (без `--section` в проверку попадают ещё и гейты Quick Close). Вызывается из `.claude/skills/week-close/SKILL.md` шаг 12, перед R23.
+> **Trace-satisfaction (WP-481 Ф5.1):** `bash .qwen/hooks/rule-engine.sh check-trace-satisfaction --protocol memory/protocol-close.md --section "Week Close"` (без `--section` в проверку попадают ещё и гейты Quick Close). Вызывается из `.qwen/skills/week-close/SKILL.md` шаг 12, перед R23.
 
 1. **Бэкап + грязные репо** — `backup-icloud.sh` + `check-dirty-repos.sh` (платформа) [[gate]]
 2. **Memory Validate** — `memory-bleed.sh` (HOT-лимит, orphans, superseded_by) [[gate]]
 3. **ТО памяти (T, SC.024.3)** — проверка здоровья статической нагрузки: [[narrative]]
-   - `wc -l {{WORKSPACE_DIR}}/.claude/rules/distinctions.md` → **> 80 строк = drift-флаг** (по правилу DP.KR.001 §6: 1-3 строки на различение). Предложить аудит в WP-7.
-   - `wc -l` по MEMORY.md текущего проекта в `~/.claude/projects/<слаг-проекта>/memory/` (слаг = путь рабочей директории, `/` → `-`) → **> 200 строк = флаг** (превышен лимит).
+   - `wc -l {{WORKSPACE_DIR}}/.qwen/rules/distinctions.md` → **> 80 строк = drift-флаг** (по правилу DP.KR.001 §6: 1-3 строки на различение). Предложить аудит в WP-7.
+   - `wc -l` по MEMORY.md текущего проекта в `~/.qwen/projects/<слаг-проекта>/memory/` (слаг = путь рабочей директории, `/` → `-`) → **> 200 строк = флаг** (превышен лимит).
    - Feedback/lessons файлы в `memory/` с `mtime > 14 дней` без обращения → предложить понизить `horizon: warm`.
    - Флаги — информативно. Пользователь решает действие.
 4. **iwe-drift.sh** — полный drift-отчёт в Week Report (S) [[narrative]]
@@ -215,11 +215,11 @@ fi
 ## Month Close (Месяц)
 
 > **Роль:** R1 Стратег (выполнение), R23 Верификатор (Haiku, чеклист). **Бюджет:** 30-45 мин. **Триггер:** последние дни закрываемого месяца, либо первый Пн следующего месяца (если не сделано раньше), перед Strategy Session первой недели.
-> Выполняется через `.claude/skills/month-close/SKILL.md`.
+> Выполняется через `.qwen/skills/month-close/SKILL.md`.
 
 ### Шаги Month Close
 
-> **Trace-satisfaction (WP-484 Ф5a):** `bash .claude/hooks/rule-engine.sh check-trace-satisfaction --protocol memory/protocol-close.md --section "Month Close"` (без `--section` в проверку попадают гейты остальных масштабов тоже). Вызывается из `.claude/skills/month-close/SKILL.md` шаг 12, перед R23. До этой фазы (19.07) Month Close вообще не имел gate-трассировки — чек-лист внизу SKILL.md был единственной проверкой, ничем не подкреплённой автоматически.
+> **Trace-satisfaction (WP-484 Ф5a):** `bash .qwen/hooks/rule-engine.sh check-trace-satisfaction --protocol memory/protocol-close.md --section "Month Close"` (без `--section` в проверку попадают гейты остальных масштабов тоже). Вызывается из `.qwen/skills/month-close/SKILL.md` шаг 12, перед R23. До этой фазы (19.07) Month Close вообще не имел gate-трассировки — чек-лист внизу SKILL.md был единственной проверкой, ничем не подкреплённой автоматически.
 
 1. **Ревизия проектов P1-P6** — для каждого активного проекта: что двигало, застыл ли, баланс часов (шаг 4 `month-close/SKILL.md`) [[gate]]
 2. **R-вопросник M1-M6** — ответы записаны в `MonthClose YYYY-MM.md` (шаг 5 `month-close/SKILL.md`) [[gate]]
@@ -236,7 +236,7 @@ fi
 
 ## Мультипликатор IWE (WP-299 Ф5, шаг 6 Day Close)
 
-> **Полная спецификация → `.claude/skills/day-close/SKILL.md` § 6.**
+> **Полная спецификация → `.qwen/skills/day-close/SKILL.md` § 6.**
 
 - **WakaTime-источник:** CLI `~/.wakatime/wakatime-cli --today` → если недоступен: Neon `domain_event WHERE event_type='coding_time'` за дату (fallback).
 - **Мультипликатор** = сумма бюджетов закрытых РП за день / WakaTime (сек). Формат: `N.Nx`.
