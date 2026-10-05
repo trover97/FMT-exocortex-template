@@ -5,10 +5,10 @@ ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 
-mkdir -p "$TMP/.claude/hooks" "$TMP/.claude"
+mkdir -p "$TMP/.qwen/hooks" "$TMP/.qwen"
 cp "$ROOT/setup/validate-template.sh" "$TMP/validate-template.sh"
-cp "$ROOT/.claude/settings.json" "$TMP/.claude/settings.json"
-cp "$ROOT/.claude/hooks/"*.sh "$TMP/.claude/hooks/"
+cp "$ROOT/.qwen/settings.json" "$TMP/.qwen/settings.json"
+cp "$ROOT/.qwen/hooks/"*.sh "$TMP/.qwen/hooks/"
 
 OUTPUT=$(bash "$TMP/validate-template.sh" "$TMP" 2>&1 || true)
 for name in agent-trace-uploader residency-gate-init residency-gate-lazy rule-engine; do
@@ -18,16 +18,16 @@ for name in agent-trace-uploader residency-gate-init residency-gate-lazy rule-en
   fi
 done
 
-printf '#!/bin/sh\n' > "$TMP/.claude/hooks/unknown-orphan.sh"
+printf '#!/bin/sh\n' > "$TMP/.qwen/hooks/unknown-orphan.sh"
 OUTPUT=$(bash "$TMP/validate-template.sh" "$TMP" 2>&1 || true)
 grep -q 'WARN: hook unknown-orphan.sh' <<<"$OUTPUT"
 
 # issue #525: UserPromptSubmit carries the user text in `.prompt`, not the
 # obsolete `.message` field. Exercise the shipped hook with a real payload and
 # assert the observable additionalContext, rather than only grepping its source.
-ROLE_HOOK="$ROOT/.claude/hooks/inject-role-prefixes.sh"
+ROLE_HOOK="$ROOT/.qwen/hooks/inject-role-prefixes.sh"
 ROLE_OUT=$(printf '%s' '{"session_id":"issue-525","prompt":"Навигатор, помоги выбрать следующий шаг"}' \
-  | CLAUDE_PROJECT_DIR="$ROOT" bash "$ROLE_HOOK")
+  | QWEN_PROJECT_DIR="$ROOT" bash "$ROLE_HOOK")
 printf '%s' "$ROLE_OUT" | python3 -c '
 import json
 import sys
@@ -43,14 +43,14 @@ assert "Навигатор" in hook["additionalContext"]
 }
 
 ROLE_LEGACY_OUT=$(printf '%s' '{"session_id":"issue-525","message":"Навигатор, legacy field"}' \
-  | CLAUDE_PROJECT_DIR="$ROOT" bash "$ROLE_HOOK")
+  | QWEN_PROJECT_DIR="$ROOT" bash "$ROLE_HOOK")
 [ "$ROLE_LEGACY_OUT" = "{}" ] || {
   echo "FAIL: inject-role-prefixes still reads the obsolete .message field" >&2
   exit 1
 }
 
 ROLE_ORDINARY_OUT=$(printf '%s' '{"session_id":"issue-525","prompt":"Обычный вопрос без роли"}' \
-  | CLAUDE_PROJECT_DIR="$ROOT" bash "$ROLE_HOOK")
+  | QWEN_PROJECT_DIR="$ROOT" bash "$ROLE_HOOK")
 [ "$ROLE_ORDINARY_OUT" = "{}" ] || {
   echo "FAIL: ordinary .prompt unexpectedly triggered role-prefix context" >&2
   exit 1
@@ -60,7 +60,7 @@ ROLE_ORDINARY_OUT=$(printf '%s' '{"session_id":"issue-525","prompt":"Обычн�
 # worktree. Verify that this snapshot consumes no stdin before it trampolines
 # to the primary worktree's current hook, and that exact session scope lands
 # only in the canonical runtime semaphore.
-python3 - "$ROOT/.claude/settings.json" <<'PY'
+python3 - "$ROOT/.qwen/settings.json" <<'PY'
 import json
 import sys
 
@@ -69,7 +69,7 @@ matches = [
     entry
     for entry in settings["hooks"]["PostToolUse"]
     if any(
-        hook.get("command") == "$CLAUDE_PROJECT_DIR/.claude/hooks/post-tool-use-scope-track.sh"
+        hook.get("command") == "$QWEN_PROJECT_DIR/.qwen/hooks/post-tool-use-scope-track.sh"
         for hook in entry.get("hooks", [])
     )
 ]
@@ -79,16 +79,16 @@ PY
 
 PRIMARY="$TMP/primary"
 LINKED="$TMP/linked"
-mkdir -p "$PRIMARY/.claude/hooks" "$PRIMARY/scripts" "$PRIMARY/DS-strategy/inbox/WP-001"
+mkdir -p "$PRIMARY/.qwen/hooks" "$PRIMARY/scripts" "$PRIMARY/DS-strategy/inbox/WP-001"
 git -C "$PRIMARY" init -q
 git -C "$PRIMARY" config user.name "Hook Test"
 git -C "$PRIMARY" config user.email "hook@example.invalid"
-cp "$ROOT/.claude/hooks/post-tool-use-scope-track.sh" "$PRIMARY/.claude/hooks/"
+cp "$ROOT/.qwen/hooks/post-tool-use-scope-track.sh" "$PRIMARY/.qwen/hooks/"
 cp "$ROOT/scripts/session-guard.sh" "$PRIMARY/scripts/"
-chmod +x "$PRIMARY/.claude/hooks/post-tool-use-scope-track.sh" "$PRIMARY/scripts/session-guard.sh"
+chmod +x "$PRIMARY/.qwen/hooks/post-tool-use-scope-track.sh" "$PRIMARY/scripts/session-guard.sh"
 printf '%s\n' 'hypothesis_relation: "tests"' > "$PRIMARY/DS-strategy/inbox/WP-001/WP-001.md"
 printf '%s\n' seed > "$PRIMARY/edited.txt"
-git -C "$PRIMARY" add -- .claude/hooks/post-tool-use-scope-track.sh scripts/session-guard.sh \
+git -C "$PRIMARY" add -- .qwen/hooks/post-tool-use-scope-track.sh scripts/session-guard.sh \
   DS-strategy/inbox/WP-001/WP-001.md edited.txt
 git -C "$PRIMARY" commit -qm "test: seed primary hook"
 git -C "$PRIMARY" worktree add -q -b linked "$LINKED"
@@ -97,14 +97,14 @@ CLAUDE_CODE_SESSION_ID="hook-harness" IWE_ROOT="$PRIMARY" IWE_GOVERNANCE_REPO="D
   bash "$PRIMARY/scripts/session-guard.sh" open --wp WP-001 --slug hook-test \
     --agent claude-code --session-id hook-session --owner-pid "$$" --close-path peer-session >/dev/null
 
-mv "$PRIMARY/.claude/hooks/post-tool-use-scope-track.sh" \
-  "$PRIMARY/.claude/hooks/post-tool-use-scope-track.real.sh"
-cat > "$PRIMARY/.claude/hooks/post-tool-use-scope-track.sh" <<'WRAPPER'
+mv "$PRIMARY/.qwen/hooks/post-tool-use-scope-track.sh" \
+  "$PRIMARY/.qwen/hooks/post-tool-use-scope-track.real.sh"
+cat > "$PRIMARY/.qwen/hooks/post-tool-use-scope-track.sh" <<'WRAPPER'
 #!/bin/bash
 printf '%s\n' canonical >> "$HOOK_TRACE_FILE"
 exec /bin/bash "$(dirname "${BASH_SOURCE[0]}")/post-tool-use-scope-track.real.sh"
 WRAPPER
-chmod +x "$PRIMARY/.claude/hooks/post-tool-use-scope-track.sh"
+chmod +x "$PRIMARY/.qwen/hooks/post-tool-use-scope-track.sh"
 printf '%s\n' changed > "$LINKED/edited.txt"
 HOOK_INPUT=$(python3 - "$LINKED/edited.txt" <<'PY'
 import json
@@ -117,9 +117,9 @@ print(json.dumps({
 }))
 PY
 )
-HOOK_TRACE_FILE="$TMP/hook-trace" CLAUDE_PROJECT_DIR="$LINKED" \
+HOOK_TRACE_FILE="$TMP/hook-trace" QWEN_PROJECT_DIR="$LINKED" \
   IWE_GOVERNANCE_REPO="DS-strategy" \
-  bash "$LINKED/.claude/hooks/post-tool-use-scope-track.sh" <<<"$HOOK_INPUT"
+  bash "$LINKED/.qwen/hooks/post-tool-use-scope-track.sh" <<<"$HOOK_INPUT"
 
 grep -qxF canonical "$TMP/hook-trace" \
   || { echo "FAIL: linked hook snapshot did not trampoline to primary" >&2; exit 1; }

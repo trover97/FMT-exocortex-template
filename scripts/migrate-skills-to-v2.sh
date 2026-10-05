@@ -9,7 +9,7 @@
 # НЕ меняет: name, description, тело SKILL.md, существующие поля.
 #
 # layer определяется автоматически:
-#   - скилл есть в FMT-exocortex-template/.claude/skills/ → L1
+#   - скилл есть в FMT-exocortex-template/.qwen/skills/ → L1
 #   - скилл только в личном IWE → L3
 #
 # Использование:
@@ -18,8 +18,8 @@
 set -uo pipefail
 
 IWE="${IWE_WORKSPACE:-$HOME/IWE}"
-SKILLS_DIR="${IWE}/.claude/skills"
-FMT_SKILLS="${IWE_TEMPLATE:-${IWE}/FMT-exocortex-template}/.claude/skills"
+SKILLS_DIR="${IWE}/.qwen/skills"
+FMT_SKILLS="${IWE_TEMPLATE:-${IWE}/FMT-exocortex-template}/.qwen/skills"
 dry_run=false
 only_skill=""
 

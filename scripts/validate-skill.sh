@@ -19,7 +19,7 @@
 set -uo pipefail
 
 IWE="${IWE_WORKSPACE:-$HOME/IWE}"
-SKILLS_DIR="${IWE}/.claude/skills"
+SKILLS_DIR="${IWE}/.qwen/skills"
 skill_id=""
 
 while [[ $# -gt 0 ]]; do
@@ -132,7 +132,7 @@ else
 fi
 
 # ── 4. Проверка depends_on (предупреждение) ─────────────────────────────────
-catalog="${IWE}/.claude/skills-catalog.yaml"
+catalog="${IWE}/.qwen/skills-catalog.yaml"
 depends_line=$(grep "^depends_on:" "$skill_md" 2>/dev/null | head -1 || echo "")
 if [[ -n "$depends_line" ]] && [[ "$depends_line" != "# depends_on: []" ]]; then
     deps=$(echo "$depends_line" | sed 's/^depends_on: *//;s/\[//;s/\]//;s/,/ /g')

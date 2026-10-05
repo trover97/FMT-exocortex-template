@@ -62,7 +62,7 @@ set -euo pipefail
 
 # Load unified environment: IWE_OS, IWE_ROOT, IWE_ICLOUD_BACKUP_DIR, etc.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/../.claude/lib/iwe-env-bootstrap.sh" || exit 1
+source "$SCRIPT_DIR/../.qwen/lib/iwe-env-bootstrap.sh" || exit 1
 
 # ---------- Конфигурация ----------
 WARN_DAYS=7

@@ -18,8 +18,8 @@ set -uo pipefail
 
 IWE="${IWE_WORKSPACE:-$HOME/IWE}"
 FMT_DIR="${IWE_TEMPLATE:-$IWE/FMT-exocortex-template}"
-IWE_SKILLS="${IWE}/.claude/skills"
-FMT_SKILLS="${FMT_DIR}/.claude/skills"
+IWE_SKILLS="${IWE}/.qwen/skills"
+FMT_SKILLS="${FMT_DIR}/.qwen/skills"
 dry_run=false
 force=false
 

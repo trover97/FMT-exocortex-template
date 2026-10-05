@@ -12,7 +12,7 @@ set -euo pipefail
 # wp-sync-bundle.sh setup this test does not need.
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
-SCRIPT_UNDER_TEST="${SCRIPT_UNDER_TEST:-$ROOT/.claude/scripts/wp-sync-bundle.sh}"
+SCRIPT_UNDER_TEST="${SCRIPT_UNDER_TEST:-$ROOT/.qwen/scripts/wp-sync-bundle.sh}"
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 

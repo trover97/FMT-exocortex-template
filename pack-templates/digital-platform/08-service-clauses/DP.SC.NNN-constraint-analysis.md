@@ -15,7 +15,7 @@ related:
   uses:
     - DP.ROLE.NNN                  # Аналитик ограничений — носитель в твоём Pack
     - DP.WP.NNN                    # Stage Dependency Map — формат выхода в твоём Pack
-    - .claude/skills/bottleneck-pick
+    - .qwen/skills/bottleneck-pick
 ---
 
 <!--
@@ -119,4 +119,4 @@ related:
 
 - `DP.ROLE.NNN` Аналитик ограничений — носитель методики (в твоём Pack)
 - `DP.WP.NNN` Stage Dependency Map — формат выхода (в твоём Pack)
-- `.claude/skills/bottleneck-pick/SKILL.md` — инструмент-носитель алгоритма
+- `.qwen/skills/bottleneck-pick/SKILL.md` — инструмент-носитель алгоритма

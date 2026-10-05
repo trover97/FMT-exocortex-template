@@ -7,13 +7,13 @@ status: active
 owner: platform
 schema_version: 1
 name: "Agent Core — элаборация"
-description: "Полные формулировки блоков SYNC-CORE/CLAUDE.md §1-2, свёрнутых при M2-слиме (WP-7 HOTBUDGET-M2). Восстановлено из git-истории (commit fee0f85^) — issue #283."
+description: "Полные формулировки блоков SYNC-CORE/QWEN.md §1-2, свёрнутых при M2-слиме (WP-7 HOTBUDGET-M2). Восстановлено из git-истории (commit fee0f85^) — issue #283."
 ---
 # Agent Core — элаборация
 
-> Слим-версии этих правил живут в `CLAUDE.md` (SYNC-CORE блок + §1-2). Здесь — полные формулировки для случаев, когда hot-каркас не даёт достаточно контекста (конфликт-резолюция, редкие ветки, примеры).
+> Слим-версии этих правил живут в `QWEN.md` (SYNC-CORE блок + §1-2). Здесь — полные формулировки для случаев, когда hot-каркас не даёт достаточно контекста (конфликт-резолюция, редкие ветки, примеры).
 
-## Pull-on-Touch (CLAUDE.md §2 п.4) — конфликт-резолюция
+## Pull-on-Touch (QWEN.md §2 п.4) — конфликт-резолюция
 
 PreToolUse-хук автоматически выполняет `git pull --rebase --autostash` при первом **обращении** к репо за сессию, один раз на репо. Агент не повторяет pull вручную и не меняет рабочий каталог через `cd`; для git-команд используется `git -C <repo>`.
 
@@ -24,7 +24,7 @@ PreToolUse-хук автоматически выполняет `git pull --reba
 
 Причина расширения с «изменения» на «обращения»: 5 мая 2026 ложный диагноз «Day Open пропущен» из-за чтения устаревшей локальной копии governance-репо (origin был на 3 коммита впереди).
 
-## Git Staging — примеры (CLAUDE.md SYNC-CORE)
+## Git Staging — примеры (QWEN.md SYNC-CORE)
 
 **NEVER `git add -u`, `git add .`, `git add -A`** — подхватывают изменения ДРУГИХ агентов (Kimi/Hermes работают параллельно в том же репо) → неверная атрибуция, случайный коммит чужой работы.
 
@@ -45,13 +45,13 @@ git diff --cached --name-only
 ```
 Если появились неожиданные файлы — `git restore --staged <file>` до коммита.
 
-## State-Transition Gate — cross-axis (CLAUDE.md Pre-action Gates)
+## State-Transition Gate — cross-axis (QWEN.md Pre-action Gates)
 
-> Этот раздел — не восстановление из M2-слима (правило появилось позже, WP-457, и в дo-слимовой версии CLAUDE.md его не было). Источник — `memory/protocol-open.md` (актуальная версия), продублировано сюда как элаборация ссылки «cross-axis → agent-core.md» из CLAUDE.md.
+> Этот раздел — не восстановление из M2-слима (правило появилось позже, WP-457, и в дo-слимовой версии QWEN.md его не было). Источник — `memory/protocol-open.md` (актуальная версия), продублировано сюда как элаборация ссылки «cross-axis → agent-core.md» из QWEN.md.
 
 Модель осей — `archive/wp-contexts/WP-457/CONCEPT-user-states.md §5` (в авторском governance-репо). Если действие затрагивает несколько осей одновременно (permission/belonging/engagement/mastery) — фиксировать переход как `provisional` до прохождения ArchGate (Ф9), не выбирать одну ось произвольно.
 
-## Status Reporting — командный режим и fail-safe (CLAUDE.md SYNC-CORE)
+## Status Reporting — командный режим и fail-safe (QWEN.md SYNC-CORE)
 
 **Командный режим (WP-398 Ф5):** если работаешь с файлами из командного репо (несколько участников в одном репо), передавай `repo="org/repo-name"` в `agent_status_update`. Это позволяет другим агентам команды видеть твои активные файлы и избегать конфликтов.
 
@@ -62,7 +62,7 @@ agent_status_update(agent="claude-code", status=working, task="WP-X фаза", f
 
 **Fail-safe:** если статус не обновлён вручную — детерминированно пишет `scripts/agent-status-report.sh <agent> <status> [task] [files-csv]` (Claude — из Stop-хука, Kimi — из `kimi-peer-adapter.sh`). Не отменяет primary-путь через MCP-инструмент.
 
-## WP-REGISTRY Naming — примеры ✅/❌ (CLAUDE.md SYNC-CORE)
+## WP-REGISTRY Naming — примеры ✅/❌ (QWEN.md SYNC-CORE)
 
 Запрещено в колонке «Название»: даты закрытия, ссылки на peer-сессии, метрики фаз, SHA коммитов, результаты проверок, количество тестов, любые другие служебные данные.
 
@@ -75,17 +75,17 @@ agent_status_update(agent="claude-code", status=working, task="WP-X фаза", f
 
 **При начале работы с РП:** прочитать `inbox/WP-NNN/WP-NNN.md`. При изменении статуса фаз → обновить frontmatter карточки, НЕ имя реестра.
 
-## Calendar Events — шаги восстановления (CLAUDE.md SYNC-CORE)
+## Calendar Events — шаги восстановления (QWEN.md SYNC-CORE)
 
 Если событие создано после 09:00 по ошибке:
 1. Удалить неверное событие немедленно.
 2. Пересоздать до 09:00 того же дня, либо на ближайшем доступном слоте до 09:00.
 3. Сообщить пилоту об ошибке.
 
-## Code Style — доставка/детекторы по агенту (CLAUDE.md SYNC-CORE)
+## Code Style — доставка/детекторы по агенту (QWEN.md SYNC-CORE)
 
 У Claude правила P0-P5 приходят через hook (`inject-code-style.sh` — UserPromptSubmit, инжектирует напоминание при правке кода). Детектор-страховка `code-style-hook.sh` пишет находки P1/P2/P4 в единый лог стиля для последующего ревью.
 
 ## Источник
 
-Большая часть содержимого восстановлена из `git show fee0f85^:CLAUDE.md` (родительский коммит перед M2-слимом 2026-07-16, WP-7 HOTBUDGET-M2) — Pull-on-Touch, Git Staging, Status Reporting, WP-REGISTRY Naming, Calendar Events, Code Style. Коммит `fee0f85` перенёс слим-версии в CLAUDE.md, но не создал этот файл-приёмник — issue #283. Раздел State-Transition Gate — отдельный источник, см. пометку внутри раздела.
+Большая часть содержимого восстановлена из `git show fee0f85^:QWEN.md` (родительский коммит перед M2-слимом 2026-07-16, WP-7 HOTBUDGET-M2) — Pull-on-Touch, Git Staging, Status Reporting, WP-REGISTRY Naming, Calendar Events, Code Style. Коммит `fee0f85` перенёс слим-версии в QWEN.md, но не создал этот файл-приёмник — issue #283. Раздел State-Transition Gate — отдельный источник, см. пометку внутри раздела.

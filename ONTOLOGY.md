@@ -22,18 +22,18 @@
 | Термин (RU) | Term (EN) | Pack-понятие | Как используется в шаблоне |
 |-------------|-----------|-------------|---------------------------|
 | Среда (IWE) | Environment (IWE) | DP.CONCEPT.002 | Корневое понятие — шаблон развёртывает IWE |
-| Экзокортекс-интерфейс | Exocortex Interface | DP.EXOCORTEX.001 | CLAUDE.md + memory/ — ядро шаблона |
-| Platform-space | Platform-space | DP.D.011 | Файлы, обновляемые через update.sh (CLAUDE.md, memory/*.md) |
+| Экзокортекс-интерфейс | Exocortex Interface | DP.EXOCORTEX.001 | QWEN.md + memory/ — ядро шаблона |
+| Platform-space | Platform-space | DP.D.011 | Файлы, обновляемые через update.sh (QWEN.md, memory/*.md) |
 | User-space | User-space | DP.D.011 | Файлы пользователя (MEMORY.md, DS-strategy/, личные планы) |
 | Экстракция знаний | Knowledge Extraction | DP.M.001 | Метод Capture-to-Pack в протоколе работы |
 | Адаптивная персонализация | Adaptive Personalization | DP.M.004 | MCP ddt — цифровой двойник ученика |
 | Цифровой двойник | Digital Twin | DP.CONCEPT.001 | MCP ddt — метамодель, цели, самооценка |
 | Навигация знаний | Knowledge Navigation | DP.NAV.001 | Gateway iwe-knowledge (mcp.aisystant.com/mcp) — hybrid search по Pack и guides |
-| IPO-паттерн | IPO Pattern | DP.ARCH.001 | Контракт описания компонентов в CLAUDE.md |
-| Архитектурная характеристика | Architectural Characteristic | DP.D.010 | АрхГейт (ЭМОГССБ) в CLAUDE.md §5 |
+| IPO-паттерн | IPO Pattern | DP.ARCH.001 | Контракт описания компонентов в QWEN.md |
+| Архитектурная характеристика | Architectural Characteristic | DP.D.010 | АрхГейт (ЭМОГССБ) в QWEN.md §5 |
 | Файл контекста РП | WP Context File | DP.EXOCORTEX.001 | inbox/WP-*.md в DS-strategy |
 | Harness (упряжь) | Harness | DP.D.025 | IWE как harness для интеллектуальной работы |
-| ИИ-система | AI System | DP.ROLE.001 | Claude Code, бот — исполнители ролей |
+| ИИ-система | AI System | DP.ROLE.001 | Qwen Code, бот — исполнители ролей |
 | ИТ-система | IT System | DP.SYS.001 | MCP-серверы, WakaTime — детерминированные компоненты |
 
 ---
@@ -44,7 +44,7 @@
 
 | Термин (RU) | Term (EN) | Определение | Pack-понятие |
 |-------------|-----------|-------------|-------------|
-| Слой памяти | Memory Layer | Уровень хранения инструкций экзокортекса (Layer 1: MEMORY.md, Layer 2: CLAUDE.md, Layer 3: memory/*.md) | DP.EXOCORTEX.001 |
+| Слой памяти | Memory Layer | Уровень хранения инструкций экзокортекса (Layer 1: MEMORY.md, Layer 2: QWEN.md, Layer 3: memory/*.md) | DP.EXOCORTEX.001 |
 | Контур системы | Platform Contour | Уровень вложенности IWE (L1 Ecosystem → L2 Platform → L3 Template → L4 Personal) | DP.ARCH.001 |
 | Ритуал ОРЗ | ORZ Ritual | Реализация протокола сессии: Открытие → Работа → Закрытие | DP.M.003 |
 | WP Gate | WP Gate | Блокирующая проверка наличия РП в плане перед началом работы | DP.EXOCORTEX.001 |

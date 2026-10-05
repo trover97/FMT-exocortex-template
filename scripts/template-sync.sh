@@ -1,9 +1,9 @@
 #!/bin/bash
 # routing: utility  deterministic=true
 # see DP.SC.159, DP.ROLE.059
-# template-sync.sh — синхронизация CLAUDE.md из авторского IWE в FMT-exocortex-template
+# template-sync.sh — синхронизация QWEN.md из авторского IWE в FMT-exocortex-template
 #
-# Flow: $IWE_WORKSPACE/CLAUDE.md → placeholder sub → strip §9 авторское → FMT/CLAUDE.md
+# Flow: $IWE_WORKSPACE/QWEN.md → placeholder sub → strip §9 авторское → FMT/QWEN.md
 #
 # Использование:
 #   ./template-sync.sh            # синхронизировать
@@ -26,8 +26,8 @@ fi
 
 IWE="${IWE_WORKSPACE:-$HOME/IWE}"
 FMT_DIR="${IWE_TEMPLATE:-$IWE/FMT-exocortex-template}"
-SRC="$IWE/CLAUDE.md"
-FMT="$FMT_DIR/CLAUDE.md"
+SRC="$IWE/QWEN.md"
+FMT="$FMT_DIR/QWEN.md"
 
 # Валидация файлов
 if [ ! -f "$SRC" ]; then
@@ -74,24 +74,24 @@ ${l9}"
 
 if $check_only; then
     if diff <(printf '%s\n' "$result") "$FMT" > /dev/null 2>&1; then
-        echo "OK: FMT/CLAUDE.md синхронен с runtime"
+        echo "OK: FMT/QWEN.md синхронен с runtime"
         exit 0
     else
-        echo "DRIFT: FMT/CLAUDE.md не синхронен с runtime"
+        echo "DRIFT: FMT/QWEN.md не синхронен с runtime"
         diff <(printf '%s\n' "$result") "$FMT" || true
         exit 1
     fi
 fi
 
 if $dry_run; then
-    echo "=== CLAUDE.md diff (dry-run) ==="
+    echo "=== QWEN.md diff (dry-run) ==="
     diff <(printf '%s\n' "$result") "$FMT" || true
 else
     printf '%s\n' "$result" > "$FMT"
-    echo "✅ Синхронизировано: CLAUDE.md → FMT/CLAUDE.md"
+    echo "✅ Синхронизировано: QWEN.md → FMT/QWEN.md"
 fi
 
-# 4a. Расширенный allowlist — sync FMT/memory/protocol-*.md и FMT/.claude/rules/*.md
+# 4a. Расширенный allowlist — sync FMT/memory/protocol-*.md и FMT/.qwen/rules/*.md
 # WP-7/PZ-2 (2026-05-29): закрытие B12c Reverse drift для протоколов и правил.
 # Каждый файл: strip <!-- AUTHOR-ONLY -->...<!-- /AUTHOR-ONLY --> блоков +
 # placeholder-подстановка путей. ToRefresh-list см. ниже.
@@ -129,10 +129,10 @@ for f in \
     memory/protocol-work.md \
     memory/protocol-close.md \
     memory/protocol-month-close.md \
-    .claude/rules/distinctions.md \
-    .claude/rules/formatting.md \
-    .claude/rules/wp-scope.md \
-    .claude/rules/role-prefixes.md
+    .qwen/rules/distinctions.md \
+    .qwen/rules/formatting.md \
+    .qwen/rules/wp-scope.md \
+    .qwen/rules/role-prefixes.md
 do
     sync_allowlist_file "$f"
 done
@@ -155,4 +155,4 @@ $dry_run && exit 0
 
 echo ""
 echo "Следующий шаг:"
-echo "  cd $FMT_DIR && git diff CLAUDE.md && git add CLAUDE.md CHANGELOG.md && git commit"
+echo "  cd $FMT_DIR && git diff QWEN.md && git add QWEN.md CHANGELOG.md && git commit"

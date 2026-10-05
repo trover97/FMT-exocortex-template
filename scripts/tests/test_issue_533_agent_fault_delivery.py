@@ -25,9 +25,9 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 SEED = ROOT / "seed" / "strategy"
-SKILL = ROOT / ".claude" / "skills" / "agent-fault" / "SKILL.md"
+SKILL = ROOT / ".qwen" / "skills" / "agent-fault" / "SKILL.md"
 ROUTER = ROOT / "scripts" / "route-task.sh"
-HOOK = ROOT / ".claude" / "hooks" / "inject-fault-profile.sh"
+HOOK = ROOT / ".qwen" / "hooks" / "inject-fault-profile.sh"
 UPDATE = ROOT / "update.sh"
 OPEN_EXTENSION = ROOT / "extensions" / "protocol-open.after.fault.md"
 CLOSE_EXTENSION = ROOT / "extensions" / "protocol-close.checks.fault.md"
@@ -4165,7 +4165,7 @@ def test_real_hook_reads_only_explicit_subject(tmp_path: Path):
     env = _platform_env(workspace, governance_dir.name, tmp_path)
     env.update(
         {
-            "CLAUDE_PROJECT_DIR": str(workspace),
+            "QWEN_PROJECT_DIR": str(workspace),
         }
     )
     env.pop("IWE_FAULT_SUBJECT_KIND", None)
@@ -4210,7 +4210,7 @@ def test_hook_pins_custom_project_as_cli_workspace(tmp_path: Path):
     hook_env.update(
         {
             "HOME": str(tmp_path / "different-home"),
-            "CLAUDE_PROJECT_DIR": str(workspace),
+            "QWEN_PROJECT_DIR": str(workspace),
             "IWE_GOVERNANCE_REPO": governance_dir.name,
             "PYTHONDONTWRITEBYTECODE": "1",
         }
@@ -4248,7 +4248,7 @@ def test_hook_refuses_half_subject_without_state_or_database(
         pytest.skip("jq is required by the real UserPromptSubmit hook")
     workspace, governance_dir = _install_seed(tmp_path)
     env = _platform_env(workspace, governance_dir.name, tmp_path)
-    env["CLAUDE_PROJECT_DIR"] = str(workspace)
+    env["QWEN_PROJECT_DIR"] = str(workspace)
     env.pop("IWE_FAULT_SUBJECT_KIND", None)
     env.pop("IWE_FAULT_SUBJECT_ID", None)
     env.update(half_subject)
@@ -4265,7 +4265,7 @@ def test_hook_refuses_half_subject_without_state_or_database(
 
     assert hook.returncode == 0, hook.stdout + hook.stderr
     assert json.loads(hook.stdout) == {}
-    assert not (workspace / ".claude" / "state").exists()
+    assert not (workspace / ".qwen" / "state").exists()
     assert not (governance_dir / DB_REL).exists()
 
 
@@ -4292,7 +4292,7 @@ def test_hook_rejects_foreign_scripts_and_allows_internal_symlink_runtime(
     )
     rejected_env.update(
         {
-            "CLAUDE_PROJECT_DIR": str(rejected_workspace),
+            "QWEN_PROJECT_DIR": str(rejected_workspace),
             "IWE_SCRIPTS": str(foreign_scripts),
         }
     )
@@ -4308,7 +4308,7 @@ def test_hook_rejects_foreign_scripts_and_allows_internal_symlink_runtime(
     assert rejected.returncode == 0, rejected.stdout + rejected.stderr
     assert json.loads(rejected.stdout) == {}
     assert not foreign_sentinel.exists()
-    assert not (rejected_workspace / ".claude" / "state").exists()
+    assert not (rejected_workspace / ".qwen" / "state").exists()
 
     workspace, governance_dir = _install_seed(tmp_path / "internal-hook")
     internal_scripts = workspace / "internal-hook-scripts"
@@ -4321,7 +4321,7 @@ def test_hook_rejects_foreign_scripts_and_allows_internal_symlink_runtime(
     fault = "hook accepted its internal symlinked runtime"
     for _ in range(3):
         assert _record(record_env, fault, subject_id="claude-code").returncode == 0
-    hook_env = {**record_env, "CLAUDE_PROJECT_DIR": str(workspace)}
+    hook_env = {**record_env, "QWEN_PROJECT_DIR": str(workspace)}
     hook_env["IWE_SCRIPTS"] = str(configured_scripts)
     hook_env.pop("IWE_FAULT_SUBJECT_KIND", None)
     hook_env.pop("IWE_FAULT_SUBJECT_ID", None)

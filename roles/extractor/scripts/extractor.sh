@@ -1,6 +1,6 @@
 #!/bin/bash
 # Knowledge Extractor Agent Runner
-# Запускает Claude Code с заданным процессом KE
+# Запускает Qwen Code с заданным процессом KE
 #
 # Использование:
 #   extractor.sh inbox-check     # headless: обработка inbox (launchd)
@@ -58,6 +58,16 @@ fi
 ENV_FILE="$HOME/.config/aist/env"
 
 # AI CLI: переопределение через переменные окружения (см. strategist.sh)
+# QWEN-OFFLINE:A12 — this fork drives role scripts with Qwen Code, not Claude Code.
+# Only when the caller set nothing: an explicit AI_CLI / AI_CLI_EXTRA_FLAGS still wins.
+# Qwen rejects unknown flags, so no --dangerously-skip-permissions and no Claude model
+# name (the flags below replace the --model argument); Claude tool names are accepted.
+if [ -z "${AI_CLI:-}" ] && command -v qwen >/dev/null 2>&1; then
+    AI_CLI="$(command -v qwen)"
+    AI_CLI_EXTRA_FLAGS="${AI_CLI_EXTRA_FLAGS:---allowedTools Read,Write,Edit,Glob,Grep,Bash}"
+    IWE_EXTRACTOR_INBOX_AI_FLAGS="${IWE_EXTRACTOR_INBOX_AI_FLAGS:---allowedTools Read,Write,Edit,Glob,Grep}"
+fi
+# /QWEN-OFFLINE:A12
 AI_CLI="${AI_CLI:-$CLAUDE_PATH}"
 AI_CLI_PROMPT_FLAG="${AI_CLI_PROMPT_FLAG:--p}"
 AI_CLI_EXTRA_FLAGS="${AI_CLI_EXTRA_FLAGS:---dangerously-skip-permissions --allowedTools Read,Write,Edit,Glob,Grep,Bash}"
@@ -261,7 +271,7 @@ check_auth() {
     if status_out=$("$AI_CLI" auth status --json 2>&1); then
         return 0
     fi
-    log "ERROR: проверка входа Claude Code не прошла — headless-запуск невозможен. Ответ 'claude auth status': $(printf '%s' "$status_out" | tr -s '[:space:]' ' ')"
+    log "ERROR: проверка входа Qwen Code не прошла — headless-запуск невозможен. Ответ 'claude auth status': $(printf '%s' "$status_out" | tr -s '[:space:]' ' ')"
     log "Если это не сетевой/временный сбой, а подписка правда не подключена: bash \$IWE_TEMPLATE/roles/extractor/scripts/connect.sh"
     return 1
 }

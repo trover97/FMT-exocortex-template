@@ -13,7 +13,7 @@ set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 FMT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-SKILLS_DIR="$FMT_ROOT/.claude/skills"
+SKILLS_DIR="$FMT_ROOT/.qwen/skills"
 
 DRY_RUN=0
 for arg in "$@"; do

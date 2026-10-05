@@ -1,14 +1,14 @@
 ---
 purpose: adversarial post-release audit prompt
 trigger: каждый релиз — после `git push` тегов или version bump'а в update-manifest.json
-who_runs: автор шаблона (через Claude Code session) ИЛИ scheduled subagent
+who_runs: автор шаблона (через Qwen Code session) ИЛИ scheduled subagent
 ---
 
 # Adversarial Post-Release Audit Prompt
 
 > **Назначение:** найти регрессии, которые detector'ы 8/8 + smoke 14/14 НЕ ловят. Этот промпт воспроизводит роль Євгения (внешний пилот) с context isolation.
 >
-> **Использование (ручное):** скопировать в Claude Code сессии: `cat setup/release-audit-prompt.md`. Адаптировать version + предыдущую под контекст.
+> **Использование (ручное):** скопировать в Qwen Code сессии: `cat setup/release-audit-prompt.md`. Адаптировать version + предыдущую под контекст.
 >
 > **Использование (автоматизация):** workflow `.github/workflows/post-release-audit.yml` (workflow_dispatch) опубликует issue с этим промптом — автор затем прогонит в Claude.
 
@@ -31,9 +31,9 @@ CHANGELOG автора.
    Должны быть PASS 8/8 + 14/14.
 
 2. **Author-space drift:** Есть ли OTHER skills/files в авторском IWE
-   (~/IWE/.claude/skills/ или ~/IWE/memory/), которые существуют у автора,
+   (~/IWE/.qwen/skills/ или ~/IWE/memory/), которые существуют у автора,
    но НЕТ в FMT?
-   diff <(ls ~/IWE/.claude/skills/) <(ls ~/IWE/FMT-exocortex-template/.claude/skills/)
+   diff <(ls ~/IWE/.qwen/skills/) <(ls ~/IWE/FMT-exocortex-template/.qwen/skills/)
 
 3. **Author-constants остались:** Помимо очевидных (DS-strategy и т.д.),
    есть ли другие авторские константы в FMT? Пример паттернов которые
@@ -45,21 +45,21 @@ CHANGELOG автора.
        --include='*.md' --include='*.py' --include='*.json' \
        --include='*.yaml' .` где `<patternN>` — авторские константы.
 
-4. **Substituted list integrity:** Все ли файлы в .claude/runtime-overlay.yaml
+4. **Substituted list integrity:** Все ли файлы в .qwen/runtime-overlay.yaml
    реально содержат хотя бы один {{X}} плейсхолдер?
 
 5. **EXTENSION POINT consistency:** Все ли declared hooks в extensions/README.md
    действительно вызываются через load-extensions.sh в коде skill/protocol?
    И наоборот — все ли вызовы load-extensions.sh имеют запись в README?
-   grep -rohE 'extensions/[a-z-]+\.[a-z]+\.md' memory/ .claude/skills/ | sort -u
-   grep -rohE 'load-extensions\.sh [a-z-]+ [a-z]+' .claude/skills/ | sort -u
+   grep -rohE 'extensions/[a-z-]+\.[a-z]+\.md' memory/ .qwen/skills/ | sort -u
+   grep -rohE 'load-extensions\.sh [a-z-]+ [a-z]+' .qwen/skills/ | sort -u
 
 6. **Manifest integrity:** Все ли файлы в update-manifest.json:files
    физически существуют? И обратное — все ли L1 файлы в дереве учтены?
 
-7. **Broken refs:** Все ли ссылки в memory/*.md, .claude/skills/*/SKILL.md,
+7. **Broken refs:** Все ли ссылки в memory/*.md, .qwen/skills/*/SKILL.md,
    docs/*.md указывают на существующие файлы?
-   grep -rohE 'memory/[a-z-]+\.md' memory/ .claude/skills/
+   grep -rohE 'memory/[a-z-]+\.md' memory/ .qwen/skills/
 
 8. **Validator regex gaps:** Можно ли пропустить current detector regex'ом,
    создав violation в новой синтаксической форме? Например, для DS-strategy

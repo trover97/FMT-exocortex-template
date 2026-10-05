@@ -13,7 +13,7 @@ originSessionId: WP-273-stage-2
 # Hooks Design Principles
 
 > **Источник:** WP-273 R4.5 fix (Round 4 red-team Евгения, 26 апр).
-> **Применимо:** все hooks в `.claude/hooks/*.sh`.
+> **Применимо:** все hooks в `.qwen/hooks/*.sh`.
 
 ## Принцип 1. Trigger = artifact, НЕ TOOL_INPUT текст
 
@@ -25,7 +25,7 @@ if ! echo "$TOOL_INPUT" | grep -q 'DayPlan\|day-close\|WeekPlan'; then
 fi
 ```
 
-**Проблема:** TOOL_INPUT включает path'ы в `git add`, commit messages, file content в `cat <<EOF`. Поэтому commit файла `.claude/skills/day-close/SKILL.md` или commit message «fix day-close ordering» триггерит DayPlan-validation, хотя DayPlan не меняется. Это false positive — пользователь блокируется на нерелевантной проверке.
+**Проблема:** TOOL_INPUT включает path'ы в `git add`, commit messages, file content в `cat <<EOF`. Поэтому commit файла `.qwen/skills/day-close/SKILL.md` или commit message «fix day-close ordering» триггерит DayPlan-validation, хотя DayPlan не меняется. Это false positive — пользователь блокируется на нерелевантной проверке.
 
 **Правильно:**
 ```bash
@@ -59,5 +59,5 @@ Hook должен возвращать одинаковый результат �
 ## Применение
 
 - Все новые hooks → следовать принципам 1-4
-- Все существующие hooks → проверить через `integration-contract-validator.sh` (детектор Ф12.5 — grep `TOOL_INPUT.*grep` в `.claude/hooks/*.sh`)
+- Все существующие hooks → проверить через `integration-contract-validator.sh` (детектор Ф12.5 — grep `TOOL_INPUT.*grep` в `.qwen/hooks/*.sh`)
 - При нарушении: рефакторинг как в `protocol-artifact-validate.sh` (R4.5 fix, WP-273 commit 0.29.0)

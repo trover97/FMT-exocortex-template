@@ -234,7 +234,7 @@ print(json.dumps(result))
 }
 
 # ============================================================
-# 3. Claude Code Sessions
+# 3. Qwen Code Sessions
 # ============================================================
 
 collect_sessions() {
@@ -302,7 +302,7 @@ collect_wp() {
     # Формат строки: | <NNN> | <P> | <Название> | <Ст> | <Репо> | <Бюджет> |
     # Статусы: ✅ done · 🔄 in_progress · ⏳ pending · 📦 archived · ↗️ merged · 🧪 testing
     local REGISTRY_FILE="$GOVERNANCE_DIR/docs/WP-REGISTRY.md"
-    # issue #875: was "$HOME/.claude/projects/-Users-$(whoami)-IWE/memory/...", which
+    # issue #875: was "$HOME/.qwen/projects/-Users-$(whoami)-IWE/memory/...", which
     # assumes the folder is literally named IWE and read a foreign workspace's
     # memory otherwise. memory/ inside the workspace is the symlink to the real one.
     local MEMORY_FILE="$WORKSPACE/memory/MEMORY.md"

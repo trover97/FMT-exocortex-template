@@ -163,12 +163,12 @@ if [ -n "$STAGED_NEW_SCRIPTS" ] && [ -x "scripts/smoke-clean-env.sh" ]; then
     fi
 fi
 
-# === Hook paths convention (.claude/settings.json) ===
+# === Hook paths convention (.qwen/settings.json) ===
 # Корень бага (20 мая 2026): settings.json вручную скопирован в FMT с относительными
-# путями .claude/hooks/X.sh. При сдвиге cwd (subagent/worktree/MCP) хук не находится.
-# Конвенция: все хук-команды должны начинаться с $CLAUDE_PROJECT_DIR/.
+# путями .qwen/hooks/X.sh. При сдвиге cwd (subagent/worktree/MCP) хук не находится.
+# Конвенция: все хук-команды должны начинаться с $QWEN_PROJECT_DIR/.
 STAGED_SETTINGS=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null \
-    | grep -E '^\.claude/settings\.json$' || true)
+    | grep -E '^\.qwen/settings\.json$' || true)
 if [ -n "$STAGED_SETTINGS" ] && [ -x "scripts/validate-fmt-scripts.sh" ]; then
     # FMT7 (#150): валидировать только staged-скрипты, а не весь scripts/ —
     # иначе pre-existing долг в чужом файле блокирует регистрацию нового хука.
@@ -229,10 +229,10 @@ fi
 # из авторского pre-0.29.5 IWE → 8 violations. Євгений нашёл на fresh clone, но
 # наш собственный валидатор НЕ запускался при коммите. Гейт: тот же скрипт что
 # Євгений, на наших же staged файлах. Escape hatch: `git commit --no-verify`.
-# Запускаем только если staged файлы из scope валидатора (roles/, .claude/, setup/,
+# Запускаем только если staged файлы из scope валидатора (roles/, .qwen/, setup/,
 # memory/, extensions/, update-manifest.json).
 STAGED_VALIDATOR_SCOPE=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null \
-    | grep -E '^(roles/|\.claude/|setup/|memory/|extensions/|seed/|update-manifest\.json)' || true)
+    | grep -E '^(roles/|\.qwen/|setup/|memory/|extensions/|seed/|update-manifest\.json)' || true)
 if [ -n "$STAGED_VALIDATOR_SCOPE" ] && [ -x "setup/integration-contract-validator.sh" ]; then
     if ! bash setup/integration-contract-validator.sh >/tmp/iwe-icv.$$ 2>&1; then
         echo "INTEGRATION-CONTRACT-VALIDATOR: FAIL"
@@ -271,7 +271,7 @@ fi
 # сверка всего репо — неблокирующий WARN (одна чужая сирота не должна
 # парализовать все коммиты форка; полная сверка остаётся в CI validate-template).
 STAGED_MANIFEST_SCOPE=$(git diff --cached --name-only --diff-filter=ACMR 2>/dev/null \
-    | grep -E '^(scripts/|\.claude/|roles/|exocortex/|memory/|\.githooks/|pack-templates/|shared/|update-manifest\.json)' || true)
+    | grep -E '^(scripts/|\.qwen/|roles/|exocortex/|memory/|\.githooks/|pack-templates/|shared/|update-manifest\.json)' || true)
 if [ -n "$STAGED_MANIFEST_SCOPE" ] && [ -f "scripts/check-manifest-coverage.py" ]; then
     # 1) Блокирующе: покрытие staged-файлов текущего коммита.
     if ! printf '%s\n' "$STAGED_MANIFEST_SCOPE" | python3 scripts/check-manifest-coverage.py update-manifest.json >/tmp/iwe-manifest.$$ 2>&1; then
@@ -361,13 +361,13 @@ fi
 
 # === WP-387: diagnose-iwe rubric sync check ===
 # Ensures derived SKILL.md is in sync with YAML SoT
-if git diff --cached --name-only | grep -qE "shared/rubrics/|\.claude/skills/diagnose-iwe/"; then
+if git diff --cached --name-only | grep -qE "shared/rubrics/|\.qwen/skills/diagnose-iwe/"; then
   if [ -f "scripts/generate-diagnose-iwe-skill.py" ]; then
     python3 scripts/generate-diagnose-iwe-skill.py --check || {
       echo ""
       echo "RUBRIC-SYNC: diagnose-iwe/SKILL.md is out of sync with shared/rubrics/form-089.yaml"
       echo "  Fix: python3 scripts/generate-diagnose-iwe-skill.py"
-      echo "  Then: git add shared/rubrics/form-089.yaml .claude/skills/diagnose-iwe/SKILL.md"
+      echo "  Then: git add shared/rubrics/form-089.yaml .qwen/skills/diagnose-iwe/SKILL.md"
       exit 1
     }
   fi

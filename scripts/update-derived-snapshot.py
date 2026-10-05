@@ -73,7 +73,7 @@ _STAGE_INT_TO_LABEL = {
 # RCS slots tracked in rcs_indices (M3/IT/A are rarely bottlenecks but included for completeness).
 _RCS_SLOTS = ["W", "M1", "M2", "M3", "M4", "IT", "A"]
 
-# Claude Code registers MCP tools as mcp__<server>__<tool>; the short tool name
+# Qwen Code registers MCP tools as mcp__<server>__<tool>; the short tool name
 # alone never matches --allowedTools, so a headless call is silently denied at
 # the permission gate (no TTY to prompt) and every retry fails the same way.
 # See bug-2026-07-12-digital-twin-fetch-fails-headless.md.

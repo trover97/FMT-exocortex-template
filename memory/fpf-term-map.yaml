@@ -1,7 +1,7 @@
 # fpf-term-map.yaml — словарь дрейфа терминологии FPF (WP-481 Ф11)
 # deprecated -> canonical. Заполняется по факту переименований в апстриме
 # (github.com/ailev/FPF), не превентивно.
-# При добавлении записи: grep IWE-корпус (CLAUDE.md, .claude/rules/, memory/,
+# При добавлении записи: grep IWE-корпус (QWEN.md, .qwen/rules/, memory/,
 # PACK-*, FMT-exocortex-template/) на deprecated-форму, доложить пилоту
 # найденное (Drift Reporting) — не чинить молча.
 #

@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
+# === OFFLINE / NO-SCHEDULER GUARD (qwen-windows-offline) ===
+# Эта ветка: Windows + git bash, без планировщика (launchd/cron/systemd).
+# Установка задач по расписанию невозможна. Рабочие скрипты роли запускаются
+# ВРУЧНУЮ — см. MANUAL-JOBS.md в корне репозитория.
+echo "[$(basename "$(dirname "$0")")] Планировщик недоступен (offline/Windows). Запуск задач — вручную, см. MANUAL-JOBS.md" >&2
+exit 0
+# === /GUARD ===
 # routing: utility  deterministic=true
 # see DP.SC.159, DP.ROLE.059
 # setup-extractor-feeders.sh — Onboarding скрипт для активации feeder-системы
@@ -130,7 +137,7 @@ REPO_DIR=\$(git rev-parse --show-toplevel 2>/dev/null || echo "")
 [[ "\$REPO_DIR" != "\$IWE_ROOT_BAKED"* ]] && exit 0
 
 # Absolute, not \$SCRIPT_DIR-relative (issue #809 — see above).
-source "\$IWE_ROOT_BAKED/.claude/lib/iwe-env-bootstrap.sh" || exit 1
+source "\$IWE_ROOT_BAKED/.qwen/lib/iwe-env-bootstrap.sh" || exit 1
 REPO_NAME=\$(basename "\$REPO_DIR")
 GOVERNANCE_REPO="\${IWE_GOVERNANCE_REPO:-DS-strategy}"
 if [ "\$REPO_NAME" = "\$GOVERNANCE_REPO" ]; then

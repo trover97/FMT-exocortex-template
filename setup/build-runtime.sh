@@ -59,7 +59,7 @@ hash_dir() {
 # subprocess (not sourced), so the two lists must be kept in sync manually (issue #327).
 is_protected_user_file() {
     case "$1" in
-        params.yaml|memory/MEMORY.md|.claude/settings.local.json|sessions/00-index.md) return 0 ;;
+        params.yaml|memory/MEMORY.md|.qwen/settings.local.json|sessions/00-index.md) return 0 ;;
         *) return 1 ;;
     esac
 }
@@ -132,7 +132,7 @@ if [ -z "$ENV_FILE" ] || [ ! -f "$ENV_FILE" ]; then
     exit 2
 fi
 
-OVERLAY_FILE="$TEMPLATE_DIR/.claude/runtime-overlay.yaml"
+OVERLAY_FILE="$TEMPLATE_DIR/.qwen/runtime-overlay.yaml"
 if [ ! -f "$OVERLAY_FILE" ]; then
     echo "ERROR: Overlay-реестр не найден: $OVERLAY_FILE" >&2
     exit 3

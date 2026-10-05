@@ -14,23 +14,23 @@ trap 'rm -rf "$TMP"' EXIT
 FAILED=0
 fail() { echo "FAIL: $1"; FAILED=$((FAILED + 1)); }
 
-mkdir -p "$TMP/.claude/hooks"
+mkdir -p "$TMP/.qwen/hooks"
 
-cat > "$TMP/.claude/settings.json" <<'EOF'
-{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"$CLAUDE_PROJECT_DIR/.claude/hooks/hook-connected.sh"}]}]}}
+cat > "$TMP/.qwen/settings.json" <<'EOF'
+{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"$QWEN_PROJECT_DIR/.qwen/hooks/hook-connected.sh"}]}]}}
 EOF
 
-cat > "$TMP/.claude/hooks/hook-connected.sh" <<'EOF'
+cat > "$TMP/.qwen/hooks/hook-connected.sh" <<'EOF'
 #!/bin/bash
 bash "$(dirname "$0")/hook-transitive.sh"
 EOF
 
-cat > "$TMP/.claude/hooks/hook-transitive.sh" <<'EOF'
+cat > "$TMP/.qwen/hooks/hook-transitive.sh" <<'EOF'
 #!/bin/bash
 exit 0
 EOF
 
-cat > "$TMP/.claude/hooks/hook-library.sh" <<'EOF'
+cat > "$TMP/.qwen/hooks/hook-library.sh" <<'EOF'
 #!/bin/bash
 # claude-hook: false — test library, must be recognized by the header marker
 exit 0
@@ -38,7 +38,7 @@ EOF
 
 # Marker below the head -3 contract boundary must NOT count as a library —
 # such a file stays an orphan (guards against burying the marker deep in a file).
-cat > "$TMP/.claude/hooks/hook-late-marker.sh" <<'EOF'
+cat > "$TMP/.qwen/hooks/hook-late-marker.sh" <<'EOF'
 #!/bin/bash
 # just a comment
 # another comment
@@ -46,12 +46,12 @@ cat > "$TMP/.claude/hooks/hook-late-marker.sh" <<'EOF'
 exit 0
 EOF
 
-cat > "$TMP/.claude/hooks/hook-allowed.sh" <<'EOF'
+cat > "$TMP/.qwen/hooks/hook-allowed.sh" <<'EOF'
 #!/bin/bash
 exit 0
 EOF
 
-echo "hook-allowed.sh  # deliberately unregistered (test)" > "$TMP/.claude/hooks/.orphan-allowlist"
+echo "hook-allowed.sh  # deliberately unregistered (test)" > "$TMP/.qwen/hooks/.orphan-allowlist"
 
 # --- Run 1: the late-marker file is present, so the guard must fail on it,
 #     while marker and allowlist recognition keep working ---
@@ -63,14 +63,14 @@ echo "$OUT" | grep -q "ALLOWED: hook-allowed.sh" || fail "run 1: allowlist entry
 echo "$OUT" | grep -q "FAIL: hook-late-marker.sh" || fail "run 1: marker on line 4 must NOT count (head -3 contract)"
 
 # --- Run 2: with the late-marker file removed, everything is accounted for -> PASS ---
-rm "$TMP/.claude/hooks/hook-late-marker.sh"
+rm "$TMP/.qwen/hooks/hook-late-marker.sh"
 OUT=$(bash "$GUARD" "$TMP" 2>&1)
 RC=$?
 [ "$RC" -eq 0 ] || fail "run 2 expected exit 0, got $RC ($OUT)"
 echo "$OUT" | grep -q "^PASS:" || fail "run 2: no PASS summary"
 
 # --- Run 3: a genuine orphan must still fail ---
-cat > "$TMP/.claude/hooks/hook-orphan.sh" <<'EOF'
+cat > "$TMP/.qwen/hooks/hook-orphan.sh" <<'EOF'
 #!/bin/bash
 exit 0
 EOF

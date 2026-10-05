@@ -19,7 +19,7 @@ set -eu
 
 # Load unified environment: WORKSPACE_DIR, IWE_ROOT, IWE_SCRIPTS, etc.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/../.claude/lib/iwe-env-bootstrap.sh" || exit 1
+source "$SCRIPT_DIR/../.qwen/lib/iwe-env-bootstrap.sh" || exit 1
 MEMORY_DIR="$IWE_ROOT/memory"
 HOT_LIMIT=150
 HOT_DOWNGRADE_DAYS=14   # HOT → WARM если не упоминался N дней
@@ -40,12 +40,12 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-# #513: единый reader вместо локальной копии — общий .claude/lib/frontmatter.sh
+# #513: единый reader вместо локальной копии — общий .qwen/lib/frontmatter.sh
 # уже нормализует обе формы (плоскую и вложенную metadata:), локальный awk видел
 # только плоскую и молча возвращал пустоту на файлах, записанных харнессом.
 _MEMORY_BLEED_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=../.claude/lib/frontmatter.sh
-source "$_MEMORY_BLEED_DIR/../.claude/lib/frontmatter.sh"
+# shellcheck source=../.qwen/lib/frontmatter.sh
+source "$_MEMORY_BLEED_DIR/../.qwen/lib/frontmatter.sh"
 
 # #515: file mtime, портируемо. GNU stat (Linux) первым, BSD (macOS) фоллбеком;
 # stderr первой формы подавлен — на macOS она шумела ошибкой в отчёт.

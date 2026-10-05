@@ -22,15 +22,15 @@ if ! repo_root=$(git rev-parse --show-toplevel 2>/dev/null); then
   exit 2
 fi
 
-SECRET_LIB="$repo_root/.claude/hooks/secret-bypass-lib.sh"
+SECRET_LIB="$repo_root/.qwen/hooks/secret-bypass-lib.sh"
 if [ ! -r "$SECRET_LIB" ]; then
-  SECRET_LIB="${IWE_ROOT:-$HOME/IWE}/.claude/hooks/secret-bypass-lib.sh"
+  SECRET_LIB="${IWE_ROOT:-$HOME/IWE}/.qwen/hooks/secret-bypass-lib.sh"
 fi
 if [ ! -r "$SECRET_LIB" ]; then
   printf 'Pre-commit secret scan unavailable: canonical pattern library is missing.\n' >&2
   exit 2
 fi
-# shellcheck source=../.claude/hooks/secret-bypass-lib.sh
+# shellcheck source=../.qwen/hooks/secret-bypass-lib.sh
 # shellcheck disable=SC1090,SC1091
 . "$SECRET_LIB"
 if ! command -v secret_pattern_process >/dev/null 2>&1 \
@@ -50,8 +50,8 @@ fi
 # job to catch (an unrelated content-review concern, same as for any file
 # whose entire purpose is to hold example/pattern text).
 if ! staged_diff=$(git diff --cached --diff-filter=ACMR --no-ext-diff --unified=0 -- . \
-    ':(exclude).claude/hooks/secret-bypass-lib.sh' \
-    ':(exclude).claude/hooks/secret-bypass-analyzer.py'); then
+    ':(exclude).qwen/hooks/secret-bypass-lib.sh' \
+    ':(exclude).qwen/hooks/secret-bypass-analyzer.py'); then
   printf 'Pre-commit secret scan unavailable: staged diff could not be read.\n' >&2
   exit 2
 fi

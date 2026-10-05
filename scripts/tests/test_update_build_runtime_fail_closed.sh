@@ -30,7 +30,7 @@ mkdir -p "$TEST_ROOT" "$FAKE_HOME"
 # --- Fixture: fake upstream (served by the curl shim) ---
 UPSTREAM="$TEST_ROOT/upstream"
 mkdir -p "$UPSTREAM/scripts"
-printf '# Template CLAUDE.md\n' > "$UPSTREAM/CLAUDE.md"
+printf '# Template QWEN.md\n' > "$UPSTREAM/QWEN.md"
 printf '#!/bin/bash\necho v2\n' > "$UPSTREAM/scripts/dummy-new.sh"
 python3 - "$UPSTREAM" <<'PY'
 import hashlib, json, sys
@@ -41,7 +41,7 @@ def entry(path):
 manifest = {
     "schema_version": 2,
     "version": "0.99.0-brt-test",
-    "files": [entry("CLAUDE.md"), entry("scripts/dummy-new.sh")],
+    "files": [entry("QWEN.md"), entry("scripts/dummy-new.sh")],
     "deprecated_files": [],
 }
 (root / "update-manifest.json").write_text(json.dumps(manifest))
@@ -49,17 +49,17 @@ PY
 
 # --- Fixture: local template copy, one file behind upstream ---
 SCRIPT_DIR="$TEST_ROOT/repo/FMT-exocortex-template"
-mkdir -p "$SCRIPT_DIR/.claude/lib" "$SCRIPT_DIR/scripts/lib" "$SCRIPT_DIR/setup"
+mkdir -p "$SCRIPT_DIR/.qwen/lib" "$SCRIPT_DIR/scripts/lib" "$SCRIPT_DIR/setup"
 cp "$ROOT/update.sh" "$SCRIPT_DIR/update.sh"
-cp "$ROOT/.claude/lib/frontmatter.sh" "$SCRIPT_DIR/.claude/lib/frontmatter.sh"
+cp "$ROOT/.qwen/lib/frontmatter.sh" "$SCRIPT_DIR/.qwen/lib/frontmatter.sh"
 cp "$ROOT/scripts/lib/common.sh" "$SCRIPT_DIR/scripts/lib/common.sh"
 chmod +x "$SCRIPT_DIR/update.sh"
-cp "$UPSTREAM/CLAUDE.md" "$SCRIPT_DIR/CLAUDE.md"
-cp "$SCRIPT_DIR/CLAUDE.md" "$SCRIPT_DIR/.claude.md.base"
+cp "$UPSTREAM/QWEN.md" "$SCRIPT_DIR/QWEN.md"
+cp "$SCRIPT_DIR/QWEN.md" "$SCRIPT_DIR/.claude.md.base"
 
 WORKSPACE_DIR="$TEST_ROOT/repo"
-cp "$SCRIPT_DIR/CLAUDE.md" "$WORKSPACE_DIR/CLAUDE.md"
-cp "$SCRIPT_DIR/CLAUDE.md" "$WORKSPACE_DIR/.claude.md.base"
+cp "$SCRIPT_DIR/QWEN.md" "$WORKSPACE_DIR/QWEN.md"
+cp "$SCRIPT_DIR/QWEN.md" "$WORKSPACE_DIR/.claude.md.base"
 printf 'GITHUB_USER="test-user"\nWORKSPACE_DIR="%s"\n' "$WORKSPACE_DIR" \
     > "$WORKSPACE_DIR/.exocortex.env"
 chmod 600 "$WORKSPACE_DIR/.exocortex.env"
@@ -231,7 +231,7 @@ mkdir -p \
     "$SCRIPT_DIR/seed/strategy/.githooks" \
     "$SCRIPT_DIR/scripts/agent-fault" \
     "$SCRIPT_DIR/scripts" \
-    "$WORKSPACE_DIR/.claude/skills/smoke-catalog" \
+    "$WORKSPACE_DIR/.qwen/skills/smoke-catalog" \
     "$WORKSPACE_DIR/custom-governance/scripts"
 cp "$ROOT/seed/strategy/scripts/install-hooks.sh" \
     "$SCRIPT_DIR/seed/strategy/scripts/install-hooks.sh"
@@ -276,7 +276,7 @@ chmod +x \
     "$SCRIPT_DIR/scripts/generate-executor-catalog.py" \
     "$SCRIPT_DIR/scripts/route-task.sh" \
     "$SCRIPT_DIR/setup/install-iwe-paths.sh"
-cat > "$WORKSPACE_DIR/.claude/skills/smoke-catalog/SKILL.md" <<'EOF'
+cat > "$WORKSPACE_DIR/.qwen/skills/smoke-catalog/SKILL.md" <<'EOF'
 ---
 name: smoke-catalog
 description: Deterministic recovery fixture.
@@ -496,7 +496,7 @@ for entry in manifest["files"]:
     entry["sha256"] = hashlib.sha256((root / entry["path"]).read_bytes()).hexdigest()
 (root / "update-manifest.json").write_text(json.dumps(manifest))
 PY
-F_CLAUDE_BEFORE=$(shasum -a 256 "$WORKSPACE_DIR/CLAUDE.md" | cut -d' ' -f1)
+F_CLAUDE_BEFORE=$(shasum -a 256 "$WORKSPACE_DIR/QWEN.md" | cut -d' ' -f1)
 F_SCRIPT_BEFORE=$(shasum -a 256 "$SCRIPT_DIR/scripts/dummy-new.sh" | cut -d' ' -f1)
 F_UPDATER_BEFORE=$(shasum -a 256 "$SCRIPT_DIR/update.sh" | cut -d' ' -f1)
 
@@ -526,11 +526,11 @@ if [ "$RC_F1" -eq 3 ] && grep -q 'отсутствует .exocortex.env' "$TEST_
 else
     fail "F1: missing env rc=$RC_F1, diagnostic/env/marker contract failed"
 fi
-if [ "$F_CLAUDE_BEFORE" = "$(shasum -a 256 "$WORKSPACE_DIR/CLAUDE.md" | cut -d' ' -f1)" ] && \
+if [ "$F_CLAUDE_BEFORE" = "$(shasum -a 256 "$WORKSPACE_DIR/QWEN.md" | cut -d' ' -f1)" ] && \
    [ "$F_SCRIPT_BEFORE" = "$(shasum -a 256 "$SCRIPT_DIR/scripts/dummy-new.sh" | cut -d' ' -f1)" ] && \
    [ "$F_UPDATER_BEFORE" = "$(shasum -a 256 "$SCRIPT_DIR/update.sh" | cut -d' ' -f1)" ] && \
    [ "$(cat "$WORKSPACE_DIR/personal/keep.txt")" = 'personal sentinel' ]; then
-    pass "F1: no template, CLAUDE.md or personal content was changed"
+    pass "F1: no template, QWEN.md or personal content was changed"
 else
     fail "F1: missing env caused a partial write"
 fi
@@ -556,7 +556,7 @@ SPECIAL_WS="$TEST_ROOT/"'$(touch PWNED)'
 SPECIAL_TEMPLATE="$SPECIAL_WS/FMT-exocortex-template"
 mkdir -p "$SPECIAL_TEMPLATE"
 cp "$ROOT/update.sh" "$SPECIAL_TEMPLATE/update.sh"
-cp "$ROOT/CLAUDE.md" "$SPECIAL_TEMPLATE/CLAUDE.md"
+cp "$ROOT/QWEN.md" "$SPECIAL_TEMPLATE/QWEN.md"
 F3_UPDATER_BEFORE=$(shasum -a 256 "$SPECIAL_TEMPLATE/update.sh" | cut -d' ' -f1)
 set +e
 ( cd "$TEST_ROOT" && PATH="$SHIM_DIR:$PATH" HOME="$FAKE_HOME" IWE_UPDATE_CHANNEL=main \

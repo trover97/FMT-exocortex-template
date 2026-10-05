@@ -5,7 +5,7 @@
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-SKILL="$ROOT/.claude/skills/day-close/SKILL.md"
+SKILL="$ROOT/.qwen/skills/day-close/SKILL.md"
 TEST_ROOT="$(mktemp -d /tmp/iwe-issue-511-commit-guard.XXXXXX)"
 GUARD_SOURCE="$TEST_ROOT/guard.sh"
 REPO="$TEST_ROOT/repo"

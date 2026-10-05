@@ -17,7 +17,7 @@
 # wrong line.
 #
 # Read-only code without {{PLACEHOLDER}}s: run straight from $IWE_TEMPLATE
-# (see .claude/runtime-overlay.yaml), it is not copied into .iwe-runtime/.
+# (see .qwen/runtime-overlay.yaml), it is not copied into .iwe-runtime/.
 set -euo pipefail
 
 SECRET_DIR="$HOME/.secrets"
@@ -45,7 +45,7 @@ verify_token() {
         rm -f "$out"
         return 0
     fi
-    echo "Тестовый вызов не прошёл. Ответ Claude Code:" >&2
+    echo "Тестовый вызов не прошёл. Ответ Qwen Code:" >&2
     sed 's/^/  /' "$out" >&2
     rm -f "$out"
     return 1
@@ -94,7 +94,7 @@ run_check_only() {
 run_full_setup() {
     [ -t 0 ] || die "нужен интерактивный терминал (скрипт открывает браузер и ждёт ввода)."
 
-    echo "Подключение Экстрактора к вашей подписке Claude Code."
+    echo "Подключение Экстрактора к вашей подписке Qwen Code."
     echo "Требуется активная подписка Pro/Max/Team/Enterprise (не обычный API-ключ)."
     [ -f "$SECRET_PATH" ] && echo "Уже сохранённый токен ($SECRET_PATH) будет заменён новым."
     echo
@@ -121,7 +121,7 @@ run_full_setup() {
     echo "Следующий шаг (по желанию): автоматический inbox-check — bash \$IWE_TEMPLATE/roles/extractor/install.sh"
 }
 
-[ -n "$CLAUDE_PATH" ] || die "команда 'claude' не найдена в PATH — сначала установите Claude Code CLI."
+[ -n "$CLAUDE_PATH" ] || die "команда 'claude' не найдена в PATH — сначала установите Qwen Code CLI."
 
 case "${1:-}" in
     "")        run_full_setup ;;

@@ -1,4 +1,4 @@
-# Inter-Agent Handoff: Kimi ↔ Claude Code
+# Inter-Agent Handoff: Kimi ↔ Qwen Code
 
 > Роль: архитектурный паттерн WP-207 H6  
 > Scope: передача контекста между агентами в разных окнах VS Code  
