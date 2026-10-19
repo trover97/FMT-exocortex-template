@@ -51,6 +51,9 @@ ALLOWLIST = {
     "PACK-agent-rules/rules/AR.NNN.md",
     ".claude/rules-registry.yaml",
     "archive/wp-contexts/WP-457/CONCEPT-user-states.md",
+    # FPF is cloned into the user's workspace by setup.sh, it is not part of the
+    # template; the Obsidian rule (#522, #883) names its big spec file as the reason.
+    "FPF/FPF-Spec.md",
 }
 
 manifest_files = set()
@@ -189,6 +192,12 @@ TREE_ALLOWLIST = {
     # right next to this reference, same "documented, not shipped by
     # design" shape as the two entries above.
     "scripts/sync-communication-style.yaml",
+    # communication-style-personal-template.md's own prose (WP-412 Ф13)
+    # names this as the file the USER creates by copying the template under
+    # this name — it is never shipped, by the same "documented extension
+    # point, absent until created" shape as the entries above. The hook
+    # (inject-communication-style.sh) reads it only if present.
+    "memory/communication-style-personal.md",
 }
 
 

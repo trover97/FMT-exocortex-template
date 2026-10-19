@@ -72,7 +72,7 @@ class ExtractorPipelineTests(unittest.TestCase):
         self.run_command(["git", "clone", str(remote), str(canonical)])
         return canonical, publisher, remote
 
-    def shell(self, command, *, runner=RUNNER, variables=None, check=True):
+    def shell(self, command, *, runner=RUNNER, variables=None, check=True, as_root=False):
         # Load the real function bodies without production startup/auth/notifications.
         functions = re.findall(r"^\w+\(\) \{[^\n]*\n.*?^\}", runner.read_text(), re.M | re.S)
         values = {
@@ -95,7 +95,19 @@ class ExtractorPipelineTests(unittest.TestCase):
             "extractor_scope_open_and_note() { return 0; }",
             "extractor_scope_close() { :; }", command,
         ]))
-        return self.run_command(["bash", str(script)], check=check)
+        # as_root: a real EUID 0 inside an unprivileged user namespace (bash's
+        # EUID is read-only, so no in-process env var can fake it) -- see the
+        # namespace-based integration test further down this class.
+        args = ["unshare", "--map-root-user", "--", "bash", str(script)] if as_root else ["bash", str(script)]
+        return self.run_command(args, check=check)
+
+    def require_unprivileged_userns(self):
+        try:
+            probe = subprocess.run(["unshare", "--map-root-user", "--", "true"], capture_output=True, timeout=2)
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            self.skipTest("unshare --map-root-user unavailable (no binary or timed out)")
+        if probe.returncode != 0:
+            self.skipTest(f"unshare --map-root-user refused (rc={probe.returncode}): likely AppArmor-restricted unprivileged userns")
 
     def make_pack(self):
         return self.published_repo("PACK-fixture", {"pack/known.md": "---\nid: DP.M.001\n---\nExisting method\n"})
@@ -250,6 +262,103 @@ class ExtractorPipelineTests(unittest.TestCase):
         self.assertIn("Pack freshness not verified", result.stdout)
         self.assertFalse(marker.exists())
         self.assertNotIn("[analyzed", (governance / "inbox/fleeting-notes.md").read_text())
+
+    def test_single_local_only_pack_degrades_instead_of_blocking(self):
+        # issue #1155: a single Pack with no `origin` remote used to leave
+        # pack_count at 0 -> mount_readonly_packs ERRORed and the whole
+        # inbox-check aborted, even though real, unrelated pending captures
+        # existed and had nothing to do with Pack-based duplicate checking.
+        pack_dir = self.workspace / "PACK-local-only"
+        pack_dir.mkdir()
+        self.run_command(["git", "init", "-q", "-b", "main", str(pack_dir)])
+        self.write(pack_dir / "pack/local.md", "Local only\n")
+        self.git(pack_dir, "add", "--", "pack/local.md")
+        self.git(pack_dir, "commit", "-m", "local fixture")
+        _, _, remote = self.published_repo("DS-fixture", {
+            "inbox/fleeting-notes.md": "### Thought\nBody\n",
+        })
+        cli = self.write(self.base / "fake-cli-local-pack", f"#!{sys.executable}\n" + '''from pathlib import Path
+source = Path("DS-fixture/inbox/fleeting-notes.md")
+source.write_text(source.read_text().replace("### Thought", "### Thought [analyzed 2026-09-12]"))
+reports = Path("DS-fixture/inbox/extraction-reports")
+reports.mkdir()
+(reports / "2026-09-12-inbox-check.md").write_text("# Fixture report\\n**Источник capture:** fleeting-notes.md — Thought\\n")
+''')
+        cli.chmod(0o700)
+        result = self.run_inbox(cli)
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("all Packs skipped", result.stdout)
+        self.assertIn("proceeding with zero Pack coverage", result.stdout)
+        self.assertIn("Completed process: inbox-check", result.stdout)
+        published = self.git(remote, "show", "main:inbox/fleeting-notes.md")
+        self.assertIn("[analyzed 2026-09-12]", published)
+
+    # issue #1116 cold-review follow-up (WP-545 Ф15): assert_ai_cli_root_compat
+    # had no direct test. IWE_EXTRACTOR_TEST_EUID lets the fixture drive both
+    # branches deterministically; the unshare variant below additionally
+    # proves the real (non-overridden) $EUID path under a genuine EUID 0.
+    def test_assert_ai_cli_root_compat_blocks_dangerous_flag_under_root(self):
+        result = self.shell(
+            'assert_ai_cli_root_compat "--dangerously-skip-permissions"',
+            variables={"IWE_EXTRACTOR_TEST_EUID": "0"}, check=False,
+        )
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("несовместим с --dangerously-skip-permissions", result.stderr)
+
+    def test_assert_ai_cli_root_compat_allows_safe_flags_under_root(self):
+        result = self.shell(
+            'assert_ai_cli_root_compat "--allowedTools Read"',
+            variables={"IWE_EXTRACTOR_TEST_EUID": "0"},
+        )
+        self.assertEqual(result.returncode, 0)
+
+    def test_assert_ai_cli_root_compat_allows_dangerous_flag_when_not_root(self):
+        result = self.shell(
+            'assert_ai_cli_root_compat "--dangerously-skip-permissions"',
+            variables={"IWE_EXTRACTOR_TEST_EUID": "1000"},
+        )
+        self.assertEqual(result.returncode, 0)
+
+    def test_assert_ai_cli_root_compat_real_root_via_namespace(self):
+        self.require_unprivileged_userns()
+        result = self.shell('assert_ai_cli_root_compat "--dangerously-skip-permissions"', as_root=True, check=False)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("несовместим с --dangerously-skip-permissions", result.stderr)
+
+    # issue #928 cold-review follow-up (WP-545 Ф15): resolve_tool_path had no
+    # direct test for its three-step fallback chain.
+    def test_resolve_tool_path_finds_iwe_scripts_first(self):
+        scripts_dir = self.base / "iwe-scripts"
+        tool = self.write(scripts_dir / "session-guard.sh", "#!/bin/sh\n")
+        tool.chmod(0o700)
+        result = self.shell("resolve_tool_path session-guard.sh", variables={"IWE_SCRIPTS": str(scripts_dir)})
+        self.assertEqual(result.stdout.strip(), str(tool))
+
+    def test_resolve_tool_path_falls_back_to_template_scripts(self):
+        # Deliberately exercises the real scripts/session-guard.sh shipped in
+        # this repo (not a fixture) to prove the actual fallback chain works,
+        # not a stand-in path; a future rename/move of that file needs a
+        # matching update here.
+        result = self.shell(
+            "resolve_tool_path session-guard.sh",
+            variables={"IWE_SCRIPTS": str(self.base / "missing")},
+        )
+        self.assertEqual(result.stdout.strip(), str(ROOT / "scripts/session-guard.sh"))
+
+    def test_resolve_tool_path_not_found_reports_all_tried_paths(self):
+        home = self.base / "home"
+        result = self.shell(
+            "resolve_tool_path no-such-tool.sh",
+            variables={"IWE_SCRIPTS": str(self.base / "missing"), "IWE_TEMPLATE": str(self.base / "missing-template"), "HOME": str(home)},
+            check=False,
+        )
+        self.assertEqual(result.returncode, 1)
+        # resolve_tool_path's only output on failure is the WARN via log(),
+        # which (like every other caller in this file) writes to stdout, not
+        # stderr — see log()'s unredirected second `echo`.
+        self.assertIn(f"{self.base}/missing/no-such-tool.sh", result.stdout)
+        self.assertIn(f"{self.base}/missing-template/scripts/no-such-tool.sh", result.stdout)
+        self.assertIn(f"{home}/IWE/scripts/no-such-tool.sh", result.stdout)
 
     def test_single_letter_ids_and_declarations(self):
         text = "id: DP.D.999\nFile: DP.D.999-new-card.md\nRelated: DP.D.001 DP.M.002 DP.FM.003\n"
@@ -428,6 +537,18 @@ reports.mkdir()
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("without updated input marks", result.stdout)
         self.assertEqual(self.git(remote, "rev-parse", "main"), before)
+        # The report file it wrote is a real, uncommitted diff -- the worktree
+        # is preserved (not swept) on this path, and maybe_cleanup_empty_
+        # worktree() returns 1 for that. Issue #1116/#1155 fix: every call to
+        # it runs under `set -e` without `|| true` at 7 of 8 sites -- a bare
+        # non-zero return there aborted the whole process immediately,
+        # skipping every statement written after it, including
+        # release_inbox_lock(). This is a *different* observable symptom than
+        # returncode or leftover-dir count (both of those happen to match a
+        # clean `return 1` by coincidence -- see cold-review finding): the
+        # lock directory must be gone, not just the right exit code.
+        self.assertFalse((self.base / "inbox.lock").exists(),
+                          "release_inbox_lock() did not run -- lock left behind (set -e killed the script early)")
 
     def test_session_open_failure_blocks_commit_and_publication(self):
         _, remote, cli = self.inbox_fixture()
@@ -554,7 +675,7 @@ block = "%s"
         self.assertNotIn("agent self-commit", self.git(remote, "log", "--format=%s", "main"))
         self.assert_canonical_untouched(governance, head_before)
 
-    def assert_feed_blocked(self, governance, remote, cli, expected_message, variables=None):
+    def assert_feed_blocked(self, governance, remote, cli, expected_message, variables=None, expected_leftover=1):
         head_before = self.git(governance, "rev-parse", "HEAD")
         before = self.git(remote, "rev-parse", "main")
         result = self.run_feed(cli, check=False, variables=variables)
@@ -563,8 +684,12 @@ block = "%s"
         self.assertNotIn("Completed process:", result.stdout)
         self.assertEqual(self.git(remote, "rev-parse", "main"), before)
         self.assert_canonical_untouched(governance, head_before)
-        # Nothing is lost: the worktree is preserved for review.
-        self.assertEqual(len(self.leftover_feed_dirs()), 1)
+        # A real policy violation leaves a diff worth reviewing, so the
+        # worktree is preserved (expected_leftover=1, the default). A clean
+        # failure with no diff at all (e.g. the AI CLI exiting before
+        # writing anything) is cleaned up immediately instead -- callers for
+        # that case pass expected_leftover=0 (issues #1116/#1155).
+        self.assertEqual(len(self.leftover_feed_dirs()), expected_leftover)
         self.assertNotIn("[feed:", (governance / "inbox/captures/2026-09.md").read_text())
 
     def test_isolated_feed_change_outside_allowlist_blocks_publication(self):
@@ -594,8 +719,10 @@ block = "%s"
         self.assert_feed_blocked(governance, remote, cli, "for this mode")
 
     def test_isolated_feed_cli_failure_publishes_nothing(self):
+        # No file was ever written in the worktree -- clean, so it gets
+        # swept immediately instead of preserved (issues #1116/#1155).
         governance, remote, cli = self.feed_fixture("sys.exit(3)\n")
-        self.assert_feed_blocked(governance, remote, cli, "AI CLI failed")
+        self.assert_feed_blocked(governance, remote, cli, "AI CLI failed", expected_leftover=0)
 
     def test_isolated_feed_replacing_captures_with_one_line_is_refused(self):
         # Accumulated captures must never be rewritten: append-only.
@@ -718,7 +845,7 @@ print("Knowledge Audit Report (printed, not written)")
         self.assertTrue((self.workspace / "PACK-fixture/pack/known.md").exists())
         self.assertTrue((self.workspace / "PACK-fixture/.git").exists())
 
-    def assert_audit_blocked(self, governance, remote, cli, expected_message, variables=None):
+    def assert_audit_blocked(self, governance, remote, cli, expected_message, variables=None, expected_leftover=1):
         head_before = self.git(governance, "rev-parse", "HEAD")
         before = self.git(remote, "rev-parse", "main")
         result = self.run_audit(cli, check=False, variables=variables)
@@ -727,8 +854,11 @@ print("Knowledge Audit Report (printed, not written)")
         self.assertNotIn("Completed process:", result.stdout)
         self.assertEqual(self.git(remote, "rev-parse", "main"), before)
         self.assert_canonical_untouched(governance, head_before)
-        # Nothing is lost: the worktree is preserved for review.
-        self.assertEqual(len(self.leftover_audit_dirs()), 1)
+        # A real contract violation leaves a diff worth reviewing, so the
+        # worktree is preserved (expected_leftover=1, the default). A clean
+        # failure with no diff at all is cleaned up immediately instead --
+        # callers for that case pass expected_leftover=0 (issues #1116/#1155).
+        self.assertEqual(len(self.leftover_audit_dirs()), expected_leftover)
 
     def test_isolated_audit_new_file_blocks_publication(self):
         # Even a well-meant report file is a change: the audit is read-only.
@@ -759,8 +889,10 @@ print("Knowledge Audit Report (printed, not written)")
         self.assert_audit_blocked(governance, remote, cli, "read-only contract): README.md")
 
     def test_isolated_audit_cli_failure_publishes_nothing(self):
+        # No file was ever written in the worktree -- clean, so it gets
+        # swept immediately instead of preserved (issues #1116/#1155).
         governance, remote, cli = self.audit_fixture("sys.exit(3)\n")
-        self.assert_audit_blocked(governance, remote, cli, "AI CLI failed")
+        self.assert_audit_blocked(governance, remote, cli, "AI CLI failed", expected_leftover=0)
 
     def test_isolated_audit_git_status_failure_blocks_instead_of_clean(self):
         governance, remote, cli = self.audit_fixture("pass\n")
