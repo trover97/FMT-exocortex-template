@@ -27,7 +27,7 @@ set -eu
 # frontmatter.sh source below still resolves relative to THIS script (issue #229).
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 _MEMORY_MIGRATE_DIR="$SCRIPT_DIR"
-source "$SCRIPT_DIR/../.claude/lib/iwe-env-bootstrap.sh" || exit 1
+source "$SCRIPT_DIR/../.qwen/lib/iwe-env-bootstrap.sh" || exit 1
 # issue #658: was a private get_field() unaware of the `metadata:`-nested
 # frontmatter dialect (issue #281) — every already-nested scalar field
 # (type/horizon/status/owner/valid_from/...) read back as empty, which made
@@ -36,7 +36,7 @@ source "$SCRIPT_DIR/../.claude/lib/iwe-env-bootstrap.sh" || exit 1
 # reader fixes scalar fields. issue #1147: `domains:` as a columnar YAML
 # list (`- item` lines) is parsed by frontmatter.sh too, so a nested
 # columnar list no longer triggers a flat duplicate either.
-source "$_MEMORY_MIGRATE_DIR/../.claude/lib/frontmatter.sh" || exit 1
+source "$_MEMORY_MIGRATE_DIR/../.qwen/lib/frontmatter.sh" || exit 1
 MEMORY_DIR="$IWE_ROOT/memory"
 DRY_RUN=0
 ALL=0

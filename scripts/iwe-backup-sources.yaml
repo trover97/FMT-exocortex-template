@@ -6,7 +6,7 @@
 # Проблема: единственный существующий механизм (backup-icloud.sh) покрывает
 # только ${HOME}/IWE. Runtime-каталоги ИИ-агентов (память, история диалогов,
 # конфиги) лежат вне IWE и ничем не защищены — найдено на инциденте потери
-# ~/.claude/logs/style-violations.log без возможности восстановить примеры
+# ~/.qwen/logs/style-violations.log без возможности восстановить примеры
 # нарушений.
 #
 # Классификация по ВОССТАНОВИМОСТИ, не по расположению (находка пир-сессии:
@@ -39,12 +39,12 @@ tier0_unique:
   - path: "${HOME}/IWE"
     agent: "core"
     note: "рабочее дерево платформы — git-репозитории включаются ЦЕЛИКОМ, включая .git/ (пир-сессия отозвала исключение .git: непушнутые коммиты/stash/локальные ветки не восстановимы из remote)"
-  - path: "${HOME}/.claude/projects"
+  - path: "${HOME}/.qwen/projects"
     agent: "claude"
     note: "auto-memory (включает MEMORY.md) и полные стенограммы — невосстановимо"
   - path: "${HOME}/.claude.json"
     agent: "claude"
-    note: "глобальный конфиг Claude Code (OAuth-токены, project history)"
+    note: "глобальный конфиг Qwen Code (OAuth-токены, project history)"
   - path: "${HOME}/.codex/config.toml"
     agent: "codex"
     note: "конфиг Codex"
@@ -56,10 +56,10 @@ tier0_unique:
     note: "HTTPS git-токены, если credential helper = store"
 
 tier1_scheduled:
-  - path: "${HOME}/.claude/logs"
+  - path: "${HOME}/.qwen/logs"
     agent: "claude"
     note: "логи с фактурой (инцидент-триггер этой фазы: style-violations.log)"
-  - path: "${HOME}/.claude/state"
+  - path: "${HOME}/.qwen/state"
     agent: "claude"
   - path: "${HOME}/.codex"
     agent: "codex"
@@ -78,7 +78,7 @@ tier1_scheduled:
     agent: "core"
 
 tier2_optional:
-  - path: "${HOME}/.claude/file-history"
+  - path: "${HOME}/.qwen/file-history"
     agent: "claude"
     note: "история правок редактора — большая по объёму, частично восстановима из git"
   - path: "${HOME}/.vscode"

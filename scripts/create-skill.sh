@@ -16,7 +16,7 @@
 set -uo pipefail
 
 IWE="${IWE_WORKSPACE:-$HOME/IWE}"
-SKILLS_DIR="${IWE}/.claude/skills"
+SKILLS_DIR="${IWE}/.qwen/skills"
 layer="L3"
 owner_role=""
 skill_id=""
@@ -57,7 +57,7 @@ if [[ -d "$skill_dir" ]]; then
 fi
 
 # Проверить дубликат имени в skills-catalog.yaml
-catalog="${IWE}/.claude/skills-catalog.yaml"
+catalog="${IWE}/.qwen/skills-catalog.yaml"
 if [[ -f "$catalog" ]]; then
     if grep -q "^  - id: ${skill_id}$" "$catalog" 2>/dev/null; then
         echo "❌ Скилл '$skill_id' уже в каталоге. Выберите другой id." >&2

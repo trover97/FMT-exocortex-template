@@ -129,7 +129,7 @@ SNIPPET="$TEST_ROOT/snippet.sh"
 chmod +x "$SNIPPET"
 
 # Evgenii Red Team review 2026-08-19 (defect #2 continued, cold review):
-# generate-executor-catalog.py resolves both its input (~/IWE/.claude/skills)
+# generate-executor-catalog.py resolves both its input (~/IWE/.qwen/skills)
 # and its default output (~/IWE/$GOVERNANCE_REPO/scripts/executor-catalog.yaml)
 # from Path.home() — the snippet sets GOVERNANCE_REPO but never HOME, so an
 # unmodified run reads the real machine's skills and writes a real file
@@ -145,8 +145,8 @@ SMOKE_FIXTURE_SCRIPT="$FAKE_HOME/IWE/smoke-fixture-dummy.sh"
 mkdir -p "$(dirname "$SMOKE_FIXTURE_SCRIPT")"
 printf '#!/usr/bin/env bash\nexit 0\n' > "$SMOKE_FIXTURE_SCRIPT"
 chmod +x "$SMOKE_FIXTURE_SCRIPT"
-mkdir -p "$FAKE_HOME/IWE/.claude/skills/smoke-fixture"
-cat > "$FAKE_HOME/IWE/.claude/skills/smoke-fixture/SKILL.md" <<'SKILLEOF'
+mkdir -p "$FAKE_HOME/IWE/.qwen/skills/smoke-fixture"
+cat > "$FAKE_HOME/IWE/.qwen/skills/smoke-fixture/SKILL.md" <<'SKILLEOF'
 ---
 name: smoke-fixture
 description: minimal fixture skill for test_issue_463_setup_reuses_resolved_python3.sh
@@ -157,7 +157,7 @@ routing:
 ---
 Fixture only — not a real skill.
 SKILLEOF
-sed -i "s#__SMOKE_FIXTURE_SCRIPT_PLACEHOLDER__#$SMOKE_FIXTURE_SCRIPT#" "$FAKE_HOME/IWE/.claude/skills/smoke-fixture/SKILL.md"
+sed -i "s#__SMOKE_FIXTURE_SCRIPT_PLACEHOLDER__#$SMOKE_FIXTURE_SCRIPT#" "$FAKE_HOME/IWE/.qwen/skills/smoke-fixture/SKILL.md"
 
 # PATH puts the no-yaml stub first for BOTH the resolver call inside the
 # snippet and any bare `python3` the snippet might call — this is the actual
@@ -223,10 +223,10 @@ fi
 
 echo "--- generator defaults: actual IWE_ROOT and governance repo, not HOME/IWE literals ---"
 CUSTOM_WORKSPACE="$TEST_ROOT/custom-workspace"
-CUSTOM_SKILLS="$CUSTOM_WORKSPACE/.claude/skills"
+CUSTOM_SKILLS="$CUSTOM_WORKSPACE/.qwen/skills"
 CUSTOM_CATALOG="$CUSTOM_WORKSPACE/custom-governance/scripts/executor-catalog.yaml"
 mkdir -p "$CUSTOM_SKILLS"
-cp -R "$FAKE_HOME/IWE/.claude/skills/smoke-fixture" "$CUSTOM_SKILLS/"
+cp -R "$FAKE_HOME/IWE/.qwen/skills/smoke-fixture" "$CUSTOM_SKILLS/"
 mkdir -p "$CUSTOM_SKILLS/agent-mode" "$CUSTOM_SKILLS/hybrid-mode" \
     "$CUSTOM_SKILLS/skip-explicit" "$CUSTOM_SKILLS/skip-destructive" \
     "$CUSTOM_SKILLS/skip-no-frontmatter" "$CUSTOM_SKILLS/skip-no-skill"
@@ -446,8 +446,8 @@ fi
 echo "--- update.sh backfill: same resolved Python and explicit installed paths ---"
 UPDATE_WORKSPACE="$TEST_ROOT/update-workspace"
 UPDATE_GOVERNANCE="$UPDATE_WORKSPACE/update-governance"
-mkdir -p "$UPDATE_WORKSPACE/.claude/skills" "$UPDATE_GOVERNANCE/scripts"
-cp -R "$FAKE_HOME/IWE/.claude/skills/smoke-fixture" "$UPDATE_WORKSPACE/.claude/skills/"
+mkdir -p "$UPDATE_WORKSPACE/.qwen/skills" "$UPDATE_GOVERNANCE/scripts"
+cp -R "$FAKE_HOME/IWE/.qwen/skills/smoke-fixture" "$UPDATE_WORKSPACE/.qwen/skills/"
 
 UPDATE_FUNCTIONS="$TEST_ROOT/update-backfill-functions.sh"
 awk '

@@ -13,8 +13,8 @@
 # in a baselined file don't cause spurious baseline drift.
 #
 # Scope: scripts/**/*.{sh,md}, setup/**/*.{sh,md}, roles/**/*.{sh,md},
-# .claude/hooks/**/*.{sh,md}, .claude/skills/**/*.{sh,md} — every delivered
-# shell perimeter that can invoke a repo-owned Python program. The .claude
+# .qwen/hooks/**/*.{sh,md}, .qwen/skills/**/*.{sh,md} — every delivered
+# shell perimeter that can invoke a repo-owned Python program. The .qwen
 # perimeter was missing until issue #521, so all three ResidencyGate adapters
 # escaped the original ratchet. The *.md half was added 26.08 (Evgenii's
 # v0.38.11 letter, WP-529 hvost 3/5, issue #541 context): an agent reading a
@@ -49,7 +49,7 @@ MODE="${1:-check}"
 # These are regular-expression literals; shell expansion would corrupt them.
 # shellcheck disable=SC2016
 # `~` added 26.08 (issue #541 hvost 3 cold-review): a leading `~/...` path
-# (e.g. `~/IWE/.claude/scripts/fp-stats.py`) fell through this class
+# (e.g. `~/IWE/.qwen/scripts/fp-stats.py`) fell through this class
 # entirely — same repo-owned-.py risk, just spelled with a home-dir shortcut
 # instead of $HOME or an absolute path.
 LITERAL_PATH_PATTERN='(^|[^$A-Za-z0-9_."'"'"'-])python3?[[:space:]]+"?[A-Za-z0-9_./${}~-]*\.py\b'
@@ -67,8 +67,8 @@ scan() {
         "$SCRIPT_DIR/scripts"
         "$SCRIPT_DIR/setup"
         "$SCRIPT_DIR/roles"
-        "$SCRIPT_DIR/.claude/hooks"
-        "$SCRIPT_DIR/.claude/skills"
+        "$SCRIPT_DIR/.qwen/hooks"
+        "$SCRIPT_DIR/.qwen/skills"
     )
     {
         grep -rnE "$LITERAL_PATH_PATTERN" "${scan_dirs[@]}" --include="*.sh" --include="*.md" 2>/dev/null || true

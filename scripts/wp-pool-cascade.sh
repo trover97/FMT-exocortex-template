@@ -29,8 +29,8 @@ STRATEGY_DIR="$IWE_WORKSPACE/$GOV_REPO"
 WP_LIST_SCRIPT="$IWE_WORKSPACE/FMT-exocortex-template/scripts/wp-list.py"
 LEDGER_APPEND="$IWE_WORKSPACE/FMT-exocortex-template/scripts/ledger-append.sh"
 TELEGRAM_LIB="$IWE_WORKSPACE/FMT-exocortex-template/scripts/lib/telegram.sh"
-HEARTBEAT_FILE="$IWE_WORKSPACE/.claude/state/wp-pool-cascade.heartbeat"
-LOCK_FILE="$IWE_WORKSPACE/.claude/state/wp-pool-cascade.lock"
+HEARTBEAT_FILE="$IWE_WORKSPACE/.qwen/state/wp-pool-cascade.heartbeat"
+LOCK_FILE="$IWE_WORKSPACE/.qwen/state/wp-pool-cascade.lock"
 
 DRY_RUN=false
 PROBE=false

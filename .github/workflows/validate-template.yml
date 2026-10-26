@@ -528,15 +528,15 @@ jobs:
       # Корень бага (май 2026): detector ловил legitimate uses (template identity,
       # python fallback, env override) как false positives. Исправлено в validate-fmt-scripts.sh.
       # Гейт: прогоняем в CI, чтобы не полагаться только на pre-commit (который зовётся
-      # только при staged .claude/settings.json) и ручной запуск.
+      # только при staged .qwen/settings.json) и ручной запуск.
       - name: Run validate-fmt-scripts (author-specific hardcodes & conventions)
         run: bash scripts/validate-fmt-scripts.sh
 
-      # issue #291: путь в бэктиках платформенной части CLAUDE.md (start..SYNC-CORE-END,
+      # issue #291: путь в бэктиках платформенной части QWEN.md (start..SYNC-CORE-END,
       # доставляется на 100% установок через update.sh §1-7 + Agent Core) обязан
       # существовать в репо или в update-manifest.json — иначе это мёртвая ссылка на
       # каждой пользовательской установке, не только у автора.
-      - name: Check CLAUDE.md platform-section links resolve (issue #291)
+      - name: Check QWEN.md platform-section links resolve (issue #291)
         run: python3 scripts/check-claude-md-links.py --strict
 
       # CI-only check: MCP — серверы подключаются через claude.ai/settings/connectors
@@ -605,7 +605,7 @@ jobs:
           # Прогон хука: имитируем PreToolUse с git commit DayPlan
           INPUT=$(jq -n --arg cmd "git add DS-strategy/current/DayPlan\\ 2026-04-22.md && git commit -m test" \
                   '{tool_name: "Bash", tool_input: {command: $cmd}}')
-          RESULT=$(echo "$INPUT" | bash .claude/hooks/protocol-artifact-validate.sh)
+          RESULT=$(echo "$INPUT" | bash .qwen/hooks/protocol-artifact-validate.sh)
           DECISION=$(echo "$RESULT" | jq -r '.decision // "allow"')
 
           if [ "$DECISION" = "block" ]; then
@@ -705,7 +705,7 @@ jobs:
 
       # issue #226: тест лежал в репо с 6 июля, ни разу не был подключён к CI —
       # найдено 2026-08-10 при аудите конвейера доставки (WP-7 Ф62). E2E smoke на
-      # 3 фиксах реального инцидента (конфликт CLAUDE.md при merge, repair-pass
+      # 3 фиксах реального инцидента (конфликт QWEN.md при merge, repair-pass
       # при TOTAL_CHANGES=0) — сторожит именно тот класс регрессии, что уже был.
       - name: Run update.sh issue #226 regression test
         run: bash setup/test-update-issue-226.sh
@@ -753,13 +753,13 @@ jobs:
       # as data; nothing is executed.
       - name: Run destructive-guard tests
         run: |
-          python3 .claude/hooks/tests/destructive-guard/hook_cases.py
-          python3 .claude/hooks/tests/destructive-guard/long_cases.py
-          python3 .claude/hooks/tests/destructive-guard/perf_cases.py
-          python3 .claude/hooks/tests/destructive-guard/guarded_rm_cases.py .claude/bin/guarded-rm
-          bash .claude/hooks/tests/test-destructive-guard-executed-command-scope.sh
-          bash .claude/hooks/tests/test-destructive-guard-isolated-commit-and-deploy-key.sh
-          bash .claude/hooks/tests/test-destructive-guard-malformed-json.sh
+          python3 .qwen/hooks/tests/destructive-guard/hook_cases.py
+          python3 .qwen/hooks/tests/destructive-guard/long_cases.py
+          python3 .qwen/hooks/tests/destructive-guard/perf_cases.py
+          python3 .qwen/hooks/tests/destructive-guard/guarded_rm_cases.py .qwen/bin/guarded-rm
+          bash .qwen/hooks/tests/test-destructive-guard-executed-command-scope.sh
+          bash .qwen/hooks/tests/test-destructive-guard-isolated-commit-and-deploy-key.sh
+          bash .qwen/hooks/tests/test-destructive-guard-malformed-json.sh
 
       # WP-529 F7 follow-up (pilot decision 2026-08-21): update.sh delivers the
       # last published release by default, moving main only via explicit
@@ -856,7 +856,7 @@ jobs:
       # a nested installer swallows their status or removes the audit record.
       # The calibration uses only private PATH stubs, never host services.
       - name: Calibrate disposable Red Team boundary (#1072)
-        run: bash .claude/skills/iwe-platform-redteam/tests/run-calibration.sh
+        run: bash .qwen/skills/iwe-platform-redteam/tests/run-calibration.sh
 
       # WP-529 Ф6 (находки Евгения 18.08): PyYAML — заявленная зависимость
       # (requirements.txt, #463), но CI её не гарантировал, а вся семья
@@ -890,8 +890,8 @@ jobs:
             roles/extractor/tests/test_extractor_pipeline.py
           # The skill directory contains a hyphen, so pytest cannot import it
           # as a package reliably; both files are executable unit suites.
-          python3 .claude/skills/residency-gate/tests/test_parser.py
-          python3 .claude/skills/residency-gate/tests/test_pre_grant.py
+          python3 .qwen/skills/residency-gate/tests/test_parser.py
+          python3 .qwen/skills/residency-gate/tests/test_pre_grant.py
 
       # Сбой build-runtime обязан оставлять .update-incomplete и валить update.sh
       # ненулевым кодом; recovery-ветка TOTAL_CHANGES=0 обязана его выполнять.
@@ -943,7 +943,7 @@ jobs:
           GRM_BASH="$(cygpath -w "$BASH")"
           export GRM_BASH
           python -c 'import os, subprocess; subprocess.run([os.environ["GRM_BASH"], "-c", "command -v cygpath"], check=True)'
-          python .claude/hooks/tests/destructive-guard/guarded_rm_cases.py .claude/bin/guarded-rm
+          python .qwen/hooks/tests/destructive-guard/guarded_rm_cases.py .qwen/bin/guarded-rm
 
   # WP-529 Ф3: single fail-closed receipt for this commit, built from the
   # results of THIS workflow run (needs.<job>.result — same trigger, same

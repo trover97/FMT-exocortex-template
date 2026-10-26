@@ -15,7 +15,7 @@ set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 MIGRATE="$ROOT/scripts/memory-migrate.sh"
 VALIDATE="$ROOT/scripts/memory-validate.sh"
-FRONTMATTER="$ROOT/.claude/lib/frontmatter.sh"
+FRONTMATTER="$ROOT/.qwen/lib/frontmatter.sh"
 
 SB="$(cd -P "$(mktemp -d "${TMPDIR:-/tmp}/iwe-issue-1147.XXXXXX")" && pwd -P)"
 trap '[ "${KEEP:-0}" = "1" ] || rm -rf "$SB"' EXIT INT TERM
@@ -42,7 +42,7 @@ append_body() {  # <file> <n-lines>
 }
 
 # Fixture: полный frontmatter, НЕ хватает только domains; domains лежит
-# столбиком внутри metadata: (диалект автопамяти Claude Code, issue #281).
+# столбиком внутри metadata: (диалект автопамяти Qwen Code, issue #281).
 cat > "$MEM/reference_dialogs.md" <<'EOF'
 ---
 metadata:

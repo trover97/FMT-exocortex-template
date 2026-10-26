@@ -23,8 +23,8 @@ set -eu
 # frontmatter.sh source below still resolves relative to THIS script (issue #229).
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 _MEMORY_VALIDATE_DIR="$SCRIPT_DIR"
-source "$SCRIPT_DIR/../.claude/lib/iwe-env-bootstrap.sh" || exit 1
-source "$_MEMORY_VALIDATE_DIR/../.claude/lib/frontmatter.sh" || exit 1
+source "$SCRIPT_DIR/../.qwen/lib/iwe-env-bootstrap.sh" || exit 1
+source "$_MEMORY_VALIDATE_DIR/../.qwen/lib/frontmatter.sh" || exit 1
 MEMORY_DIR="$IWE_ROOT/memory"
 QUIET=0
 TARGET=""
@@ -80,7 +80,7 @@ validate_file() {
     done
 
     # Проверка 2b (#513): каноническая форма — плоская. Вложенный metadata:
-    # (его пишет системная инструкция Claude Code, запретить нельзя) читается
+    # (его пишет системная инструкция Qwen Code, запретить нельзя) читается
     # единым reader'ом; конфликт «один ключ в обеих формах с разными
     # значениями» — ошибка, тихий приоритет запрещён.
     if awk '/^---/{f++; next} f!=1{next} /^metadata:[ \t\r]*$/{found=1; exit} END{exit !found}' "$file"; then

@@ -98,7 +98,7 @@ def load_fault_profile() -> str:
     (caused by interpreter mismatch, regex drift, or CLI breakage)
     surfaces in pipeline logs instead of vanishing.
 
-    Symmetric with .claude/hooks/inject-fault-profile.sh: same data source
+    Symmetric with .qwen/hooks/inject-fault-profile.sh: same data source
     (iwe_memory.db via the unified CLI), filtered to CRITICAL/MAJOR
     with n>=3.
     """

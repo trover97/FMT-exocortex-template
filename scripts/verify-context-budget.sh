@@ -4,7 +4,7 @@
 set -euo pipefail
 
 IWE_ROOT="${IWE_ROOT:-$HOME/IWE}"
-IWE_RULES="$IWE_ROOT/.claude/rules"
+IWE_RULES="$IWE_ROOT/.qwen/rules"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 IWE_RUNTIME="${IWE_RUNTIME:-$IWE_ROOT/.iwe-runtime}"
 HOT_FILES_LIST="$IWE_RUNTIME/hot-files.list"

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""check-claude-md-links.py — path references in shipped CLAUDE.md,
-.claude/skills/**/*.md and memory/*.md must resolve.
+"""check-claude-md-links.py — path references in shipped QWEN.md,
+.qwen/skills/**/*.md and memory/*.md must resolve.
 
-issue #291: platform section (start .. SYNC-CORE-END) of CLAUDE.md is what
+issue #291: platform section (start .. SYNC-CORE-END) of QWEN.md is what
 update.sh delivers to every user via §1-7 + Agent Core — a path in backticks
 that doesn't exist in this repo (and isn't in update-manifest.json's files[])
 is a dead reference on 100% of installs, not just this one. {{PLACEHOLDER}}
@@ -10,12 +10,12 @@ tokens are substituted by setup.sh/update.sh at delivery time, so they're
 skipped here, not resolved.
 
 issue #1110: the same class of dead reference was found independently by two
-post-release audits inside delivered skills (.claude/skills/**/*.md) and
-memory (memory/*.md) — trees the CLAUDE.md-only check above never looked at.
+post-release audits inside delivered skills (.qwen/skills/**/*.md) and
+memory (memory/*.md) — trees the QWEN.md-only check above never looked at.
 check_claude_md() below is untouched (same regex, same rules, same output) —
 the new check_tree() is a separate, deliberately more conservative pass:
 
-- Skills/memory files spell out paths three ways CLAUDE.md barely uses:
+- Skills/memory files spell out paths three ways QWEN.md barely uses:
   inline `single-backtick spans` (sometimes "command arg/path.sh", not just
   a bare path), fenced ```bash blocks (a shell command naming a script, no
   backticks around the path at all), and markdown links ([text](path)).
@@ -39,7 +39,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-CLAUDE_MD = ROOT / "CLAUDE.md"
+CLAUDE_MD = ROOT / "QWEN.md"
 END_MARKER = "<!-- SYNC-CORE-END -->"
 
 PATH_RE = re.compile(r"`([\w./{}-]+\.[a-zA-Z]{2,5}(?:\s+§?[\w.]*)?)`")
@@ -49,7 +49,7 @@ PATH_RE = re.compile(r"`([\w./{}-]+\.[a-zA-Z]{2,5}(?:\s+§?[\w.]*)?)`")
 # just be noise, not a new finding.
 ALLOWLIST = {
     "PACK-agent-rules/rules/AR.NNN.md",
-    ".claude/rules-registry.yaml",
+    ".qwen/rules-registry.yaml",
     "archive/wp-contexts/WP-457/CONCEPT-user-states.md",
     # FPF is cloned into the user's workspace by setup.sh, it is not part of the
     # template; the Obsidian rule (#522, #883) names its big spec file as the reason.
@@ -63,7 +63,7 @@ if manifest_path.exists():
 
 
 def check_claude_md():
-    """issue #291, unchanged by #1110: backtick spans inside CLAUDE.md's
+    """issue #291, unchanged by #1110: backtick spans inside QWEN.md's
     platform section (start .. SYNC-CORE-END) only."""
     text = CLAUDE_MD.read_text(encoding="utf-8")
     platform_text = text.split(END_MARKER, 1)[0]
@@ -83,7 +83,7 @@ def check_claude_md():
 
 
 # ---------------------------------------------------------------------------
-# issue #1110: .claude/skills/**/*.md and memory/*.md
+# issue #1110: .qwen/skills/**/*.md and memory/*.md
 # ---------------------------------------------------------------------------
 
 # A backtick span's raw inner text — may be a bare path ("memory/x.md"), a
@@ -109,7 +109,7 @@ WHITESPACE_RE = re.compile(r"\S+")
 # right in the file this fix touches) -- but the bare "$" voided the whole
 # token above, so a genuinely dead "$IWE_SCRIPTS/<typo>.sh" was never even
 # tested. These two vars are a deliberately narrow, explicit exception, not
-# a shell-expansion parser: update.sh/setup.sh deliver .claude/, memory/ and
+# a shell-expansion parser: update.sh/setup.sh deliver .qwen/, memory/ and
 # scripts/ directly under $IWE_ROOT, and $IWE_SCRIPTS is specifically
 # $IWE_ROOT/<this repo>/scripts -- both map unambiguously onto the exact
 # three prefixes is_dead() already restricts itself to. Other vars seen in
@@ -143,7 +143,7 @@ def _candidate_from_token(tok):
 LEAD_STRIP = "\"'(["
 TRAIL_STRIP = "\"')],;:"
 
-# Same spirit as CLAUDE.md's ALLOWLIST: a reference that's a known, already
+# Same spirit as QWEN.md's ALLOWLIST: a reference that's a known, already
 # -understood gap rather than something #1110 should fix. See the report for
 # issue #1110 for the full reasoning.
 TREE_ALLOWLIST = {
@@ -170,7 +170,7 @@ TREE_ALLOWLIST = {
     "scripts/processes/quick-close.yaml",
     # author-mode/SKILL.md's "$IWE_SCRIPTS/template-sync.sh" line is inside a
     # paragraph explicitly gated "Автор (author_mode: true)" -- the author's
-    # own delivery tooling, which root CLAUDE.md says lives in a separate
+    # own delivery tooling, which root QWEN.md says lives in a separate
     # setup repo, not in this template. Only reachable since the
     # $IWE_SCRIPTS-prefix substitution above was added; the original #1110
     # checker's charset never looked at this token at all (it contains "$"),
@@ -185,7 +185,7 @@ TREE_ALLOWLIST = {
     "memory/project_iwe_systems_map.md",
     # .gitignore'd runtime checkpoint (PreCompact writes it); never present
     # in a fresh checkout by design, not something that ships.
-    ".claude/checkpoint.md",
+    ".qwen/checkpoint.md",
     # .gitignore'd, author-local config for sync-communication-style.py
     # (confirmed: scripts/.gitignore lists it); communication-style-
     # downstream-template.md names the .example template to copy it from
@@ -248,7 +248,7 @@ def is_dead(candidate, referencing_dir=None):
     # Restrict to the prefixes where skills/memory text unambiguously means
     # "this repo's own tree" — proven sufficient for all 7 items issue #1110
     # itself lists.
-    if not rel.startswith((".claude/", "memory/", "scripts/")):
+    if not rel.startswith((".qwen/", "memory/", "scripts/")):
         return False
     if (ROOT / rel).exists() or rel in manifest_files or f"scripts/{Path(rel).name}" in manifest_files:
         return False
@@ -312,21 +312,21 @@ def main():
     strict = "--strict" in sys.argv
 
     claude_md_dead = check_claude_md()
-    tree_dead = check_tree(ROOT / ".claude" / "skills", "**/*.md") + check_tree(ROOT / "memory", "*.md")
+    tree_dead = check_tree(ROOT / ".qwen" / "skills", "**/*.md") + check_tree(ROOT / "memory", "*.md")
 
     if claude_md_dead:
-        print(f"❌ {len(claude_md_dead)} dead link(s) in CLAUDE.md platform section (start..SYNC-CORE-END):")
+        print(f"❌ {len(claude_md_dead)} dead link(s) in QWEN.md platform section (start..SYNC-CORE-END):")
         for candidate in claude_md_dead:
             print(f"   {candidate}")
     else:
-        print("✅ check-claude-md-links: no dead links in CLAUDE.md platform section")
+        print("✅ check-claude-md-links: no dead links in QWEN.md platform section")
 
     if tree_dead:
-        print(f"❌ {len(tree_dead)} dead link(s) in .claude/skills/**/*.md and memory/*.md:")
+        print(f"❌ {len(tree_dead)} dead link(s) in .qwen/skills/**/*.md and memory/*.md:")
         for rel_file, lineno, candidate in tree_dead:
             print(f"   {rel_file}:{lineno}  {candidate}")
     else:
-        print("✅ check-claude-md-links: no dead links in .claude/skills/**/*.md or memory/*.md")
+        print("✅ check-claude-md-links: no dead links in .qwen/skills/**/*.md or memory/*.md")
 
     if strict and (claude_md_dead or tree_dead):
         sys.exit(1)

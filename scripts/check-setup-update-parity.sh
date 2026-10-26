@@ -22,7 +22,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(dirname "$SCRIPT_DIR")"
-CONFIG_FILE="$REPO_ROOT/.claude/parity-contract.yaml"
+CONFIG_FILE="$REPO_ROOT/.qwen/parity-contract.yaml"
 VERSION="0.1.1"
 ERRORS=0
 WARNINGS=0

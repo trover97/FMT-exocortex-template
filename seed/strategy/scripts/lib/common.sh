@@ -449,7 +449,7 @@ iwe_heading_style() {
 # iwe_render_heading_style STYLE — filters stdin, converting DayPlan/WeekPlan
 # section headings between the two forms iwe_heading_style selects (issue
 # #496). `details` (the default) passes text through unchanged — the
-# validator (.claude/hooks/protocol-artifact-validate.sh Check 1) already
+# validator (.qwen/hooks/protocol-artifact-validate.sh Check 1) already
 # accepts both forms, so this is purely a rendering choice, not a format
 # migration. Only converts the two literal patterns producers actually emit:
 # `<summary><b>TEXT</b></summary>` and `<summary><strong>TEXT</strong></summary>`

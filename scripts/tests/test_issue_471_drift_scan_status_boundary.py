@@ -6,7 +6,7 @@ import importlib.util
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-MEMORY_DRIFT_SCAN = ROOT / ".claude" / "scripts" / "memory-drift-scan.py"
+MEMORY_DRIFT_SCAN = ROOT / ".qwen" / "scripts" / "memory-drift-scan.py"
 
 
 def load_memory_drift_scan():

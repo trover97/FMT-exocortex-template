@@ -1,0 +1,16 @@
+# Хуки, осознанно не зарегистрированные в шаблонном .qwen/settings.json.
+# Формат: одно имя файла в строке; всё после # — причина.
+# Проверяет: scripts/check-orphan-hooks.sh (issue #310, #323).
+#
+# Список — не место, где дефекты становятся невидимыми. Каждая строка обязана
+# называть причину и следующий шаг. Пустая причина = дефект, а не исключение.
+#
+# Библиотеки и CLI, лежащие рядом с хуками (rule-engine.sh, residency-gate-*.sh,
+# agent-trace-uploader.sh), в этот список НЕ вносятся: они несут маркер
+# `# claude-hook: false — …` в шапке, и сторож распознаёт его сам (2026-08-04,
+# пир-сессия по issues #310/#321/#323).
+#
+agent-trace-recorder.sh     # локальная телеметрия (трассы инструментов в домашнем каталоге): включается осознанным opt-in пользователя, retention-контракт не определён — по умолчанию в шаблоне выключен. Включение: добавить в settings.json Stop+PostToolUse.
+# QWEN-OFFLINE:A15 — не подключены в ветке qwen-windows-offline (правило A15 адаптера).
+session-open-gate.sh        # под Qwen блокировал бы КАЖДЫЙ git commit/push: семафор с harness_session_id пишет только session-guard.sh и только из CLAUDE_CODE_SESSION_ID (у Qwen это QWEN_CODE_SESSION_ID), а сам session-guard.sh в git bash падает на fcntl (нужен WSL2, апстрим #1180). Следующий шаг: подключать, когда session-guard научится Qwen и git bash.
+pull-on-touch.sh            # офлайн-сборка: git pull без сети не нужен, обновления приходят ZIP-архивом (UPDATE.md). Следующий шаг: нет, пока сборка офлайн.

@@ -17,13 +17,13 @@ set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # SELF_DIR: iwe-env-bootstrap.sh (sourced next) reassigns SCRIPT_DIR to ITS OWN
-# directory (.claude/lib/) — it's sourced, not run in a subshell, so that
+# directory (.qwen/lib/) — it's sourced, not run in a subshell, so that
 # clobbers ours. Capture our own location under a name it can't collide with
 # before sourcing it (issue #298 migration needs this script's own dir below
 # to find wp-list.py).
 SELF_DIR="$SCRIPT_DIR"
 # shellcheck source=/dev/null
-source "$SCRIPT_DIR/../.claude/lib/iwe-env-bootstrap.sh" || exit 1
+source "$SCRIPT_DIR/../.qwen/lib/iwe-env-bootstrap.sh" || exit 1
 IWE="${2:-$IWE_ROOT}"
 INBOX="${1:-$IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/inbox}"
 GIT_DAYS="${WP_SWEEP_GIT_DAYS:-7}"

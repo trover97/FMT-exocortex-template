@@ -85,7 +85,7 @@ echo -n "$x" | iwe_md5    # вместо bare `md5sum`
 ```
 
 Путь к `lib/common.sh` относительно вызывающего скрипта (`scripts/*.sh` →
-`lib/common.sh`; вне `scripts/` — see `.claude/lib/capture_writer.sh` для
+`lib/common.sh`; вне `scripts/` — see `.qwen/lib/capture_writer.sh` для
 примера относительного пути из другой директории).
 
 ### flock — guard + mkdir-fallback, не copy-paste

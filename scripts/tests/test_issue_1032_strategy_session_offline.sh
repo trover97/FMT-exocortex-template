@@ -9,8 +9,8 @@ trap 'rm -rf "$FIXTURE"' EXIT
 WORKSPACE="$FIXTURE/offline workspace"
 CANON="$WORKSPACE/DS-strategy"
 GUARD="$WORKSPACE/scripts/session-guard.sh"
-SKILL="$WORKSPACE/.claude/skills/strategy-session/SKILL.md"
-mkdir -p "$CANON/inbox/WP-529" "$WORKSPACE/scripts/lib" "$WORKSPACE/.claude/skills/strategy-session" "$WORKSPACE/MC-sessions" "$FIXTURE/bin"
+SKILL="$WORKSPACE/.qwen/skills/strategy-session/SKILL.md"
+mkdir -p "$CANON/inbox/WP-529" "$WORKSPACE/scripts/lib" "$WORKSPACE/.qwen/skills/strategy-session" "$WORKSPACE/MC-sessions" "$FIXTURE/bin"
 
 # These are the installer-delivered locations. Keep the fixture entirely in
 # the temporary workspace; setup.sh also writes to the real user home.
@@ -18,7 +18,7 @@ cp "$TEMPLATE_ROOT/scripts/session-guard.sh" "$GUARD"
 cp "$TEMPLATE_ROOT/scripts/lib/session-guard-isolate-lib.sh" "$WORKSPACE/scripts/lib/"
 cp "$TEMPLATE_ROOT/scripts/lib/wp-num.sh" "$WORKSPACE/scripts/lib/"
 cp "$TEMPLATE_ROOT/scripts/isolate-push.sh" "$WORKSPACE/scripts/"
-cp "$TEMPLATE_ROOT/.claude/skills/strategy-session/SKILL.md" "$SKILL"
+cp "$TEMPLATE_ROOT/.qwen/skills/strategy-session/SKILL.md" "$SKILL"
 printf 'WP-529 offline fixture\n' > "$CANON/inbox/WP-529/WP-529.md"
 git -C "$CANON" init -q -b main
 git -C "$CANON" -c user.name=test -c user.email=offline@test.invalid add inbox/WP-529/WP-529.md

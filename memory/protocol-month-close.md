@@ -14,13 +14,13 @@ schema_version: 1
 
 > **Точка входа:** Вызвать Skill `month-close`. Алиас для `/run-protocol month-close`.
 > **Принцип:** Month Close = стадия 7 каскада ВДВ v9 (PD.METHOD.008). Агрегация 4-5 Week Close'ов + переосмысление фазы/калибра. Не повторяет Week Close — читает его выходы.
-> **Полный алгоритм:** `.claude/skills/month-close/SKILL.md`. Здесь — только триггеры и инварианты.
+> **Полный алгоритм:** `.qwen/skills/month-close/SKILL.md`. Здесь — только триггеры и инварианты.
 
 ## Маршрутизация
 
 | Триггер | Аргумент | Skill |
 |---------|---------|-------|
-| «закрываем месяц» / «итоги месяца» / `/month-close` | `month-close` | `.claude/skills/month-close/SKILL.md` |
+| «закрываем месяц» / «итоги месяца» / `/month-close` | `month-close` | `.qwen/skills/month-close/SKILL.md` |
 
 ## Позиция в ВДВ v9
 

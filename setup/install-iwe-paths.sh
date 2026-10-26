@@ -1,5 +1,5 @@
 #!/bin/bash
-# install-iwe-paths.sh — генерация workspace/.iwe-paths + sourcing из ~/.zshenv.
+# install-iwe-paths.sh — генерация $HOME/.iwe-paths + sourcing из ~/.zshenv.
 #
 # Source-of-truth для IWE_* path-переменных (WP-219, DP.FM.009).
 # Вызывается из:
@@ -11,8 +11,11 @@
 # при миграции ~/.iwe-paths не апгрейдился (Round 5 Евгения, 27 апр).
 #
 # Usage:
-#   bash install-iwe-paths.sh --workspace PATH --governance REPO_NAME
-#       [--skip-zshenv] [--dry-run] [--quiet]
+#   bash install-iwe-paths.sh --workspace PATH --governance REPO_NAME [--dry-run] [--quiet]
+#
+# Env:
+#   IWE_ALLOW_FOREIGN_WORKSPACE=1 — overwrite ~/.iwe-paths even if it points at another
+#                                   workspace (deliberate move of the primary install)
 #
 # Exit codes:
 #   0 — успех
@@ -22,16 +25,16 @@ set -eu
 
 WORKSPACE_DIR=""
 GOVERNANCE_REPO=""
+TEMPLATE_DIR=""        # явный путь к FMT-репо (любое имя/расположение)
 DRY_RUN=false
 QUIET=false
-SKIP_ZSHENV=false
 
 while [ $# -gt 0 ]; do
     case "$1" in
         --workspace)  WORKSPACE_DIR="$2"; shift 2 ;;
         --governance) GOVERNANCE_REPO="$2"; shift 2 ;;
+        --template)   TEMPLATE_DIR="$2"; shift 2 ;;
         --dry-run)    DRY_RUN=true; shift ;;
-        --skip-zshenv) SKIP_ZSHENV=true; shift ;;
         --quiet|-q)   QUIET=true; shift ;;
         --help|-h)
             grep '^#' "$0" | head -20
@@ -51,23 +54,57 @@ fi
 
 WORKSPACE_DIR="${WORKSPACE_DIR/#\~/$HOME}"
 GOVERNANCE_REPO="${GOVERNANCE_REPO:-DS-strategy}"
+TEMPLATE_DIR="${TEMPLATE_DIR/#\~/$HOME}"
+# Default (обратная совместимость): FMT внутри workspace под каноничным именем.
+TEMPLATE_DIR="${TEMPLATE_DIR:-$WORKSPACE_DIR/FMT-exocortex-template}"
 
-# WP-7 F161 (peer session 2026-09-21-04-wp537-wp7-fmt-decisions-followup,
-# Claude+Codex): a live scripts/ checkout at workspace root is canonical
-# and ahead of the template's own copy (which is deliberately trimmed,
-# WP-546) -- prefer it when present, fall back to the template only when
-# there is no live checkout to defer to. Resolved here, once, at install
-# time (not as a runtime if/else in the generated file): .iwe-paths is a
-# flat list of literal export lines, same as every other IWE_* var in it,
-# and T25 (setup/test-update-edge-cases.sh) asserts exactly one
-# `^export IWE_` line per variable.
-#
-# Issue #957: "a live checkout" is a REGULAR (non-symlink) session-guard.sh in
-# $WORKSPACE_DIR/scripts, not just an existing directory. A scripts/ with only
-# a README and audit logs, or personal scripts plus symlinks into the template,
-# is not a checkout: pointing IWE_SCRIPTS there hides every platform script.
-# The marker proves "live checkout", not completeness of its file set.
-# Keep in sync with .claude/lib/iwe-env-bootstrap.sh (same rule, same marker).
+IWE_ENV_FILE="$HOME/.iwe-paths"
+# Offline/Windows ветка: оболочка — git bash, не zsh. Источник переменных —
+# ~/.bashrc. Если есть и ~/.zshenv (двойная среда) — прописываем в оба.
+RC_FILES=("$HOME/.bashrc")
+[ -f "$HOME/.zshenv" ] && RC_FILES+=("$HOME/.zshenv")
+IWE_ENV_MARKER="# IWE environment (WP-219, DP.FM.009): lookup-слой для путей к скриптам"
+
+# Port of upstream issue #768 (main aa870ed, update.sh detect_host_global_owner_conflict).
+# In this branch the host-global resource is ~/.iwe-paths itself: it carries the
+# workspace path, and the rc files only source it. Rerunning setup-offline.sh or
+# update.sh from a second copy of the workspace (a test unpack of a new ZIP next to
+# the working one) silently retargeted every shell and agent onto that copy. Upstream
+# checks this in update.sh only; here the check sits next to the write, so both
+# callers are covered. A virgin machine (no file, or no IWE_WORKSPACE line) still
+# lets the first run claim ownership.
+canonical_workspace_path() {
+    if [ -d "$1" ]; then
+        (cd "$1" 2>/dev/null && pwd -P)
+    else
+        printf '%s\n' "${1%/}"
+    fi
+}
+
+HOST_OWNER_CONFLICT=""
+if [ "${IWE_ALLOW_FOREIGN_WORKSPACE:-0}" != "1" ] && [ -f "$IWE_ENV_FILE" ]; then
+    EXISTING_WS=$(sed -n 's/^export IWE_WORKSPACE="\(.*\)"$/\1/p' "$IWE_ENV_FILE" | head -1)
+    if [ -n "$EXISTING_WS" ] && \
+       [ "$(canonical_workspace_path "$EXISTING_WS")" != "$(canonical_workspace_path "$WORKSPACE_DIR")" ]; then
+        HOST_OWNER_CONFLICT="$IWE_ENV_FILE points to $EXISTING_WS"
+    fi
+fi
+
+if [ -n "$HOST_OWNER_CONFLICT" ]; then
+    # Not quiet-gated: the caller runs with --quiet, and a silent skip is exactly the
+    # "nothing happened, nothing said" failure this check exists to prevent.
+    echo "  ⚠ $HOST_OWNER_CONFLICT — ~/.iwe-paths и ${RC_FILES[*]} НЕ изменены."
+    echo "    Если это осознанный перенос основной установки: IWE_ALLOW_FOREIGN_WORKSPACE=1"
+elif $DRY_RUN; then
+    $QUIET || echo "  [DRY RUN] Would write $IWE_ENV_FILE (workspace=$WORKSPACE_DIR, governance=$GOVERNANCE_REPO)"
+    $QUIET || echo "  [DRY RUN] Would ensure ${RC_FILES[*]} source \$HOME/.iwe-paths"
+fi
+$DRY_RUN && exit 0
+
+# Port of upstream issue #957 (main 27d79bdb): a live scripts/ checkout at workspace
+# root wins over the template copy, and "live" means a REGULAR (non-symlink)
+# session-guard.sh there. Same rule and marker as .qwen/lib/iwe-env-bootstrap.sh.
+# An offline install normally has no such checkout, so the value stays the template's.
 SCRIPTS_MARKER="$WORKSPACE_DIR/scripts/session-guard.sh"
 if [ -f "$SCRIPTS_MARKER" ] && [ ! -L "$SCRIPTS_MARKER" ]; then
     IWE_SCRIPTS_TARGET="\$IWE_WORKSPACE/scripts"
@@ -75,50 +112,20 @@ else
     IWE_SCRIPTS_TARGET="\$IWE_TEMPLATE/scripts"
 fi
 
-# Issue #966: MC-sessions is created on demand, not by setup.sh (pilot decision
-# 18.08, ADR-004). resolve_orz_sessions_dir (scripts/session-guard.sh) reads an
-# EXPLICIT IWE_SESSIONS_ROOT as a deliberate choice and refuses without any
-# fallback, so naming a directory that was never created made `session-guard.sh
-# open` fail on every installation that has not adopted MC-sessions. Name it only
-# while it exists; otherwise write an EMPTY value: the resolver tests
-# `[ -n "${IWE_SESSIONS_ROOT:-}" ]` (so empty == unset and its legacy fallback with
-# a WARN stays reachable) and the file keeps exactly eight `export IWE_` lines
-# (T25). A directory that exists but is not a git repository still gets the path:
-# the resolver's loud refusal is the intended signal of a broken migration (ADR-004).
+# Port of upstream issue #966 (main 27d79bdb): session-guard.sh treats an EXPLICIT
+# IWE_SESSIONS_ROOT as deliberate and refuses without fallback when it is missing.
+# setup-offline.sh never creates MC-sessions, so the unconditional value written by
+# cycle 11 broke `session-guard.sh open` on every offline install. Name it only while
+# it exists; otherwise write an empty value (the resolver treats empty as unset and
+# keeps its legacy fallback). The file keeps exactly eight `export IWE_` lines.
 if [ -d "$WORKSPACE_DIR/MC-sessions" ]; then
     IWE_SESSIONS_ROOT_TARGET="\$IWE_WORKSPACE/MC-sessions"
 else
     IWE_SESSIONS_ROOT_TARGET=""
 fi
 
-IWE_ENV_FILE="$WORKSPACE_DIR/.iwe-paths"
-ZSHENV_FILE="$HOME/.zshenv"
-# issue #808: .zshenv is read only by zsh. On Linux/WSL, where bash is the
-# default interactive shell, IWE_* never reached the shell at all — install
-# into .bashrc too so both shells pick up the same workspace. --skip-zshenv
-# (its name predates this fix) already means "another workspace/tool owns
-# this host's shell rc files" at every call site, so it gates both targets.
-BASHRC_FILE="$HOME/.bashrc"
-IWE_ENV_MARKER="# IWE environment (WP-219, DP.FM.009): lookup-слой для путей к скриптам"
-
-if $DRY_RUN; then
-    $QUIET || echo "  [DRY RUN] Would write $IWE_ENV_FILE (workspace=$WORKSPACE_DIR, governance=$GOVERNANCE_REPO)"
-    if $SKIP_ZSHENV; then
-        $QUIET || echo "  [DRY RUN] Would leave $ZSHENV_FILE and $BASHRC_FILE unchanged (--skip-zshenv)"
-    else
-        $QUIET || echo "  [DRY RUN] Would ensure $ZSHENV_FILE and $BASHRC_FILE source \$WORKSPACE_DIR/.iwe-paths"
-    fi
-    exit 0
-fi
-
-# Issue #957: update.sh redoes this file on every apply, always with --quiet, so
-# an IWE_SCRIPTS switch used to pass without a word. Remember the previous value
-# to announce a change after the write. The file keeps literals ($IWE_WORKSPACE,
-# $IWE_TEMPLATE); compare and show them resolved, so an absolute path to the
-# same directory is not reported as a change. Only the leading reference is
-# replaced, by concatenation: in a ${v//pat/rep} replacement bash 5.2+ treats
-# '&' as the matched text (patsub_replacement), which would mangle a workspace
-# path that contains one.
+# Issue #957: update.sh reruns this script with --quiet, so an IWE_SCRIPTS switch
+# would pass without a word. Compare old and new values resolved, not as literals.
 resolve_paths_literal() {
     local value="$1"
     # shellcheck disable=SC2016 # literal "$IWE_*" references, exactly as written in .iwe-paths
@@ -126,23 +133,24 @@ resolve_paths_literal() {
         '$IWE_WORKSPACE' | '$IWE_WORKSPACE'/*)
             value="$WORKSPACE_DIR${value#\$IWE_WORKSPACE}" ;;
         '$IWE_TEMPLATE' | '$IWE_TEMPLATE'/*)
-            value="$WORKSPACE_DIR/FMT-exocortex-template${value#\$IWE_TEMPLATE}" ;;
+            value="$TEMPLATE_DIR${value#\$IWE_TEMPLATE}" ;;
     esac
     printf '%s' "$value"
 }
 OLD_IWE_SCRIPTS=""
-if [ -f "$IWE_ENV_FILE" ]; then
+if [ -z "$HOST_OWNER_CONFLICT" ] && [ -f "$IWE_ENV_FILE" ]; then
     OLD_IWE_SCRIPTS=$(sed -n 's/^export IWE_SCRIPTS="\(.*\)"$/\1/p' "$IWE_ENV_FILE" | head -1)
 fi
 
+if [ -z "$HOST_OWNER_CONFLICT" ]; then
 cat > "$IWE_ENV_FILE" <<IWEENV_EOF
 # IWE environment variables
-# Generated by install-iwe-paths.sh. Rerun setup.sh / migrate-to-runtime-target.sh / iwe-update to regenerate.
+# Generated by install-iwe-paths.sh. Rerun setup-offline.sh / iwe-update to regenerate.
 # Do not edit manually — changes will be lost.
 
 export IWE_WORKSPACE="$WORKSPACE_DIR"
-export IWE_ROOT="\$IWE_WORKSPACE"
-export IWE_TEMPLATE="\$IWE_WORKSPACE/FMT-exocortex-template"
+export IWE_ROOT="$WORKSPACE_DIR"
+export IWE_TEMPLATE="$TEMPLATE_DIR"
 export IWE_SCRIPTS="$IWE_SCRIPTS_TARGET"
 export IWE_ROLES="\$IWE_TEMPLATE/roles"
 export IWE_RUNTIME="\$IWE_WORKSPACE/.iwe-runtime"
@@ -159,64 +167,23 @@ if [ -n "$OLD_IWE_SCRIPTS" ]; then
         # Deliberately not gated by --quiet: this is the case --quiet callers must see.
         echo "  ⚠ IWE_SCRIPTS: $OLD_SCRIPTS_RESOLVED → $NEW_SCRIPTS_RESOLVED"
         echo "    Рабочая scripts/ берётся, только если в ней обычный (не симлинк) session-guard.sh; иначе — scripts/ шаблона. Проверьте, что путь ожидаемый."
-        echo "    Новое значение подхватят только новые оболочки и Claude Code после перезапуска."
+        echo "    Новое значение подхватят только новые оболочки и qwen после перезапуска."
     fi
 fi
 
-# WP-529 Ф94 (peer-session 2026-09-08-32): $HOME/.iwe-paths was the ORIGINAL
-# canonical file (Round 5, pre-WP-219) before the source-of-truth moved to
-# $WORKSPACE_DIR/.iwe-paths above. Installs from that era can still have a
-# real (non-symlink) file there that nothing regenerates or reads anymore —
-# flag it so custom edits to it don't silently stop mattering unnoticed.
-LEGACY_IWE_PATHS="$HOME/.iwe-paths"
-if [ -f "$LEGACY_IWE_PATHS" ] && [ ! -L "$LEGACY_IWE_PATHS" ] && [ "$LEGACY_IWE_PATHS" != "$IWE_ENV_FILE" ]; then
-    $QUIET || echo "  ⚠ Найден устаревший $LEGACY_IWE_PATHS (до WP-219) — больше не читается ни одним скриптом."
-    $QUIET || echo "    Актуальный файл: $IWE_ENV_FILE. Проверьте $LEGACY_IWE_PATHS на предмет ручных правок и удалите его вручную."
-fi
-
-# issue #768: a foreign/unowned $ZSHENV_FILE (already pointing at a
-# different, already-configured workspace, per the caller's ownership check)
-# must not be touched — that real, per-user shell rc file is not scoped to
-# $WORKSPACE_DIR the way $IWE_ENV_FILE above is.
-# Idempotent: replaces both the legacy $HOME/.iwe-paths one-liner and any
-# older managed block in $1 (marker presence alone is not proof that it
-# sources this workspace), then appends a fresh block if missing.
-install_iwe_env_block() {
-    local rc_file="$1"
-    if [ -f "$rc_file" ]; then
-        local rc_tmp
-        rc_tmp=$(mktemp)
-        awk '
-          /^# IWE environment \(WP-219, DP.FM.009\):/{skip=1; next}
-          skip && /^unset _IWE_ROOT$/{skip=0; next}
-          /\[ -f "\$HOME\/\.iwe-paths" \] && source "\$HOME\/\.iwe-paths"/{next}
-          !skip{print}
-        ' "$rc_file" > "$rc_tmp"
-        mv "$rc_tmp" "$rc_file"
-    fi
-    if ! grep -qF "_IWE_ROOT=\"$WORKSPACE_DIR\"" "$rc_file" 2>/dev/null; then
-        cat >> "$rc_file" <<RC_EOF
+# Ensure each shell rc sources ~/.iwe-paths (idempotent)
+for RC in "${RC_FILES[@]}"; do
+    if [ -f "$RC" ] && grep -qF "$IWE_ENV_MARKER" "$RC"; then
+        $QUIET || echo "  ○ $RC already sources \$HOME/.iwe-paths"
+    else
+        cat >> "$RC" <<'RC_EOF'
 
 # IWE environment (WP-219, DP.FM.009): lookup-слой для путей к скриптам
-_IWE_ROOT="$WORKSPACE_DIR"
-[ -f "\$_IWE_ROOT/.iwe-paths" ] && source "\$_IWE_ROOT/.iwe-paths"
-unset _IWE_ROOT
+[ -f "$HOME/.iwe-paths" ] && source "$HOME/.iwe-paths"
 RC_EOF
-        $QUIET || echo "  ✓ $rc_file → sources \$WORKSPACE_DIR/.iwe-paths"
-    else
-        $QUIET || echo "  ○ $rc_file already sources $WORKSPACE_DIR/.iwe-paths"
+        $QUIET || echo "  ✓ $RC → sources \$HOME/.iwe-paths"
     fi
-}
-
-if $SKIP_ZSHENV; then
-    $QUIET || echo "  ○ $ZSHENV_FILE and $BASHRC_FILE unchanged (--skip-zshenv)"
-else
-    install_iwe_env_block "$ZSHENV_FILE"
-    # issue #808: bash (login or not) never reads .zshenv. touch -a creates an
-    # empty .bashrc if none exists yet, same as a fresh shell would on first
-    # write — matches .zshenv's own implicit behavior a few lines above.
-    touch "$BASHRC_FILE"
-    install_iwe_env_block "$BASHRC_FILE"
+done
 fi
 
 # Auto-enable pre-commit hooks for IWE repos that have .githooks/

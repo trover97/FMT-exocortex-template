@@ -16,8 +16,8 @@ ROOT = Path(__file__).resolve().parents[2]
 STATUS_LEGEND = ROOT / "scripts" / "iwe-drift-helpers" / "check-status-legend.sh"
 DAY_OPEN = ROOT / "scripts" / "day-open-scaffold.sh"
 CLOSE_WP = ROOT / "scripts" / "close-wp.sh"
-DESTRUCTIVE_GUARD = ROOT / ".claude" / "hooks" / "destructive-guard.sh"
-MEMORY_DRIFT_SCAN = ROOT / ".claude" / "scripts" / "memory-drift-scan.py"
+DESTRUCTIVE_GUARD = ROOT / ".qwen" / "hooks" / "destructive-guard.sh"
+MEMORY_DRIFT_SCAN = ROOT / ".qwen" / "scripts" / "memory-drift-scan.py"
 
 
 def load_memory_drift_scan():

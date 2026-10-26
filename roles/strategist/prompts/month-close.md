@@ -16,7 +16,7 @@
 
 ```bash
 # Проверить наличие skill
-SKILL="${IWE_WORKSPACE:-$HOME/IWE}/.claude/skills/month-close/SKILL.md"
+SKILL="${IWE_WORKSPACE:-$HOME/IWE}/.qwen/skills/month-close/SKILL.md"
 if [ -f "$SKILL" ]; then
   # Делегировать выполнение skill /month-close
   echo "Делегирую в skills/month-close/SKILL.md"
@@ -30,14 +30,14 @@ fi
 
 Если `skills/month-close/SKILL.md` не найден:
 
-0. **Extensions (before)** — issue #884: делегирование в п.1 читает `month-close.before/.after` штатно (сам скилл их загружает), но этот inline-fallback skill вообще не открывает, значит и расширения не читает. `bash .claude/scripts/load-extensions.sh month-close before` → Exit 0: `Read` каждый файл из вывода (alphabetic), выполнить как первые шаги. Exit 1: расширений нет, продолжить.
+0. **Extensions (before)** — issue #884: делегирование в п.1 читает `month-close.before/.after` штатно (сам скилл их загружает), но этот inline-fallback skill вообще не открывает, значит и расширения не читает. `bash .qwen/scripts/load-extensions.sh month-close before` → Exit 0: `Read` каждый файл из вывода (alphabetic), выполнить как первые шаги. Exit 1: расширений нет, продолжить.
 1. **Ретро месяца** — сравнить R1-R6 (факт vs план) из WeekPlans
 2. **Архивация фокуса** — перенести достижения месяца в `Strategy.md`
 3. **Новые R1-R6** — сформулировать цели нового месяца
 4. **ТОС и гипотеза** — определить топ-3 приоритета и гипотезу роста
 5. **Red line проверка** — D7, runway, WakaTime, блокеры
 6. **MEMORY аудит** — ротация уроков, свежая таблица РП, проверка лимитов
-7. **Extensions (after)** — `bash .claude/scripts/load-extensions.sh month-close after` → Exit 0: `Read` каждый файл из вывода (alphabetic), выполнить. Exit 1: расширений нет, продолжить.
+7. **Extensions (after)** — `bash .qwen/scripts/load-extensions.sh month-close after` → Exit 0: `Read` каждый файл из вывода (alphabetic), выполнить. Exit 1: расширений нет, продолжить.
 8. **Commit и push** — `git add` → commit → push
 
 ```
@@ -65,7 +65,7 @@ Git: закоммичен и запушен ✅
 
 ## Источники
 
-- **Skill (primary):** `{{WORKSPACE_DIR}}/.claude/skills/month-close/SKILL.md`
+- **Skill (primary):** `{{WORKSPACE_DIR}}/.qwen/skills/month-close/SKILL.md`
 - **WeekPlans:** `{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/archive/week-plans/WeekPlan W*.md`
 - **Strategy:** `{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/docs/Strategy.md`
 - **MEMORY:** `{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/memory/MEMORY.md`

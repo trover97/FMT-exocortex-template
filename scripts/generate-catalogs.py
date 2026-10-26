@@ -5,8 +5,8 @@
 generate-catalogs.py — единый генератор публичных каталогов IWE.
 
 Собирает три markdown-каталога в docs/ из реальных файлов репозитория:
-  - docs/skills-catalog.md   — все скиллы (.claude/skills/*/SKILL.md)
-  - docs/scripts-catalog.md  — скрипты-хелперы (scripts/*.sh, .claude/scripts/*.{sh,py})
+  - docs/skills-catalog.md   — все скиллы (.qwen/skills/*/SKILL.md)
+  - docs/scripts-catalog.md  — скрипты-хелперы (scripts/*.sh, .qwen/scripts/*.{sh,py})
   - docs/roles-catalog.md    — роли (memory/roles.md, таблицы | R<N> | ... |)
 
 Каталоги — derived-артефакты: НЕ редактировать вручную, перегенерировать скриптом.
@@ -50,7 +50,7 @@ def stamp() -> str:
 # ---------- skills ----------
 def collect_skills(root: Path) -> list[dict]:
     skills = []
-    skills_dir = root / ".claude" / "skills"
+    skills_dir = root / ".qwen" / "skills"
     for skill_md in sorted(skills_dir.glob("*/SKILL.md")):
         sid = skill_md.parent.name
         if sid == "_template":
@@ -68,7 +68,7 @@ def render_skills(skills: list[dict], root: Path) -> str:
         "# Каталог скиллов IWE",
         "",
         f"> Автогенерировано `scripts/generate-catalogs.py` · {stamp()} · НЕ редактировать вручную.",
-        f"> Источник: `.claude/skills/*/SKILL.md`. Скилл вызывается командой `/<id>`.",
+        f"> Источник: `.qwen/skills/*/SKILL.md`. Скилл вызывается командой `/<id>`.",
         "",
         "| Скилл | Что делает |",
         "|-------|------------|",
@@ -114,8 +114,8 @@ def collect_scripts(root: Path) -> list[dict]:
     seen, scripts = set(), []
     search = [
         (root / "scripts", "*.sh"),
-        (root / ".claude" / "scripts", "*.sh"),
-        (root / ".claude" / "scripts", "*.py"),
+        (root / ".qwen" / "scripts", "*.sh"),
+        (root / ".qwen" / "scripts", "*.py"),
     ]
     for d, pat in search:
         if not d.is_dir():
@@ -137,7 +137,7 @@ def render_scripts(scripts: list[dict]) -> str:
         "# Каталог скриптов IWE",
         "",
         f"> Автогенерировано `scripts/generate-catalogs.py` · {stamp()} · НЕ редактировать вручную.",
-        "> Источник: `scripts/*.sh`, `.claude/scripts/*.{sh,py}`. Это вспомогательные скрипты (хелперы, утилиты, серверы), не скиллы.",
+        "> Источник: `scripts/*.sh`, `.qwen/scripts/*.{sh,py}`. Это вспомогательные скрипты (хелперы, утилиты, серверы), не скиллы.",
         "",
         "| Скрипт | Путь | Что делает |",
         "|--------|------|------------|",

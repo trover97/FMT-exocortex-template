@@ -9,7 +9,7 @@
 
 issue #884: тот же класс дефекта, что был у `week-review.md` (см. шаг 5b там) — пользовательские расширения `day-open.before.*` подключены к интерактивному скиллу `/day-open`, но этот ручной сценарий (`strategist.sh day-plan`) их не читал вовсе.
 
-`bash .claude/scripts/load-extensions.sh day-open before` → Exit 0: `Read` каждый файл из вывода (alphabetic), выполнить как первые шаги. Exit 1: расширений нет, продолжить как обычно.
+`bash .qwen/scripts/load-extensions.sh day-open before` → Exit 0: `Read` каждый файл из вывода (alphabetic), выполнить как первые шаги. Exit 1: расширений нет, продолжить как обычно.
 
 ### Шаг 0 — Scaffold (детерминированный каркас, БЛОКИРУЮЩЕЕ)
 
@@ -95,7 +95,7 @@ fi
 
 ### Шаг 6b — Extensions (after)
 
-`bash .claude/scripts/load-extensions.sh day-open after` → Exit 0: `Read` каждый файл из вывода (alphabetic), выполнить. Exit 1: расширений нет, продолжить.
+`bash .qwen/scripts/load-extensions.sh day-open after` → Exit 0: `Read` каждый файл из вывода (alphabetic), выполнить. Exit 1: расширений нет, продолжить.
 
 ### Шаг 7 — сохранение и коммит
 
@@ -112,16 +112,16 @@ git -C "$REPO_DIR" push
 - ❌ **НЕ задавать вопросов** «что от меня нужно?» / «вариант A/B/C?»
 - ❌ **НЕ останавливаться** если файл DayPlan уже существует — заполни PENDING секции (не пересоздавай)
 - ❌ **НЕ просить подтверждения** — все решения по алгоритму
-- ✅ Все решения принимай по skill /day-open (`${IWE_WORKSPACE:-{{WORKSPACE_DIR}}}/.claude/skills/day-open/SKILL.md`)
+- ✅ Все решения принимай по skill /day-open (`${IWE_WORKSPACE:-{{WORKSPACE_DIR}}}/.qwen/skills/day-open/SKILL.md`)
 - ✅ Финал: SUCCESS + git push (Telegram-уведомление отправляет strategist.sh автоматически после завершения)
 
 ## Источники
 
 - HUB: `{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/current/`
 - SPOKES: `{{WORKSPACE_DIR}}/*/WORKPLAN.md`
-- MEMORY: `~/.claude/projects/{{CLAUDE_PROJECT_SLUG}}/memory/`
-- Skill: `{{WORKSPACE_DIR}}/.claude/skills/day-open/SKILL.md`
-- Templates: `~/.claude/projects/{{CLAUDE_PROJECT_SLUG}}/memory/templates-dayplan.md`
+- MEMORY: `~/.qwen/projects/{{CLAUDE_PROJECT_SLUG}}/memory/`
+- Skill: `{{WORKSPACE_DIR}}/.qwen/skills/day-open/SKILL.md`
+- Templates: `~/.qwen/projects/{{CLAUDE_PROJECT_SLUG}}/memory/templates-dayplan.md`
 - Scaffold: `{{WORKSPACE_DIR}}/FMT-exocortex-template/scripts/day-open-scaffold.sh` (резолвится через `$IWE_SCRIPTS`)
 - Extensions: `{{WORKSPACE_DIR}}/extensions/day-open.before.md`, `.after.md`, `.checks.md`
 

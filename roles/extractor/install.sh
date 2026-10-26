@@ -1,4 +1,11 @@
 #!/bin/bash
+# === OFFLINE / NO-SCHEDULER GUARD (qwen-windows-offline) ===
+# Эта ветка: Windows + git bash, без планировщика (launchd/cron/systemd).
+# Установка задач по расписанию невозможна. Рабочие скрипты роли запускаются
+# ВРУЧНУЮ — см. MANUAL-JOBS.md в корне репозитория.
+echo "[$(basename "$(dirname "$0")")] Планировщик недоступен (offline/Windows). Запуск задач — вручную, см. MANUAL-JOBS.md" >&2
+exit 0
+# === /GUARD ===
 # Extractor: установка launchd-агента для inbox-check
 # Запускает inbox-check каждые 3 часа.
 # WP-273 Этап 2: plist берётся из $IWE_RUNTIME (Generated runtime, F).
@@ -28,7 +35,7 @@ fi
 if [ ! -f "$HOME/.secrets/claude_code_oauth_token" ] \
    && command -v claude >/dev/null 2>&1 \
    && ! claude auth status --json >/dev/null 2>&1; then
-    echo "  ⚠ Claude Code не подключён — автоматический inbox-check не сможет войти."
+    echo "  ⚠ Qwen Code не подключён — автоматический inbox-check не сможет войти."
     echo "    Выполните: bash \$IWE_TEMPLATE/roles/extractor/scripts/connect.sh"
 fi
 

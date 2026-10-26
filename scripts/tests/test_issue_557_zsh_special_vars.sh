@@ -9,7 +9,7 @@
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-SKILL="$ROOT/.claude/skills/day-close/SKILL.md"
+SKILL="$ROOT/.qwen/skills/day-close/SKILL.md"
 TEST_ROOT="$(mktemp -d /tmp/iwe-issue-557-zsh-guard.XXXXXX)"
 GUARD_SOURCE="$TEST_ROOT/guard.sh"
 REPO="$TEST_ROOT/repo"
@@ -39,7 +39,7 @@ fi
 cd "$ROOT"
 # The actual function bodies live in day-close-helpers.sh, not in the
 # extracted guard block (just a `source` line) — scan that file.
-HELPERS_FILE="$ROOT/.claude/skills/day-close/day-close-helpers.sh"
+HELPERS_FILE="$ROOT/.qwen/skills/day-close/day-close-helpers.sh"
 
 # --- 1. Static regression: zsh special parameter names must not come back. ---
 # `path`/`status` broke live (issue #557); the rest are the same failure class

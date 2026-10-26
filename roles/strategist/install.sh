@@ -1,4 +1,11 @@
 #!/bin/bash
+# === OFFLINE / NO-SCHEDULER GUARD (qwen-windows-offline) ===
+# Эта ветка: Windows + git bash, без планировщика (launchd/cron/systemd).
+# Установка задач по расписанию невозможна. Рабочие скрипты роли запускаются
+# ВРУЧНУЮ — см. MANUAL-JOBS.md в корне репозитория.
+echo "[$(basename "$(dirname "$0")")] Планировщик недоступен (offline/Windows). Запуск задач — вручную, см. MANUAL-JOBS.md" >&2
+exit 0
+# === /GUARD ===
 # Install Strategist Agent launchd jobs
 # WP-273 Этап 2: plists берутся из $IWE_RUNTIME (Generated runtime, F).
 # Fallback на $SCRIPT_DIR/scripts/launchd/ — для старых установок до 0.29.0.
