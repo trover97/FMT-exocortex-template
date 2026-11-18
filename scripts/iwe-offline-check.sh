@@ -10,7 +10,8 @@
 # System Defaults → User (~/.qwen/settings.json) → Workspace ($cwd/.qwen/settings.json) → System
 # (system применяется последним). Два вердикта: запуск из корня workspace и из подпапки
 # (в подпапке проектный слой не действует — Qwen ищет workspace-settings только в точном cwd).
-# Дальше: три строки в ~/.qwen/.env, заглушка хука конца сессии, версия qwen, QWEN_CODE_MEMORY_LOCAL,
+# Дальше: три строки в ~/.qwen/.env, одобрение хуков проекта (без него Qwen работает без них),
+# заглушка хука конца сессии, версия qwen, QWEN_CODE_MEMORY_LOCAL,
 # а также что остаётся открытым (remote в хранилищах, Telegram, MCP/расширения, прокси).
 # Код выхода 1, если хотя бы один вердикт или обязательный пункт не прошёл.
 # Переопределения для тестов: IWE_OFFLINE_ENV_FILE, IWE_OFFLINE_SETTINGS_PATHS (пути слоёв через ':'),
@@ -18,7 +19,7 @@
 set -euo pipefail
 
 case "${1:-}" in
-  --help|-h) sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+  --help|-h) sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
   "") ;;
   *) echo "Неизвестный аргумент: $1 (см. --help)" >&2; exit 2 ;;
 esac
@@ -199,7 +200,41 @@ else
   done
 fi
 
-echo; echo "[3] Хук конца сессии (единственный автоматический сетевой выход ветки)"
+echo; echo "[3] Хуки проекта: доверие к папке и одобрение"
+# Qwen 0.27.2 не запускает хуки из проектного слоя до явного решения: доверие к папке
+# (security.folderTrust + trustedFolders.json) или одобрение в диалоге (hookApprovals.json).
+# Без этого запрет чтения секретов и напоминания ритуалов молча не работают.
+HOOK_STATE="$("$PY" - "$QWEN_BASE" "$WS" <<'PYEOF'
+import json, os, sys
+base, ws = sys.argv[1], sys.argv[2]
+
+def load(path):
+    try:
+        with open(path, encoding="utf-8") as fh:
+            data = json.load(fh)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+ws = os.path.realpath(ws)
+state = "pending"
+for path, level in load(os.path.join(base, "trustedFolders.json")).items():
+    if os.path.realpath(path) == ws and level in ("TRUST_FOLDER", "TRUST_PARENT"):
+        state = "trusted"
+if state != "trusted":
+    for path, rec in load(os.path.join(base, "hookApprovals.json")).items():
+        if os.path.realpath(path) == ws and isinstance(rec, dict) and rec.get("status") == "approved":
+            state = "approved"
+print(state)
+PYEOF
+)"
+case "$HOOK_STATE" in
+  trusted)  ok "папка отмечена доверенной: хуки проекта загружаются (trustedFolders.json)" ;;
+  approved) ok "одобрение хуков записано (hookApprovals.json); после смены набора хуков Qwen спросит снова" ;;
+  *)        bad "хуки проекта не одобрены: Qwen работает без них, запрет чтения секретов и напоминания не действуют. Запустите qwen из $WS и ответьте «одобрить» (второй путь - security.folderTrust, см. MANUAL-JOBS.md)" ;;
+esac
+
+echo; echo "[4] Хук конца сессии (единственный автоматический сетевой выход ветки)"
 SES="$WS/.qwen/hooks/session-end-status.sh"
 if [ ! -f "$SES" ]; then
   warn "нет файла $SES"
@@ -209,7 +244,7 @@ else
   bad "хук session-end-status без заглушки: при наличии файла секретов и psql он пишет в базу Neon"
 fi
 
-echo; echo "[4] Версия и окружение"
+echo; echo "[5] Версия и окружение"
 if command -v qwen >/dev/null 2>&1; then
   ver="$(qwen --version 2>/dev/null | head -n 1 || true)"
   ok "qwen --version: ${ver:-не определилась}"
@@ -226,7 +261,7 @@ for v in HTTPS_PROXY HTTP_PROXY ALL_PROXY https_proxy http_proxy; do
   fi
 done
 
-echo; echo "[5] Что остаётся открытым"
+echo; echo "[6] Что остаётся открытым"
 for d in "$WS"/*/; do
   if [ -e "${d}.git" ]; then
     remotes="$(git -C "$d" remote 2>/dev/null | tr '\n' ' ' || true)"
@@ -245,7 +280,7 @@ echo "  Не закрыто переключателями: команды, ко
 echo "  ssh у iwe-grep-secret.sh, фоновые подсистемы qwen 0.27 (daemon/ACP по умолчанию выключены),"
 echo "  новые выходы будущих версий Qwen. Жёстко закрыл бы брандмауэр (pf/Packet Filter, нужны права администратора)."
 
-echo; echo "[6] Сверка по трафику (руками, после каждого обновления Qwen)"
+echo; echo "[7] Сверка по трафику (руками, после каждого обновления Qwen)"
 echo "  Запустите Qwen из корня рабочей папки и из подпапки хранилища, сделайте один обмен с моделью, затем:"
 echo "    lsof -nP -iTCP -sTCP:ESTABLISHED | grep -Ei 'node|qwen'"
 echo "      # в выводе должен остаться только адрес вашей модели (localhost/локальная сеть)"
