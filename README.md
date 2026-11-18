@@ -104,6 +104,11 @@ bash update.sh                # применить
 Все 7 hook-событий IWE (`UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`, `PreCompact`, `SessionStart`, `SessionEnd`) поддерживаются Qwen Code и сохранены. События жизненного цикла сессии (`SessionStart`/`SessionEnd`) существуют в Qwen Code с v0.13.0 — ранняя редакция этой строки ошибочно считала их неподдерживаемыми и называла пять событий вместо семи.
 
 Подробно о ручном запуске фоновых задач — в [`MANUAL-JOBS.md`](MANUAL-JOBS.md).
+
+> **Всё, что ниже, — текст основной ветки.** Разделы «Как это выглядит на практике», «Начать» и FAQ
+> описывают установку с Claude Code: `setup.sh`, подписка Claude Pro, облачное расписание. В этой
+> офлайн-сборке установка другая — `setup-offline.sh`, агент `qwen`, локальная модель, ручной запуск
+> задач (см. [`MANUAL-JOBS.md`](MANUAL-JOBS.md)).
 <!-- QWEN-OFFLINE:END -->
 
 ## Проблема

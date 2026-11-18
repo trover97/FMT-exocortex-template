@@ -3521,7 +3521,7 @@
     },
     {
       "path": "scripts/iwe-offline-check.sh",
-      "sha256": "e721de930652b4087449a32ae4a0dc8760a3a58732ccf5d2ad87e177da3d0d4b"
+      "sha256": "9f27e197164a5da90194de1993510513a20e67f443cb52d3202965981a1a9b73"
     }
   ],
   "excluded_paths": [

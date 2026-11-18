@@ -516,9 +516,16 @@ A15
     echo "  ✓ A17 install-iwe-paths.sh из main (zshenv + owner-guard на месте)"
   fi
 
-  # A18: .gitignore строится от свежего main (шаг 2 уже сделал Qwen-замены). Ветке нужны
-  #      свои строки — эталоны правил и памяти. Дословный restore их бы откатывал, поэтому
-  #      файл не в OWNED, а дополняется здесь идемпотентно.
+  # A18: .gitignore строится от свежего main и дополняется здесь. Шаг 2 в него не заходит:
+  #      файл без расширения не попадает в отбор, поэтому .claude.md.base и .claude/state/
+  #      игнорировали бы несуществующие пути, а .qwen.md.base и .qwen/state/ остались бы
+  #      неигнорированными. Замены делаем тут, затем добавляем эталоны правил и памяти.
+  #      Идемпотентно: повторный прогон ничего не меняет.
+  if [ -f .gitignore ]; then
+    before_gitignore="$(cksum < .gitignore)"
+    perl -i -pe 's/\.claude\.md\.base/.qwen.md.base/g; s/\.claude\//.qwen\//g' .gitignore
+    [ "$before_gitignore" = "$(cksum < .gitignore)" ] || echo "  ✓ A18 Qwen-пути → .gitignore"
+  fi
   if [ -f .gitignore ] && ! grep -qxF '.qwen-memory.baseline/' .gitignore; then
     {
       echo ""

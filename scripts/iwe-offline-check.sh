@@ -10,7 +10,7 @@
 # System Defaults → User (~/.qwen/settings.json) → Workspace ($cwd/.qwen/settings.json) → System
 # (system применяется последним). Два вердикта: запуск из корня workspace и из подпапки
 # (в подпапке проектный слой не действует — Qwen ищет workspace-settings только в точном cwd).
-# Дальше: три строки в ~/.qwen/.env, одобрение хуков проекта (без него Qwen работает без них),
+# Дальше: три строки в ~/.qwen/.env, одобрение хуков проекта или доверие к папке (иначе Qwen работает без них),
 # заглушка хука конца сессии, версия qwen, QWEN_CODE_MEMORY_LOCAL,
 # а также что остаётся открытым (remote в хранилищах, Telegram, MCP/расширения, прокси).
 # Код выхода 1, если хотя бы один вердикт или обязательный пункт не прошёл.
@@ -200,39 +200,219 @@ else
   done
 fi
 
-echo; echo "[3] Хуки проекта: доверие к папке и одобрение"
-# Qwen 0.27.2 не запускает хуки из проектного слоя до явного решения: доверие к папке
-# (security.folderTrust + trustedFolders.json) или одобрение в диалоге (hookApprovals.json).
+echo; echo "[3] Хуки проекта: одобрение и доверие к папке"
+# Qwen 0.27.2 не запускает хуки из проектного слоя до явного решения: одобрение ровно того
+# набора хуков (hookApprovals.json) или явное доверие к папке (security.folderTrust +
+# trustedFolders.json). Одобрение привязано к хешу набора хуков и проектного окружения,
+# поэтому после update.sh, правки хуков или .env в рабочей папке Qwen спросит снова.
 # Без этого запрет чтения секретов и напоминания ритуалов молча не работают.
-HOOK_STATE="$("$PY" - "$QWEN_BASE" "$WS" <<'PYEOF'
-import json, os, sys
-base, ws = sys.argv[1], sys.argv[2]
+if [ -z "$PY" ]; then
+  bad "не найден Python: состояние хуков НЕ проверено (это не «одобрено»). Поставьте python3 (xcode-select --install) и повторите"
+else
+HOOK_STATE="$("$PY" - "$WS" "$USER_SETTINGS" "$SYSTEM_DEFAULTS" "$SYSTEM_SETTINGS" <<'PYEOF'
+import hashlib, json, os, re, sys
 
-def load(path):
+ws, user_settings, system_defaults, system_settings = sys.argv[1:5]
+
+
+def qwen_global_dir():
+    # Qwen хранит одобрения и доверие в глобальном каталоге (QWEN_HOME или ~/.qwen),
+    # а не в QWEN_RUNTIME_DIR.
+    return os.environ.get("QWEN_HOME") or os.path.join(os.path.expanduser("~"), ".qwen")
+
+
+def load_json(path):
+    if not path or not os.path.exists(path):
+        return "missing", {}
     try:
-        with open(path, encoding="utf-8") as fh:
+        with open(path, encoding="utf-8-sig") as fh:
             data = json.load(fh)
-        return data if isinstance(data, dict) else {}
     except Exception:
-        return {}
+        return "bad", {}
+    if not isinstance(data, dict):
+        return "bad", {}
+    return "ok", data
 
-ws = os.path.realpath(ws)
-state = "pending"
-for path, level in load(os.path.join(base, "trustedFolders.json")).items():
-    if os.path.realpath(path) == ws and level in ("TRUST_FOLDER", "TRUST_PARENT"):
-        state = "trusted"
-if state != "trusted":
-    for path, rec in load(os.path.join(base, "hookApprovals.json")).items():
-        if os.path.realpath(path) == ws and isinstance(rec, dict) and rec.get("status") == "approved":
-            state = "approved"
-print(state)
+
+def dig(data, dotted):
+    cur = data
+    for part in dotted.split("."):
+        if not isinstance(cur, dict) or part not in cur:
+            return None
+        cur = cur[part]
+    return cur
+
+
+def merge(base, overlay):
+    out = dict(base)
+    for key, value in overlay.items():
+        if isinstance(value, dict) and isinstance(out.get(key), dict):
+            out[key] = merge(out[key], value)
+        else:
+            out[key] = value
+    return out
+
+
+def folder_trust_enabled():
+    # Включатель читается только из пользовательского/системного слоёв: проектный
+    # settings.json его включить не может (Qwen игнорирует это значение из workspace).
+    merged = {}
+    for path in (system_defaults, user_settings, system_settings):
+        state, data = load_json(path)
+        if state == "ok":
+            merged = merge(merged, data)
+    return dig(merged, "security.folderTrust.enabled") is True
+
+
+def real(path):
+    try:
+        return os.path.realpath(path)
+    except OSError:
+        return None
+
+
+def trust_decision(root):
+    """True/False/None по правилам trustedFolders.json: побеждает самый глубокий путь,
+    при равенстве глубины побеждает отказ (как в Qwen)."""
+    path = os.environ.get("QWEN_CODE_TRUSTED_FOLDERS_PATH") or os.path.join(
+        qwen_global_dir(), "trustedFolders.json")
+    state, rules = load_json(path)
+    winner, depth = None, -1
+    for rule_path, level in rules.items():
+        if level == "TRUST_PARENT":
+            base, trust = os.path.dirname(rule_path), True
+        elif level == "TRUST_FOLDER":
+            base, trust = rule_path, True
+        elif level == "DO_NOT_TRUST":
+            base, trust = rule_path, False
+        else:
+            continue
+        base = real(base)
+        if base is None or not (root == base or root.startswith(base + os.sep)):
+            continue
+        here = base.count(os.sep)
+        if here > depth or (here == depth and not trust and winner is not False):
+            winner, depth = trust, here
+    return winner
+
+
+def parse_dotenv(text):
+    """Разбор .env как у npm dotenv: KEY=VALUE, кавычки, комментарии, export."""
+    out = {}
+    if text.startswith("﻿"):
+        text = text[1:]
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        match = re.match(r"^(?:export\s+)?([\w.-]+)\s*=\s*(.*)$", line)
+        if not match:
+            continue
+        key, value = match.group(1), match.group(2).strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+            quote, value = value[0], value[1:-1]
+            if quote == '"':
+                value = (value.replace("\\n", "\n").replace("\\r", "\r")
+                              .replace('\\"', '"').replace("\\\\", "\\"))
+        else:
+            cut = value.find(" #")
+            if cut >= 0:
+                value = value[:cut].rstrip()
+        out[key] = value
+    return out
+
+
+def project_env_files(root):
+    """Файлы, которые Qwen включает в хеш одобрения: (уверены?, {путь: значения}).
+    Берётся первый найденный при подъёме от рабочей папки .qwen/.env или .env."""
+    found = None
+    cur = root
+    while True:
+        for candidate in (os.path.join(cur, ".qwen", ".env"), os.path.join(cur, ".env")):
+            if os.path.isfile(candidate):
+                found = candidate
+                break
+        if found or os.path.dirname(cur) == cur:
+            break
+        cur = os.path.dirname(cur)
+    if not found:
+        return True, {}
+    real_found = real(found)
+    if real_found is None:
+        return False, {}
+    if not (real_found == root or real_found.startswith(root + os.sep)):
+        return True, {}  # файл вне рабочей папки Qwen в хеш не берёт
+    try:
+        with open(real_found, encoding="utf-8") as fh:
+            text = fh.read()
+    except Exception:
+        return False, {}
+    return True, {real_found: parse_dotenv(text)}
+
+
+def hash_project_hooks(hooks, env):
+    stable = json.dumps({"hooks": hooks, "env": env}, sort_keys=True,
+                        separators=(",", ":"), ensure_ascii=False)
+    return hashlib.sha256(stable.encode("utf-8")).hexdigest()
+
+
+def approval_state(root, hooks, settings):
+    path = os.environ.get("QWEN_CODE_HOOK_APPROVALS_PATH") or os.path.join(
+        qwen_global_dir(), "hookApprovals.json")
+    _, records = load_json(path)
+    record = None
+    for record_path, value in records.items():
+        if real(record_path) == root and isinstance(value, dict):
+            record = value
+    sure, files = project_env_files(root)
+    if not sure:
+        return "unknown"
+    expected = hash_project_hooks(hooks, {"files": files, "settings": settings.get("env")})
+    if not record or record.get("hash") != expected:
+        return "pending"
+    status = record.get("status")
+    return status if status in ("approved", "rejected") else "pending"
+
+
+def main():
+    root = real(ws)
+    state, settings = load_json(os.path.join(root, ".qwen", "settings.json"))
+    hooks = settings.get("hooks") if state == "ok" else None
+    if not isinstance(hooks, dict) or not hooks:
+        return "nohooks"
+    enabled = folder_trust_enabled()
+    trust = trust_decision(root) if enabled else None
+    approval = approval_state(root, hooks, settings)
+    # Qwen при включённом доверии и недоверенной папке не загружает проектные
+    # настройки целиком, поэтому проверка доверия идёт первой.
+    if enabled and trust is not True:
+        return "bad-untrusted"
+    if approval == "approved":
+        return "ok-approved"
+    if approval == "rejected":
+        return "bad-rejected"
+    if approval == "pending":
+        return "ok-trust" if (enabled and trust is True) else "bad-pending"
+    return "bad-unknown"
+
+
+try:
+    print(main())
+except Exception:
+    print("error")
 PYEOF
 )"
 case "$HOOK_STATE" in
-  trusted)  ok "папка отмечена доверенной: хуки проекта загружаются (trustedFolders.json)" ;;
-  approved) ok "одобрение хуков записано (hookApprovals.json); после смены набора хуков Qwen спросит снова" ;;
-  *)        bad "хуки проекта не одобрены: Qwen работает без них, запрет чтения секретов и напоминания не действуют. Запустите qwen из $WS и ответьте «одобрить» (второй путь - security.folderTrust, см. MANUAL-JOBS.md)" ;;
+  nohooks)       ok "в .qwen/settings.json нет хуков проекта: одобрять нечего" ;;
+  ok-approved)   ok "одобрение совпадает с текущим набором хуков (hookApprovals.json): хуки проекта работают" ;;
+  ok-trust)      ok "папка явно доверена (security.folderTrust + trustedFolders.json): хуки проекта работают без отдельного одобрения" ;;
+  bad-untrusted) bad "доверие к папкам включено, но $WS не доверена: Qwen не загрузит проектные настройки, хуки не работают. Отметьте папку доверенной в qwen (/permissions) или в trustedFolders.json" ;;
+  bad-rejected)  bad "хуки отклонены для этой папки: Qwen не спросит снова, пока набор хуков не изменится. Удалите запись из hookApprovals.json и откройте /hooks или перезапустите qwen" ;;
+  bad-pending)   bad "одобрения нет или оно устарело (менялись хуки, .env или env в настройках): Qwen работает без них, запрет чтения секретов и напоминания не действуют. Запустите qwen из $WS и ответьте «одобрить» (второй путь - security.folderTrust, см. MANUAL-JOBS.md)" ;;
+  bad-unknown)   bad "не удалось сверить одобрение с текущими хуками (не разобрался проектный .env): проверьте вручную, откройте qwen из $WS и посмотрите /hooks" ;;
+  *)             bad "состояние хуков не определилось: откройте qwen из $WS и посмотрите /hooks" ;;
 esac
+fi
 
 echo; echo "[4] Хук конца сессии (единственный автоматический сетевой выход ветки)"
 SES="$WS/.qwen/hooks/session-end-status.sh"
