@@ -46,14 +46,14 @@ resolve_find_python3() {
 err() { ERRORS+=("$1"); }
 
 # Section headings come from the language catalogs (WP-610 F9): the template
-# copy finds them under its own .claude/; a copy promoted to <workspace>/<governance
+# copy finds them under its own .qwen/; a copy promoted to <workspace>/<governance
 # repo>/scripts/ under the workspace, which git hooks reach without IWE_* set.
 VALIDATOR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-for I18N_LIB in "$VALIDATOR_DIR/../.claude/lib/i18n.sh" "$VALIDATOR_DIR/../../.claude/lib/i18n.sh" \
-                "${IWE_WORKSPACE:-${IWE_ROOT:-}}/.claude/lib/i18n.sh"; do
+for I18N_LIB in "$VALIDATOR_DIR/../.qwen/lib/i18n.sh" "$VALIDATOR_DIR/../../.qwen/lib/i18n.sh" \
+                "${IWE_WORKSPACE:-${IWE_ROOT:-}}/.qwen/lib/i18n.sh"; do
     [ -f "$I18N_LIB" ] && break
 done
-# shellcheck source=../.claude/lib/i18n.sh
+# shellcheck source=../.qwen/lib/i18n.sh
 . "$I18N_LIB" 2>/dev/null || i18n_pattern() { echo "i18n: cannot load $I18N_LIB" >&2; return 3; }
 
 # staged_to_tmp <path> — staged blob to a temp file; prints the path.

@@ -3,7 +3,7 @@
 #
 # The second half of the portability story (the first is backup in day-close.sh + the auto-mirror
 # memory-exocortex-sync.sh). Applies on a NEW device or after loss/corruption of the
-# local memory/: unfolds exocortex/ back into auto-memory + CLAUDE.md + symlink.
+# local memory/: unfolds exocortex/ back into auto-memory + QWEN.md + symlink.
 #
 # Usage:
 #   restore-from-exocortex.sh [<governance-repo-path>] [--force] [--dry-run]
@@ -66,12 +66,30 @@ if [ -z "$GOV_ARG" ]; then
         BACKUP_SELECTED=true
     fi
 fi
-# Claude Code slugifies the project path, replacing with '-' not only '/', but also '_' and '.'.
+# Qwen Code slugifies the project path, replacing with '-' not only '/', but also '_' and '.'.
 # If $HOME contains '_' (e.g. username john_doe), the real folder is '-home-john-doe-IWE'.
 # tr '/' '-' would give a phantom '-home-john_doe-IWE' → restore would miss the auto-memory.
 # Symlink resolution is unusable here: on a new machine $WORKSPACE_DIR/memory is not created yet.
-WORKSPACE_SLUG=$(printf '%s' "$WORKSPACE_DIR" | tr '/_.' '-')
-COMPUTED_MEMORY="$HOME/.claude/projects/${WORKSPACE_SLUG}/memory"
+# QWEN-OFFLINE:A14 — каталог памяти Qwen и ссылку на него ведёт scripts/link-memory.sh:
+# там единственная формула (POSIX-санитизация без нижнего регистра, ближайший git root,
+# QWEN_HOME) и нативный симлинк. Комментарий выше про слаг описывает формулу Claude.
+LINK_MEMORY_SH="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/link-memory.sh"
+if [ ! -f "$LINK_MEMORY_SH" ]; then
+    echo "Не найден $LINK_MEMORY_SH: без него каталог памяти Qwen не вычислить. Обнови папку FMT целиком." >&2
+    exit 1
+fi
+COMPUTED_MEMORY=$(bash "$LINK_MEMORY_SH" --workspace "$WORKSPACE_DIR" --print-target) || exit 1
+# Ссылка workspace/memory → каталог памяти (шаг 3). link-memory.sh делает нативный
+# симлинк и никогда не подменяет его копией.
+# Чужой каталог (IWE_MEMORY_SRC) link-memory.sh не знает — для него прежний ln -s.
+link_memory_dir() {
+    if [ "$MEMORY_DST" = "$COMPUTED_MEMORY" ]; then
+        run_cmd bash "$LINK_MEMORY_SH" --workspace "$WORKSPACE_DIR"
+    else
+        run_cmd ln -s -- "$MEMORY_DST" "$LINK"
+    fi
+}
+# /QWEN-OFFLINE:A14
 PHYSICAL_MEMORY=""
 if [ -d "$WORKSPACE_DIR/memory" ]; then
     PHYSICAL_MEMORY=$(cd -P -- "$WORKSPACE_DIR/memory" 2>/dev/null && pwd -P) || exit 1
@@ -212,31 +230,31 @@ atomic_restore_claude() {
     local src="$1" dst="$2" parent tmp
     parent=$(dirname -- "$dst")
     if $DRY_RUN; then
-        printf '  [dry-run] render CLAUDE.md atomically: %q -> %q\n' "$src" "$dst"
+        printf '  [dry-run] render QWEN.md atomically: %q -> %q\n' "$src" "$dst"
         return 0
     fi
     mkdir -p -- "$parent"
     if [ -e "$dst" ] && [ ! -f "$dst" ] && [ ! -L "$dst" ]; then
-        err "CLAUDE.md: назначение не является обычным файлом: $dst"
+        err "QWEN.md: назначение не является обычным файлом: $dst"
         return 1
     fi
-    tmp=$(mktemp -- "$parent/.CLAUDE.md.render.XXXXXX") || {
-        err "CLAUDE.md: не удалось создать временный файл"
+    tmp=$(mktemp -- "$parent/.QWEN.md.render.XXXXXX") || {
+        err "QWEN.md: не удалось создать временный файл"
         return 1
     }
     if ! sed "s|{{HOME_DIR}}|$HOME_SED_SAFE|g" "$src" > "$tmp"; then
         rm -f -- "$tmp"
-        err "CLAUDE.md: подстановка HOME не выполнена"
+        err "QWEN.md: подстановка HOME не выполнена"
         return 1
     fi
     if [ -L "$dst" ] && ! rm -- "$dst"; then
         rm -f -- "$tmp"
-        err "CLAUDE.md: не удалось убрать конечный симлинк"
+        err "QWEN.md: не удалось убрать конечный симлинк"
         return 1
     fi
     if ! mv -f -- "$tmp" "$dst"; then
         rm -f -- "$tmp"
-        err "CLAUDE.md: атомарная замена не удалась"
+        err "QWEN.md: атомарная замена не удалась"
         return 1
     fi
 }
@@ -368,7 +386,7 @@ else
 fi
 
 # === Step 1c: rules/ → workspace ===
-RULES_DST="$WORKSPACE_DIR/.claude/rules"
+RULES_DST="$WORKSPACE_DIR/.qwen/rules"
 if [ -d "$EXOCORTEX_SRC/rules" ]; then
     if [ -d "$RULES_DST" ] && [ -n "$(ls -A -- "$RULES_DST" 2>/dev/null)" ] && ! $FORCE && ! $DRY_RUN; then
         warn "rules/ уже не пуста: $RULES_DST — пропуск (для восстановления — --force)"
@@ -388,17 +406,17 @@ else
     warn "exocortex/rules/ отсутствует (старый бэкап) — пропуск"
 fi
 
-# === Step 2: CLAUDE.md → workspace root ===
+# === Step 2: QWEN.md → workspace root ===
 # issue #217: direct substitution {{HOME_DIR}} -> $HOME makes the restore
 # OS-agnostic (the backup is written on the placeholder in day-close.sh, step 1).
 # $HOME sits in the replacement part of sed s/// — escape & and \, otherwise a HOME with &
 # is treated as "the whole matched text" and corrupts the path (cold-review finding).
 HOME_SED_SAFE=$(printf '%s' "$HOME" | sed 's/[|&\]/\\&/g')
-if [ -f "$EXOCORTEX_SRC/CLAUDE.md" ]; then
-    atomic_restore_claude "$EXOCORTEX_SRC/CLAUDE.md" "$WORKSPACE_DIR/CLAUDE.md" || exit 1
-    log "CLAUDE.md восстановлен → $WORKSPACE_DIR/CLAUDE.md"
+if [ -f "$EXOCORTEX_SRC/QWEN.md" ]; then
+    atomic_restore_claude "$EXOCORTEX_SRC/QWEN.md" "$WORKSPACE_DIR/QWEN.md" || exit 1
+    log "QWEN.md восстановлен → $WORKSPACE_DIR/QWEN.md"
 else
-    warn "CLAUDE.md в exocortex отсутствует — пропуск"
+    warn "QWEN.md в exocortex отсутствует — пропуск"
 fi
 
 # params.yaml belongs in the workspace root. Existing user configuration is
@@ -423,12 +441,12 @@ if [ -L "$LINK" ]; then
     else
         warn "Симлинк memory/ указывает на $current (ожидалось $MEMORY_DST) — пересоздаю"
         run_cmd rm -- "$LINK"
-        run_cmd ln -s -- "$MEMORY_DST" "$LINK"
+        link_memory_dir
     fi
 elif [ -e "$LINK" ]; then
     warn "$LINK существует и НЕ симлинк — не трогаю (разбери вручную)"
 else
-    run_cmd ln -s -- "$MEMORY_DST" "$LINK"
+    link_memory_dir
     log "Симлинк создан: $LINK → $MEMORY_DST"
 fi
 
@@ -436,5 +454,5 @@ echo ""
 if $DRY_RUN; then
     warn "dry-run завершён. Для применения — запусти без --dry-run."
 else
-    log "Восстановление завершено. Перезапусти Claude Code для загрузки memory/."
+    log "Восстановление завершено. Перезапусти Qwen Code для загрузки memory/."
 fi

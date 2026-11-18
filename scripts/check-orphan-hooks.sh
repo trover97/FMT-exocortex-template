@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # routing: utility  deterministic=true
-# check-orphan-hooks.sh — every hook in .claude/hooks/ is actually invoked
+# check-orphan-hooks.sh — every hook in .qwen/hooks/ is actually invoked
 #
-# Defect class (issue #310, #323): a guard script lies in .claude/hooks/, is declared
-# blocking in CLAUDE.md, but is not registered in any settings.json event and is
+# Defect class (issue #310, #323): a guard script lies in .qwen/hooks/, is declared
+# blocking in QWEN.md, but is not registered in any settings.json event and is
 # not called from any other hook. It never fires — and nobody finds out,
 # because "did not fire" looks exactly like "there were no violations".
 # That is how IntegrationGate (rule-engine.sh) and ResidencyGate (residency-gate-*.sh) lived.
@@ -11,7 +11,7 @@
 # Reachability is computed transitively: a hook from settings.json may launch others
 # (capture-bus.sh → detectors), such calls also count as wiring.
 #
-# Deliberately unwired hooks are listed in .claude/hooks/.orphan-allowlist
+# Deliberately unwired hooks are listed in .qwen/hooks/.orphan-allowlist
 # (one line = file name, `#` — a comment with the reason). A file in the allowlist stays
 # visible in the report but does not fail the check: the watchdog's goal is for "not wired"
 # to be a decision, not an accident.
@@ -23,10 +23,10 @@
 set -uo pipefail
 
 FMT_DIR="${1:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
-HOOKS_DIR="$FMT_DIR/.claude/hooks"
-SETTINGS="$FMT_DIR/.claude/settings.json"
+HOOKS_DIR="$FMT_DIR/.qwen/hooks"
+SETTINGS="$FMT_DIR/.qwen/settings.json"
 ALLOWLIST="$HOOKS_DIR/.orphan-allowlist"
-ENFORCEMENT_INVENTORY="$FMT_DIR/.claude/rules-lazy/blocking-rules-full.md"
+ENFORCEMENT_INVENTORY="$FMT_DIR/.qwen/rules-lazy/blocking-rules-full.md"
 
 if [ ! -d "$HOOKS_DIR" ]; then
     echo "SKIP: $HOOKS_DIR не найден"
@@ -86,13 +86,13 @@ for path in "$HOOKS_DIR"/*.sh; do
     fi
     case " $allow " in
         *" $name "*)
-            echo "ALLOWED: $name — не подключён осознанно (см. .claude/hooks/.orphan-allowlist)"
+            echo "ALLOWED: $name — не подключён осознанно (см. .qwen/hooks/.orphan-allowlist)"
             allowed=$((allowed + 1))
             continue ;;
     esac
-    echo "FAIL: $name лежит в .claude/hooks/, но не вызывается ни из settings.json, ни из другого хука"
+    echo "FAIL: $name лежит в .qwen/hooks/, но не вызывается ни из settings.json, ни из другого хука"
     echo "  Либо зарегистрируйте его в событии settings.json, либо удалите,"
-    echo "  либо внесите в .claude/hooks/.orphan-allowlist с причиной."
+    echo "  либо внесите в .qwen/hooks/.orphan-allowlist с причиной."
     orphans=$((orphans + 1))
 done
 

@@ -3,7 +3,7 @@
 # Configures a forked FMT-exocortex-template: placeholders, memory, launchd, DS-strategy
 #
 # Usage:
-#   bash setup.sh          # Full installation (git + GitHub CLI + Claude Code + automation)
+#   bash setup.sh          # Full installation (git + GitHub CLI + Qwen Code + automation)
 #   bash setup.sh --core   # Minimal installation (git only, no network)
 #
 set -e
@@ -97,7 +97,7 @@ if $VALIDATE_ONLY; then
 
     # Check required files
     echo "[2/4] Файлы..."
-    CHECK_FILES="CLAUDE.md memory/MEMORY.md memory/protocol-open.md memory/protocol-close.md memory/protocol-work.md memory/navigation.md memory/roles.md"
+    CHECK_FILES="QWEN.md memory/MEMORY.md memory/protocol-open.md memory/protocol-close.md memory/protocol-work.md memory/navigation.md memory/roles.md"
     for f in $CHECK_FILES; do
         if [ -f "$SCRIPT_DIR/$f" ]; then
             echo "  ✓ $f"
@@ -126,7 +126,7 @@ if $VALIDATE_ONLY; then
     # Check MCP accessibility
     echo "[4/4] MCP-доступность..."
     echo "  MCP подключается через claude.ai/settings/connectors"
-    echo "  Проверьте командой /mcp в Claude Code"
+    echo "  Проверьте командой /mcp в Qwen Code"
 
     # Delegate structural invariants to the template validator (installed mode:
     # skips checks that are legitimately violated after setup — /Users/, /opt/homebrew, MEMORY skeleton).
@@ -166,9 +166,9 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 TEMPLATE_DIR="$SCRIPT_DIR"
 
 # Verify we're inside the template
-if [ ! -f "$TEMPLATE_DIR/CLAUDE.md" ] || [ ! -f "$TEMPLATE_DIR/AGENTS.md" ] || [ ! -d "$TEMPLATE_DIR/memory" ]; then
+if [ ! -f "$TEMPLATE_DIR/QWEN.md" ] || [ ! -f "$TEMPLATE_DIR/AGENTS.md" ] || [ ! -d "$TEMPLATE_DIR/memory" ]; then
     echo "ERROR: This script must be run from the root of FMT-exocortex-template."
-    echo "  Expected: $TEMPLATE_DIR/CLAUDE.md, $TEMPLATE_DIR/AGENTS.md and $TEMPLATE_DIR/memory/"
+    echo "  Expected: $TEMPLATE_DIR/QWEN.md, $TEMPLATE_DIR/AGENTS.md and $TEMPLATE_DIR/memory/"
     echo ""
     echo "  Steps:"
     echo "    gh repo fork TserenTserenov/FMT-exocortex-template --clone"
@@ -227,14 +227,14 @@ if command -v git >/dev/null 2>&1; then
     [ -z "$_ID_PROBE" ] || rm -rf "$_ID_PROBE"
 fi
 
-# jq — always required: .claude/hooks/dry-run-gate.sh (installed in any mode,
+# jq — always required: .qwen/hooks/dry-run-gate.sh (installed in any mode,
 # see step 4b) fail-closed blocks ALL tool calls without jq, with no explicit warning (issue #192).
 check_command "jq" "jq" "brew install jq (Linux: apt install jq / dnf install jq)"
 
 if $CORE_ONLY; then
     echo ""
     echo "  Режим --core: проверяются только обязательные зависимости (git)."
-    echo "  GitHub CLI, Node.js, Claude Code — не требуются."
+    echo "  GitHub CLI, Node.js, Qwen Code — не требуются."
 else
     # In CI mode (SETUP_CI=1) node/npm/claude are optional: Test 10 checks delivery
     # and role installation, not the presence of runtime tools on the machine.
@@ -243,7 +243,7 @@ else
     check_command "gh" "GitHub CLI" "brew install gh" "$_TOOL_REQUIRED"
     check_command "node" "Node.js" "brew install node (or https://nodejs.org)" "$_TOOL_REQUIRED"
     check_command "npm" "npm" "Comes with Node.js" "$_TOOL_REQUIRED"
-    # Multi-agent support: Claude Code, Kimi Code, Hermes — any of them will do
+    # Multi-agent support: Qwen Code, Kimi Code, Hermes — any of them will do
     AI_CLI_CANDIDATES="${AI_CLI_CANDIDATES:-claude kimi-code kimi hermes}"
     _AGENT_FOUND=false
     for _agent_cmd in $AI_CLI_CANDIDATES; do
@@ -257,7 +257,7 @@ else
         if [ "${_TOOL_REQUIRED:-true}" = "true" ]; then
             echo "  ✗ AI Agent: не найден"
             echo "    Установи один из поддерживаемых агентов:"
-            echo "      Claude Code: npm install -g @anthropic-ai/claude-code"
+            echo "      Qwen Code: npm install -g @anthropic-ai/claude-code"
             echo "      Kimi Code:   расширение Kimi Code в VS Code"
             echo "      Hermes:      см. https://hermes-agent.nousresearch.com/"
             echo "    Или задай AI_CLI_CANDIDATES=<команда-агента> в окружении"
@@ -329,16 +329,16 @@ fi
 HOME_DIR="$HOME"
 USER_NAME="$(id -un)"
 
-# iwe_claude_project_slug PATH — the directory name Claude Code uses under
-# ~/.claude/projects for PATH: every character that is not an ASCII letter or
+# iwe_claude_project_slug PATH — the directory name Qwen Code uses under
+# ~/.qwen/projects for PATH: every character that is not an ASCII letter or
 # digit becomes "-" (so "/", ".", "_" and " " all do): /Users/alice/IWE → -Users-alice-IWE.
 # issue #869: three scripts used three different rules ("tr /", "tr /_.",
 # "tr /_ "), and none converted a Git Bash path ("/f/notes") to the native form
-# Claude Code actually sees ("F:\notes"). On Windows the native path comes from
+# Qwen Code actually sees ("F:\notes"). On Windows the native path comes from
 # cygpath; the drive-letter case does not matter there, the file system is
 # case-insensitive. A non-ASCII character becomes one dash (python3 counts characters
 # whatever the locale - launchd and cron run with none; the sed fallback does the same
-# only under a UTF-8 locale). Not verified against Claude Code for non-ASCII paths.
+# only under a UTF-8 locale). Not verified against Qwen Code for non-ASCII paths.
 # KEEP IN SYNC with update.sh and scripts/day-close.sh — the same function body;
 # scripts/tests/test_issue_869_claude_slug.sh fails when the copies diverge.
 iwe_claude_project_slug() {
@@ -635,7 +635,7 @@ fi
 # === 1. Build generated runtime (.iwe-runtime/) ===
 # WP-273 Stage 2: substituted files live in $WORKSPACE_DIR/.iwe-runtime/
 # (Generated runtime, F). FMT stays a clean upstream — no sed over $TEMPLATE_DIR.
-# Registry of overlay files: .claude/runtime-overlay.yaml. Implementation: setup/build-runtime.sh.
+# Registry of overlay files: .qwen/runtime-overlay.yaml. Implementation: setup/build-runtime.sh.
 echo ""
 echo "[1/6] Building generated runtime..."
 
@@ -674,7 +674,7 @@ fi
 
 # === 2. Copy agent instructions to workspace root (with substitution) ===
 # FMT instruction files stay clean upstream. Workspace copies are substituted;
-# CLAUDE.md additionally keeps a substituted base for its 3-way merge.
+# QWEN.md additionally keeps a substituted base for its 3-way merge.
 install_workspace_instruction() {
     local source_name="$1"
     local destination="$WORKSPACE_DIR/$source_name"
@@ -714,7 +714,7 @@ install_workspace_instruction() {
 }
 
 install_workspace_merge_base() {
-    local source="$WORKSPACE_DIR/CLAUDE.md"
+    local source="$WORKSPACE_DIR/QWEN.md"
     local destination="$WORKSPACE_DIR/.claude.md.base"
     local destination_temp=""
     if [ -L "$source" ] || [ ! -f "$source" ]; then
@@ -738,14 +738,14 @@ install_workspace_merge_base() {
 }
 
 install_agent_instruction_bundle() {
-    install_workspace_instruction "CLAUDE.md" || return 1
+    install_workspace_instruction "QWEN.md" || return 1
     install_workspace_instruction "AGENTS.md" || return 1
     install_workspace_merge_base || return 1
 }
 
-echo "[2/6] Installing CLAUDE.md + AGENTS.md..."
+echo "[2/6] Installing QWEN.md + AGENTS.md..."
 if $DRY_RUN; then
-    echo "  [DRY RUN] Would copy: $TEMPLATE_DIR/CLAUDE.md → $WORKSPACE_DIR/CLAUDE.md (substituted)"
+    echo "  [DRY RUN] Would copy: $TEMPLATE_DIR/QWEN.md → $WORKSPACE_DIR/QWEN.md (substituted)"
     echo "  [DRY RUN] Would copy: $TEMPLATE_DIR/AGENTS.md → $WORKSPACE_DIR/AGENTS.md (substituted)"
 else
     # Workspace merge base is substituted. The template repo must never receive
@@ -753,12 +753,12 @@ else
     # Any unsafe destination aborts the actual setup path; a helper refusal must
     # never fall through into a false-success message or poisoned merge base.
     install_agent_instruction_bundle || exit 1
-    echo "  Copied CLAUDE.md (+ merge base) and AGENTS.md (substituted)"
+    echo "  Copied QWEN.md (+ merge base) and AGENTS.md (substituted)"
 fi
 
 # === 3. Copy memory to Claude projects directory ===
 echo "[3/6] Installing memory..."
-CLAUDE_MEMORY_DIR="$HOME/.claude/projects/$CLAUDE_PROJECT_SLUG/memory"
+CLAUDE_MEMORY_DIR="$HOME/.qwen/projects/$CLAUDE_PROJECT_SLUG/memory"
 if $DRY_RUN; then
     # Recursive find, not a top-level glob: memory/ has nested paths (memory/reference/agent-core.md)
     # that a "$TEMPLATE_DIR/memory/"*.md glob never matches (issue #1105).
@@ -792,7 +792,7 @@ else
         echo "  ВНИМАНИЕ: не удалось записать $WORKSPACE_DIR/.memory-deployed.tsv; update.sh будет отличать нетронутые файлы памяти от изменённых по другим признакам." >&2
     fi
 
-    # Create symlink so CLAUDE.md references (memory/protocol-open.md etc.) resolve from workspace root
+    # Create symlink so QWEN.md references (memory/protocol-open.md etc.) resolve from workspace root
     if [ ! -e "$WORKSPACE_DIR/memory" ]; then
         MEMORY_LN_ERR=$(ln -s "$CLAUDE_MEMORY_DIR" "$WORKSPACE_DIR/memory" 2>&1) || true
         # issue #869: on Windows (Git Bash without symlink rights) `ln -s` quietly
@@ -818,7 +818,7 @@ else
                     echo "    Копию перенести не удалось: удалите $WORKSPACE_DIR/memory вручную (память в $CLAUDE_MEMORY_DIR не тронута)." >&2
                 fi
             fi
-            echo "    Без ссылки CLAUDE.md не найдёт memory/ в рабочей папке." >&2
+            echo "    Без ссылки QWEN.md не найдёт memory/ в рабочей папке." >&2
             case "$(uname -s 2>/dev/null)" in
                 MINGW*|MSYS*|CYGWIN*)
                     echo "    Windows: включите «Режим разработчика» и запустите терминал с MSYS=winsymlinks:nativestrict," >&2
@@ -831,23 +831,23 @@ else
     fi
 fi
 
-# === 4. Copy .claude settings ===
+# === 4. Copy .qwen settings ===
 if $CORE_ONLY; then
     echo "[4/6] Claude settings... пропущено (core mode)"
 else
     echo "[4/6] Installing Claude settings..."
     if $DRY_RUN; then
-        if [ -f "$TEMPLATE_DIR/.claude/settings.local.json" ]; then
-            echo "  [DRY RUN] Would copy: settings.local.json → $WORKSPACE_DIR/.claude/settings.local.json"
+        if [ -f "$TEMPLATE_DIR/.qwen/settings.local.json" ]; then
+            echo "  [DRY RUN] Would copy: settings.local.json → $WORKSPACE_DIR/.qwen/settings.local.json"
         else
             echo "  WARN: settings.local.json not found in template."
         fi
         echo "  [DRY RUN] Would show MCP setup instructions (claude.ai/settings/connectors)"
     else
-        mkdir -p "$WORKSPACE_DIR/.claude"
-        if [ -f "$TEMPLATE_DIR/.claude/settings.local.json" ]; then
-            cp "$TEMPLATE_DIR/.claude/settings.local.json" "$WORKSPACE_DIR/.claude/settings.local.json"
-            echo "  Copied to $WORKSPACE_DIR/.claude/settings.local.json"
+        mkdir -p "$WORKSPACE_DIR/.qwen"
+        if [ -f "$TEMPLATE_DIR/.qwen/settings.local.json" ]; then
+            cp "$TEMPLATE_DIR/.qwen/settings.local.json" "$WORKSPACE_DIR/.qwen/settings.local.json"
+            echo "  Copied to $WORKSPACE_DIR/.qwen/settings.local.json"
         else
             echo "  WARN: settings.local.json not found in template, skipping."
         fi
@@ -859,49 +859,49 @@ else
         echo "  T1-T2: при первом запуске откроется браузер (OAuth через Ory)."
         echo "  T3-T4: CLI-режим (IWE_TIER=T3 в env или tier: T3 в ~/.iwe/config.yaml)."
         echo "  Необходима подписка «Инженерия интеллекта» (ранее «Бесконечное развитие»)."
-        echo "  После входа: /mcp в Claude Code."
+        echo "  После входа: /mcp в Qwen Code."
     fi
 fi
 
 # === 4b. Propagate skills, hooks, rules, lib, config, detectors, scripts, styles to workspace ===
 echo "[4b] Installing skills, hooks, rules, rules-lazy, lib, bin, config, detectors, scripts, styles..."
 if $DRY_RUN; then
-    echo "  [DRY RUN] Would copy .claude/{skills,hooks,rules,rules-lazy,lib,bin,config,detectors,scripts,agents,styles}/ → $WORKSPACE_DIR/.claude/"
+    echo "  [DRY RUN] Would copy .qwen/{skills,hooks,rules,rules-lazy,lib,bin,config,detectors,scripts,agents,styles}/ → $WORKSPACE_DIR/.qwen/"
 else
-    mkdir -p "$WORKSPACE_DIR/.claude"
+    mkdir -p "$WORKSPACE_DIR/.qwen"
     # lib/config/detectors — runtime dependencies of the capture bus (capture-bus.sh) and detectors
     # scripts — required by skills (e.g. load-extensions.sh)
     # styles — language style discipline (WP-412)
     # rules-lazy — lazy-loaded rule expansions (role-prefixes-full), parity with update.sh
     for subdir in skills hooks rules rules-lazy lib bin config detectors scripts agents styles templates; do
-        if [ -d "$TEMPLATE_DIR/.claude/$subdir" ]; then
-            cp -r "$TEMPLATE_DIR/.claude/$subdir" "$WORKSPACE_DIR/.claude/"
-            # .claude/bin holds extension-less executables (guarded-rm, issue #940)
-            [ "$subdir" = bin ] && chmod +x "$WORKSPACE_DIR/.claude/bin/"* 2>/dev/null || true
-            echo "  ✓ .claude/$subdir/ → $WORKSPACE_DIR/.claude/$subdir/"
+        if [ -d "$TEMPLATE_DIR/.qwen/$subdir" ]; then
+            cp -r "$TEMPLATE_DIR/.qwen/$subdir" "$WORKSPACE_DIR/.qwen/"
+            # .qwen/bin holds extension-less executables (guarded-rm, issue #940)
+            [ "$subdir" = bin ] && chmod +x "$WORKSPACE_DIR/.qwen/bin/"* 2>/dev/null || true
+            echo "  ✓ .qwen/$subdir/ → $WORKSPACE_DIR/.qwen/$subdir/"
         fi
     done
     # Copy settings.json (project-level, not local)
-    if [ -f "$TEMPLATE_DIR/.claude/settings.json" ]; then
-        cp "$TEMPLATE_DIR/.claude/settings.json" "$WORKSPACE_DIR/.claude/settings.json"
-        echo "  ✓ .claude/settings.json"
+    if [ -f "$TEMPLATE_DIR/.qwen/settings.json" ]; then
+        cp "$TEMPLATE_DIR/.qwen/settings.json" "$WORKSPACE_DIR/.qwen/settings.json"
+        echo "  ✓ .qwen/settings.json"
     fi
-    # issue #891: settings.json above was the only loose top-level .claude/
+    # issue #891: settings.json above was the only loose top-level .qwen/
     # file this installer ever copied. update-manifest.json declares several
     # more (rules-registry.yaml among them — AR.112/AR.113, read by
     # sql-pii-guard.sh on every .sql write) that this loop never delivered,
     # so a fresh install has them checksummed in the manifest but absent on
-    # disk. Mirror every remaining loose file in the template's .claude/
+    # disk. Mirror every remaining loose file in the template's .qwen/
     # root instead of naming each one, the same way the subdir loop above
     # mirrors directories rather than hardcoding a file list.
-    for f in "$TEMPLATE_DIR/.claude/"*; do
+    for f in "$TEMPLATE_DIR/.qwen/"*; do
         [ -f "$f" ] || continue
         name=$(basename "$f")
         case "$name" in
             settings.json|settings.local.json) continue ;;  # already handled above
         esac
-        cp "$f" "$WORKSPACE_DIR/.claude/$name"
-        echo "  ✓ .claude/$name"
+        cp "$f" "$WORKSPACE_DIR/.qwen/$name"
+        echo "  ✓ .qwen/$name"
     done
 fi
 
@@ -1010,7 +1010,7 @@ else
             # issue #786: a bare cp copied .mcp.json bypassing the placeholder
             # substitution procedure — {{HOME_DIR}} arrived literally, ext-railway could
             # never start. install_workspace_instruction is the same atomic
-            # copy+sed+move that CLAUDE.md/AGENTS.md already use earlier in the file.
+            # copy+sed+move that QWEN.md/AGENTS.md already use earlier in the file.
             if install_workspace_instruction ".mcp.json"; then
                 echo "  ✓ $MCP_DEST → iwe-knowledge (браузерный OAuth, tier=$_IWE_TIER)"
                 echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) setup tier=$_IWE_TIER mode=browser" >> "$_MCP_LOG"
@@ -1103,13 +1103,13 @@ generate_executor_catalog_for_governance() {
         echo "[6a] Generating executor-catalog.yaml..."
         if CATALOG_OUTPUT=$(IWE_ROOT="$WORKSPACE_DIR" IWE_GOVERNANCE_REPO="$GOVERNANCE_REPO" \
             "$YAML_PYTHON3" "$TEMPLATE_DIR/scripts/generate-executor-catalog.py" \
-            --skills-dir "$WORKSPACE_DIR/.claude/skills" \
+            --skills-dir "$WORKSPACE_DIR/.qwen/skills" \
             --output "$WORKSPACE_DIR/$GOVERNANCE_REPO/scripts/executor-catalog.yaml" 2>&1); then
             echo "$CATALOG_OUTPUT" | sed 's/^/  /'
         else
             echo "$CATALOG_OUTPUT" | sed 's/^/  /'
             echo "  ⚠ executor-catalog.yaml не сгенерирован — запусти вручную:"
-            echo "    IWE_ROOT=\"$WORKSPACE_DIR\" \"$YAML_PYTHON3\" $TEMPLATE_DIR/scripts/generate-executor-catalog.py --skills-dir \"$WORKSPACE_DIR/.claude/skills\" --output \"$WORKSPACE_DIR/$GOVERNANCE_REPO/scripts/executor-catalog.yaml\""
+            echo "    IWE_ROOT=\"$WORKSPACE_DIR\" \"$YAML_PYTHON3\" $TEMPLATE_DIR/scripts/generate-executor-catalog.py --skills-dir \"$WORKSPACE_DIR/.qwen/skills\" --output \"$WORKSPACE_DIR/$GOVERNANCE_REPO/scripts/executor-catalog.yaml\""
         fi
     fi
 }
@@ -1499,7 +1499,7 @@ else
 fi
 
 # === 8b. VS Code default permission mode (WP-406, onboarding VS Code track) ===
-# Without this, every new VS Code window starts the Claude Code extension in
+# Without this, every new VS Code window starts the Qwen Code extension in
 # Manual (ask before each edit) — a newcomer picking Auto in one window sees
 # it reset in the next, because the extension's own default is Manual.
 if $CORE_ONLY; then
@@ -1552,7 +1552,7 @@ else
     echo "=========================================="
     echo ""
     echo "Verify installation:"
-    echo "  ✓ CLAUDE.md:   $WORKSPACE_DIR/CLAUDE.md"
+    echo "  ✓ QWEN.md:   $WORKSPACE_DIR/QWEN.md"
     echo "  ✓ Memory:      $CLAUDE_MEMORY_DIR/ ($(find "$CLAUDE_MEMORY_DIR" -type f -name "*.md" 2>/dev/null | wc -l | tr -d ' ') files)"
     echo "  ✓ Symlink:     $WORKSPACE_DIR/memory → $CLAUDE_MEMORY_DIR"
     echo "  ✓ $GOVERNANCE_REPO: $MY_STRATEGY_DIR/"
@@ -1562,7 +1562,7 @@ else
     echo "Next steps:"
     echo "  1. cd $WORKSPACE_DIR"
     if $CORE_ONLY; then
-        echo "  2. Запустите ваш AI CLI (Claude Code, Codex, Aider, Continue.dev и др.)"
+        echo "  2. Запустите ваш AI CLI (Qwen Code, Codex, Aider, Continue.dev и др.)"
         echo "  3. Скажите: «Проведём первую стратегическую сессию»"
     else
         echo "  2. claude"

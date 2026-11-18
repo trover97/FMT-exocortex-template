@@ -67,7 +67,7 @@ GOVERNANCE_REPO="${GOVERNANCE_REPO:-DS-strategy}"
 # a README and audit logs, or personal scripts plus symlinks into the template,
 # is not a checkout: pointing IWE_SCRIPTS there hides every platform script.
 # The marker proves "live checkout", not completeness of its file set.
-# Keep in sync with .claude/lib/iwe-env-bootstrap.sh (same rule, same marker).
+# Keep in sync with .qwen/lib/iwe-env-bootstrap.sh (same rule, same marker).
 #
 # Issue #957 recurrence (Artem, 21.10): a real session-guard.sh file is not
 # necessarily a live checkout either. He had a short local workaround for
@@ -177,7 +177,7 @@ if [ -n "$OLD_IWE_SCRIPTS" ]; then
         # Deliberately not gated by --quiet: this is the case --quiet callers must see.
         echo "  ⚠ IWE_SCRIPTS: $OLD_SCRIPTS_RESOLVED → $NEW_SCRIPTS_RESOLVED"
         echo "    Рабочая scripts/ берётся, только если в ней обычный (не симлинк) session-guard.sh; иначе — scripts/ шаблона. Проверьте, что путь ожидаемый."
-        echo "    Новое значение подхватят только новые оболочки и Claude Code после перезапуска."
+        echo "    Новое значение подхватят только новые оболочки и Qwen Code после перезапуска."
     fi
 fi
 

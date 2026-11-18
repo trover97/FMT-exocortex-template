@@ -8,19 +8,19 @@
 #   bash validate-fmt-scripts.sh [scripts-dir] [--scripts|--settings-json|--all]
 #
 #   --scripts       check scripts only (1, 2, 4) — together with --all by default
-#   --settings-json check only .claude/settings.json (check 3)
+#   --settings-json check only .qwen/settings.json (check 3)
 #   --all           full check [default]
 #
 # What it checks:
 #   1. *.sh/*.py: the user's absolute home path (/Users/<name> or /home/<name>)
 #   2. *.sh/*.py: bare name of the author's governance repo without ${VAR:-default} protection
-#   3. .claude/settings.json: hook commands on .claude/hooks/X.sh must have the prefix
-#      $CLAUDE_PROJECT_DIR/ (otherwise they break when cwd shifts: subagent/worktree/MCP)
+#   3. .qwen/settings.json: hook commands on .qwen/hooks/X.sh must have the prefix
+#      $QWEN_PROJECT_DIR/ (otherwise they break when cwd shifts: subagent/worktree/MCP)
 #   4. *.sh under set -e: ((VAR++)) without || true → silent exit when VAR==0 (B8 gap)
-#   5. .claude/skills/*/SKILL.md: $HOME/IWE/<author-repo>/ and ~/IWE/<author-repo>/
+#   5. .qwen/skills/*/SKILL.md: $HOME/IWE/<author-repo>/ and ~/IWE/<author-repo>/
 #      without env-fallback ${IWE_GOVERNANCE_REPO:-...} (WP-337 Z-Phase6, June 1, 2026)
-#   6. .claude/skills/*/SKILL.md: L1 layer without the <!-- USER-SPACE --> marker
-#   7. .claude/skills/*/SKILL.md: L1 layer with an unresolved <!-- L3-author: KEY=value --> (WP-5)
+#   6. .qwen/skills/*/SKILL.md: L1 layer without the <!-- USER-SPACE --> marker
+#   7. .qwen/skills/*/SKILL.md: L1 layer with an unresolved <!-- L3-author: KEY=value --> (WP-5)
 
 set -uo pipefail
 
@@ -111,7 +111,7 @@ if [[ "$MODE" != "settings-json" ]]; then
         # fourth branch is moved to a flag, the check stayed single, below the case.
         #
         # A guard by shebang/+x (discussed when closing the issue) does not work here:
-        # the .claude/hooks/tests/*.sh files are themselves real executable test
+        # the .qwen/hooks/tests/*.sh files are themselves real executable test
         # harnesses with a shebang (run directly), not fixtures-as-files.
         # A fixture is a STRING LITERAL inside `expect "..." pass '...'`
         # (a call argument), not the whole file; a file-level guard cannot
@@ -121,10 +121,10 @@ if [[ "$MODE" != "settings-json" ]]; then
         # scaffolding by convention, its contents are not scanned.
         skip_hardcode_check=0
         case "$f" in
-            scripts/tests/*|*/scripts/tests/*) skip_hardcode_check=1 ;;  # issues #446/#450: фикстуры конвенции scripts/tests/ — не сканировать. Уже, чем */tests/* — другие tests/-каталоги репо (.claude/skills/*/tests/, guide-kit/tests/) продолжают проверяться как обычно.
+            scripts/tests/*|*/scripts/tests/*) skip_hardcode_check=1 ;;  # issues #446/#450: фикстуры конвенции scripts/tests/ — не сканировать. Уже, чем */tests/* — другие tests/-каталоги репо (.qwen/skills/*/tests/, guide-kit/tests/) продолжают проверяться как обычно.
             setup/test-*|*/setup/test-*|setup/smoke-test-*|*/setup/smoke-test-*) skip_hardcode_check=1 ;;  # issue #499: setup/ test harnesses by naming convention — their fail messages and grep patterns CONTAIN the literal as the subject of their own check; a class-based path exception (not a per-line heuristic), the rest of setup/ is scanned as before.
             setup/validate-template.sh|*/setup/validate-template.sh) skip_hardcode_check=1 ;;  # WP-544 D28: same class as #499 — this file itself scans the repo for author-specific literals (check [1/5]) via a string array in a for loop; its own pattern list is the subject of the check, not a hardcode. Do not quote the literals verbatim in this comment — [1/5] in validate-fmt-scripts.sh itself would catch it.
-            .claude/hooks/tests/*|*/.claude/hooks/tests/*) skip_hardcode_check=1 ;;  # issue #759: hook-test fixtures — same class as scripts/tests/.
+            .qwen/hooks/tests/*|*/.qwen/hooks/tests/*) skip_hardcode_check=1 ;;  # issue #759: hook-test fixtures — same class as scripts/tests/.
         esac
         if [ "$skip_hardcode_check" != "1" ]; then
         if grep -q "$AUTHOR_GOV_REPO" "$f" 2>/dev/null; then
@@ -262,11 +262,11 @@ if [[ "$MODE" != "settings-json" ]]; then
 fi
 
 if [[ "$MODE" != "scripts" && "$MODE" != "settings-json" ]]; then
-    # Check 5: .claude/skills/*/SKILL.md — literal hardcoded file paths
+    # Check 5: .qwen/skills/*/SKILL.md — literal hardcoded file paths
     # Catches: $HOME/IWE/<author-repo>/scripts/... and ~/IWE/<author-repo>/scripts/...
     # Allowed: $HOME/IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/scripts/... (env-fallback)
     # Allowed: bare DS-strategy in comments/documentation
-    SKILLS_DIR="$FMT_ROOT/.claude/skills"
+    SKILLS_DIR="$FMT_ROOT/.qwen/skills"
     if [[ -d "$SKILLS_DIR" ]]; then
         skills_checked=0
         while IFS= read -r -d '' md_file; do
@@ -351,23 +351,23 @@ if [[ "$MODE" != "scripts" && "$MODE" != "settings-json" ]]; then
 fi
 
 if [[ "$MODE" != "scripts" ]]; then
-    # Check 3: .claude/settings.json — hook commands must come with the $CLAUDE_PROJECT_DIR/ prefix
-    SETTINGS_JSON="$FMT_ROOT/.claude/settings.json"
+    # Check 3: .qwen/settings.json — hook commands must come with the $QWEN_PROJECT_DIR/ prefix
+    SETTINGS_JSON="$FMT_ROOT/.qwen/settings.json"
     if [[ -f "$SETTINGS_JSON" ]]; then
         if command -v jq >/dev/null 2>&1; then
-            # Collect all .hooks.*[].hooks[].command, look for those mentioning .claude/hooks/
+            # Collect all .hooks.*[].hooks[].command, look for those mentioning .qwen/hooks/
             bad_cmds=$(jq -r '.hooks // {} | to_entries[] | .value[] | .hooks[]? | .command // empty' "$SETTINGS_JSON" \
-                | grep -E '\.claude/hooks/' \
-                | grep -vE '^\$CLAUDE_PROJECT_DIR/' || true)
+                | grep -E '\.qwen/hooks/' \
+                | grep -vE '^\$QWEN_PROJECT_DIR/' || true)
             if [[ -n "$bad_cmds" ]]; then
-                echo "  ❌ .claude/settings.json: хук-команды без префикса \$CLAUDE_PROJECT_DIR/" >&2
+                echo "  ❌ .qwen/settings.json: хук-команды без префикса \$QWEN_PROJECT_DIR/" >&2
                 echo "$bad_cmds" | sed 's/^/     /' >&2
-                echo "     → Замени на \$CLAUDE_PROJECT_DIR/.claude/hooks/<имя>.sh" >&2
+                echo "     → Замени на \$QWEN_PROJECT_DIR/.qwen/hooks/<имя>.sh" >&2
                 echo "     → Док: https://code.claude.com/docs/en/hooks#reference-scripts-by-path" >&2
                 errors=$((errors + 1))
             fi
         else
-            echo "  ⚠ jq не найден, пропускаю проверку .claude/settings.json" >&2
+            echo "  ⚠ jq не найден, пропускаю проверку .qwen/settings.json" >&2
         fi
     fi
 fi

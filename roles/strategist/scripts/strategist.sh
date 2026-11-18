@@ -1,6 +1,6 @@
 #!/bin/bash
 # Strategist Agent Runner
-# Runs Claude Code with a given scenario
+# Runs Qwen Code with a given scenario
 
 set -e
 
@@ -145,6 +145,15 @@ fi
 CLAUDE_TIMEOUT=1800  # 30 min: protection against Claude CLI hanging
 
 # AI CLI: override via environment variables (see extractor.sh)
+# QWEN-OFFLINE:A12 — this fork drives role scripts with Qwen Code, not Claude Code.
+# Only when the caller set nothing: an explicit AI_CLI / AI_CLI_EXTRA_FLAGS still wins.
+# Qwen rejects unknown flags, so no --dangerously-skip-permissions and no Claude model
+# name (the flags below replace the --model argument); Claude tool names are accepted.
+if [ -z "${AI_CLI:-}" ] && command -v qwen >/dev/null 2>&1; then
+    AI_CLI="$(command -v qwen)"
+    AI_CLI_EXTRA_FLAGS="${AI_CLI_EXTRA_FLAGS:---allowedTools Read,Write,Edit,Glob,Grep,Bash}"
+fi
+# /QWEN-OFFLINE:A12
 AI_CLI="${AI_CLI:-$CLAUDE_PATH}"
 AI_CLI_PROMPT_FLAG="${AI_CLI_PROMPT_FLAG:--p}"
 
@@ -932,14 +941,14 @@ ${prompt}"
         return "$SESSION_OPEN_FAILED_RC"
     fi
 
-    # Run Claude Code with the command content as the prompt (with timeout protection)
+    # Run Qwen Code with the command content as the prompt (with timeout protection)
     local rc=0
     local model_args=()
     if [ -n "$model_override" ]; then
         model_args=(--model "$model_override")
         log "Model override: $model_override"
     fi
-    # NB: --dangerously-skip-permissions is not used -- Claude Code blocks the flag
+    # NB: --dangerously-skip-permissions is not used -- Qwen Code blocks the flag
     # under root/sudo (Linux cron). --allowedTools sets an explicit whitelist, which is enough.
     # The calendar connector is in the whitelist (issue #581): without it the morning run does not see
     # the day's meetings under any configuration. The server name depends on the installation --
@@ -949,7 +958,7 @@ ${prompt}"
     local calendar_mcp="${IWE_CALENDAR_MCP_SERVERS:-mcp__claude_ai_Google_Calendar}"
     [ "$calendar_source" = "connector" ] || calendar_mcp=""
     # AR.293: AI_CLI_EXTRA_FLAGS is a substitution point for when AI_CLI points
-    # to something other than Claude Code (--model/--allowedTools are its flags, not portable as is).
+    # to something other than Qwen Code (--model/--allowedTools are its flags, not portable as is).
     # The default reproduces the previous behavior one to one.
     local extra_flags
     if [ -n "${AI_CLI_EXTRA_FLAGS:-}" ]; then
@@ -1670,7 +1679,7 @@ acquire_captures_write_lock() {
 }
 
 # Read strategy_day from the config (L4 Personal)
-# issue #729: previously the only source was Claude Code auto-memory at the
+# issue #729: previously the only source was Qwen Code auto-memory at the
 # literal path "-Users-$(whoami)-IWE" -- it breaks silently if the workspace
 # is not literally ~/IWE (a symlink or another path on Linux/WSL), and the fallback to
 # monday gave no signal of the error. The governance repo copy is the same
@@ -1681,17 +1690,17 @@ resolve_rhythm_config() {
     local ws="$1" iwe_workspace="$2"
     local rhythm_config="$ws/exocortex/day-rhythm-config.yaml"
     if [ ! -f "$rhythm_config" ]; then
-        # Fallback: Claude Code auto-memory, the path is derived from the REAL workspace
+        # Fallback: Qwen Code auto-memory, the path is derived from the REAL workspace
         # (pwd -P resolves symlinks), not from the literal "~/IWE".
         local ws_real
         ws_real="$(cd "${iwe_workspace:-$HOME/IWE}" 2>/dev/null && pwd -P || true)"
         if [ -n "$ws_real" ]; then
-            # tr '/_.' '-', not sed 's#/#-#g': Claude Code slugifies the path,
+            # tr '/_.' '-', not sed 's#/#-#g': Qwen Code slugifies the path,
             # replacing "_" and "." with "-" as well (see memory-exocortex-sync.sh) --
             # the sed-only variant would silently break for workspace paths with "." or "_".
             local ws_slug
             ws_slug="$(printf '%s' "$ws_real" | tr '/_.' '-')"
-            rhythm_config="$HOME/.claude/projects/${ws_slug}/memory/day-rhythm-config.yaml"
+            rhythm_config="$HOME/.qwen/projects/${ws_slug}/memory/day-rhythm-config.yaml"
         fi
     fi
     printf '%s\n' "$rhythm_config"

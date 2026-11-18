@@ -12,7 +12,7 @@
 #   1. manifest_paths    — пути из update-manifest.json существуют в дереве
 #   2. seed_references   — protocol-*.md ссылки на seed/ существуют в seed/
 #   3. extension_table   — extensions/README.md table ↔ реальное placement EXTENSION POINT в protocol-*/SKILL.md
-#   4. hook_artifact     — .claude/hooks/*.sh не грепают TOOL_INPUT по artifact-именам (антипаттерн R4.5)
+#   4. hook_artifact     — .qwen/hooks/*.sh не грепают TOOL_INPUT по artifact-именам (антипаттерн R4.5)
 #   5. runner_readonly   — runners резолвят prompts/role.yaml/notify через $IWE_TEMPLATE (R5.1, 0.29.3)
 #   6. install_failfast  — install.sh имеют grep '{{' check на PLIST_SRC (R5.2, 0.29.3)
 #   7. prompts_python_coverage — нет hardcoded DS-strategy в prompts и .py (R6.1*, 0.29.5)
@@ -124,8 +124,8 @@ if [ -f extensions/README.md ]; then
     # "ДО `git commit` проверить `extensions/X.md`"). Расширили: ищем
     # `extensions/X.md` отдельным regex, без зависимости от «EXTENSION POINT».
     real_eps=$(grep -hroE 'extensions/[a-z-]+\.[a-z]+\.md' \
-        memory/protocol-*.md .claude/skills/*/SKILL.md \
-        .claude/skills/*/scripts/*.sh 2>/dev/null | sort -u || true)
+        memory/protocol-*.md .qwen/skills/*/SKILL.md \
+        .qwen/skills/*/scripts/*.sh 2>/dev/null | sort -u || true)
 
     # For each entry in declared_table, check that it's loaded somewhere
     while IFS= read -r line; do
@@ -154,7 +154,7 @@ log ""
 # === Detector 4: hook trigger pattern (hooks-design.md принцип) ===
 log "[4/11] hook_artifact — hooks не грепают TOOL_INPUT (R4.5 антипаттерн)..."
 HOOK_VIOLATIONS=0
-if [ -d .claude/hooks ]; then
+if [ -d .qwen/hooks ]; then
     while IFS= read -r f; do
         # WP-273 R6 fix (Round 5 sub-agent assessment): уточнили regex до
         # КОНКРЕТНОГО антипаттерна (R4.5) — grep'ать TOOL_INPUT по artifact-именам
@@ -164,7 +164,7 @@ if [ -d .claude/hooks ]; then
             log "  ⚠ $f: grep TOOL_INPUT по artifact-именам (нарушает hooks-design.md, использовать staged-files)"
             HOOK_VIOLATIONS=$((HOOK_VIOLATIONS + 1))
         fi
-    done < <(find .claude/hooks -name "*.sh" -type f 2>/dev/null)
+    done < <(find .qwen/hooks -name "*.sh" -type f 2>/dev/null)
 
     if [ "$HOOK_VIOLATIONS" -eq 0 ]; then
         log "  ✅ PASS"
@@ -173,7 +173,7 @@ if [ -d .claude/hooks ]; then
         # WARN, не FAIL — есть валидные case'ы (debug logging)
     fi
 else
-    log "  ⊘ SKIP (нет .claude/hooks/)"
+    log "  ⊘ SKIP (нет .qwen/hooks/)"
 fi
 log ""
 
@@ -303,7 +303,7 @@ while IFS= read -r path; do
         fi
         ;;
     esac
-done < <(awk '/^substituted:/,/^[a-z_]+:/' .claude/runtime-overlay.yaml 2>/dev/null | grep -oE '^\s+- .*' | sed 's/^[[:space:]]*-[[:space:]]*//' | sed 's/[[:space:]]*#.*//')
+done < <(awk '/^substituted:/,/^[a-z_]+:/' .qwen/runtime-overlay.yaml 2>/dev/null | grep -oE '^\s+- .*' | sed 's/^[[:space:]]*-[[:space:]]*//' | sed 's/[[:space:]]*#.*//')
 
 if [ "$SED_VIOLATIONS" -eq 0 ]; then
     log "  ✅ PASS"

@@ -1,4 +1,11 @@
 #!/bin/bash
+# === OFFLINE / NO-SCHEDULER GUARD (qwen-macos-offline) ===
+# Эта ветка: macOS, сознательно без планировщика (launchd) — политика офлайн-сборки.
+# Установка задач по расписанию не выполняется. Рабочие скрипты роли запускаются
+# ВРУЧНУЮ — см. MANUAL-JOBS.md в корне репозитория.
+echo "[$(basename "$(dirname "$0")")] Планировщик отключён (offline-сборка). Запуск задач — вручную, см. MANUAL-JOBS.md" >&2
+exit 0
+# === /GUARD ===
 # Synchronizer: installation of the central dispatcher (launchd)
 # Replaces the separate Strategist launchd agents with a single scheduler
 set -e

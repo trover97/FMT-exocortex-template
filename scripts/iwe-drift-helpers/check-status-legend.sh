@@ -11,7 +11,7 @@
 #   I3. **Format compliance — terminal id:** rows with a crossed id `| ~~<num>~~ |` have a
 #       terminal status from {✅, 📦, ↗️, ❌}.
 #
-# I2 + I3 — the id-format ↔ status invariant (see .claude/rules/formatting.md "Tables with WPs").
+# I2 + I3 — the id-format ↔ status invariant (see .qwen/rules/formatting.md "Tables with WPs").
 # Broken = mismatch between row-format and status, which breaks counters (linear-sync.sh, day-close.sh).
 #
 # Usage:
@@ -26,7 +26,7 @@ set -eu
 
 # Load unified environment: WORKSPACE_DIR, IWE_ROOT, IWE_SCRIPTS, etc.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/../../.claude/lib/iwe-env-bootstrap.sh" || exit 1
+source "$SCRIPT_DIR/../../.qwen/lib/iwe-env-bootstrap.sh" || exit 1
 REGISTRY="${REGISTRY:-$IWE_ROOT/${IWE_GOVERNANCE_REPO:-}/docs/WP-REGISTRY.md}"
 MODE="${MODE:-all}"
 

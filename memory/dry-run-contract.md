@@ -29,7 +29,7 @@ description: "Операционный файл памяти IWE"
 3. **Атомарные переходы и создание:** только `active→completed`, монотонно, tmp+mv внутри короткого транзакционного замка (`transaction.lock/` через `mkdir`, владелец замка pid+nonce — доказуемо осиротевший замок уносится уникальным именем; освобождение только по своему nonce). Создание — тоже под замком и тоже только через helper (`scripts/dry-run-begin.sh`: скан заново, отказ при активной репетиции, эксклюзивное создание sentinel после state). Завершение делает **команда завершения** (`scripts/dry-run-complete.sh`, capability token), Stop-хук — идемпотентный fallback inline по `gate_id`+`owner_session_id` (не срабатывает для репетиции с `stop_fallback: "hold"` — её начинают `dry-run-begin.sh <initiator> <session_id> hold`, когда подагент может уйти в фон и пережить ход владельца; такую репетицию завершает только команда завершения, ограничитель — TTL флага, issue #1435). Цена `hold`: флаг общий для хоста, поэтому забытая удержанная репетиция до истечения TTL блокирует запись во всех сессиях пользователя, а после TTL блокируется всё, включая `rm` агента. Восстановление — из терминала пилота в два шага: `rm -f /tmp/iwe-dry-run.flag`, затем `dry-run-complete.sh <gate_id> manual-recovery` (без `hold` второй шаг делал Stop-хук) (весь скан под одним замком, переход только при ровно одном валидном v2 active своей сессии, sentinel только после успешного перехода). Повторное завершение не перетирает metadata.
 4. **Доказуемое сиротство** (вместо вечной блокировки): `owner_pid` мёртв ИЛИ его `lstart` не совпал (pid reuse) **И** ни одного живого процесса с `owner_pgid` → `completed(reason=orphan-sweep)` → allow. Любая неоднозначность (ошибка ps, битый state, неизвестный gate_id, живой pgid) → прежний вечный fail-closed с командой восстановления `dry-run-complete.sh <gate_id> manual-recovery`.
 5. **Известные остатки (приняты осознанно):** (а) если рантайм помещает сам гейт в process group владельца, pgid-скан всегда видит «живых» → вечный fail-closed (безопасное направление); (б) `lstart` — текстовый платформенный формат: живой pid с ДРУГИМ стартом = pid reuse (исходный владелец доказуемо мёртв), а НЕЧИТАЕМЫЙ ps/пустой вывод = «не доказано» → fail-closed; (c) атаки от того же uid вне threat model (защита — 0700 каталог + lstat-проверки от symlink/чужого владельца); (d) PGID reuse даёт только ложный fail-closed; (e) env-оверрайды путей (`IWE_DRY_RUN_DIR`/`IWE_DRY_RUN_SENTINEL`) действуют только при наличии маркера `.iwe-dry-run-test-mode` в override-каталоге — ambient-переменные из конфигурации запуска защиту не отключают.
-6. **Один каталог и один критерий приватности (issue #1447):** путь каталога и его проверку вычисляет только `.claude/lib/dry-run-dir.sh` — его подключают гейт, Stop-хук, `dry-run-begin.sh` и `dry-run-complete.sh`. Политика везде одна: каталог, приватность которого не доказана, отклоняется (fail-closed), в том числе без активной репетиции. Различается только критерий: Linux, macOS, Cygwin — владелец + права 0700; Git Bash (`uname -s` MINGW*/MSYS*, где `chmod` не действует и права всегда читаются как 755) — каталог `%LOCALAPPDATA%\iwe-dry-run`, при создании `icacls /inheritance:r` с полным доступом только текущему пользователю и SYSTEM, при каждой проверке `icacls /save` и разбор SDDL: защищённый список (флаг `P`), только разрешающие записи для SID текущего пользователя (из `whoami /user`) и SYSTEM, с наследованием OICI и полным доступом. Любое другое (чужие и групповые SID, запрет, нечитаемый вывод, ошибка или отсутствие `%SYSTEMROOT%\System32\icacls.exe`, пустая `LOCALAPPDATA`) — отказ; `icacls` из PATH не используется, запасной проверки по битам прав нет. Каталог, который проверка только что создала и не смогла закрыть, удаляется; существующий чужой — только отклоняется. Остаток: локальный администратор может забрать каталог во владение; на настоящем Windows проверка пока не прогонялась (только заглушки в тестах).
+6. **Один каталог и один критерий приватности (issue #1447):** путь каталога и его проверку вычисляет только `.qwen/lib/dry-run-dir.sh` — его подключают гейт, Stop-хук, `dry-run-begin.sh` и `dry-run-complete.sh`. Политика везде одна: каталог, приватность которого не доказана, отклоняется (fail-closed), в том числе без активной репетиции. Различается только критерий: Linux, macOS, Cygwin — владелец + права 0700; Git Bash (`uname -s` MINGW*/MSYS*, где `chmod` не действует и права всегда читаются как 755) — каталог `%LOCALAPPDATA%\iwe-dry-run`, при создании `icacls /inheritance:r` с полным доступом только текущему пользователю и SYSTEM, при каждой проверке `icacls /save` и разбор SDDL: защищённый список (флаг `P`), только разрешающие записи для SID текущего пользователя (из `whoami /user`) и SYSTEM, с наследованием OICI и полным доступом. Любое другое (чужие и групповые SID, запрет, нечитаемый вывод, ошибка или отсутствие `%SYSTEMROOT%\System32\icacls.exe`, пустая `LOCALAPPDATA`) — отказ; `icacls` из PATH не используется, запасной проверки по битам прав нет. Каталог, который проверка только что создала и не смогла закрыть, удаляется; существующий чужой — только отклоняется. Остаток: локальный администратор может забрать каталог во владение; на настоящем Windows проверка пока не прогонялась (только заглушки в тестах).
 7. **Legacy:** owner-*.token старого формата (без state-файла) — прежняя вечная ветка с `rm -f`-восстановлением. `sentinel+completed` — самолечение: stale sentinel снимается после сверки gate_id.
 
 ## Sentinel-механика
@@ -87,7 +87,7 @@ v2 (WP-7/BUGTRIAGE2, issue #237): не regex по всей строке кома
 (3) классифицировать каждый фрагмент по первому слову (после пропуска `VAR=val`/
 `command`/`env`/`nohup`/`time`/`sudo`). Закрывает одновременно subshell-обход
 (`(git commit)`) и ложные срабатывания на текст внутри кавычек (`echo "git commit"`).
-Реализация — `.claude/hooks/dry-run-gate.sh`, секция «Bash matchers».
+Реализация — `.qwen/hooks/dry-run-gate.sh`, секция «Bash matchers».
 
 Классифицируемые команды (по первому слову фрагмента):
 
@@ -103,7 +103,7 @@ python|python3 <script>           # indirect execution — block, КРОМЕ whi
 python|python3 -c "..."           # inline snippet — вне контракта по threat model (см. ниже), allow
 eval|source|.|xargs               # indirect execution — payload неинспектируем после quote-strip
 ./x | ../x | $VAR/x | ~/x | x.sh | /abs/x.py   # программа по пути или скрипт по имени — indirect execution, block (issue #1434)
-                                  # Читается .claude/hooks/dry-run-cmd-parse.pl по исходной команде с учётом кавычек,
+                                  # Читается .qwen/hooks/dry-run-cmd-parse.pl по исходной команде с учётом кавычек,
                                   # $'..', ${..}, тел heredoc и комментариев; командное слово — после присваиваний,
                                   # перенаправлений, ключевых слов (if/while/!/…) и обёрток с опциями (env, sudo,
                                   # command, time, exec, nice, timeout, stdbuf, ionice). Блок: начинается с ./ или ../;
@@ -122,8 +122,8 @@ Whitelist read-only helpers (issue #264) — разрешены под dry-run, 
 в коде скрипта нет (проверяется при добавлении, см. правило ниже):
 
 ```
-.claude/scripts/load-extensions.sh                    # относительный, от workspace-root
-$HOME/IWE/.claude/scripts/load-extensions.sh          # абсолютный, захардкожен
+.qwen/scripts/load-extensions.sh                    # относительный, от workspace-root
+$HOME/IWE/.qwen/scripts/load-extensions.sh          # абсолютный, захардкожен
 scripts/day-close-prepare.sh                          # относительный (issue #315) — рабочий,
                                                         # только если CWD внутри FMT-exocortex-template
 ${IWE_SCRIPTS:-$HOME/IWE/scripts}/day-close-prepare.sh # абсолютный (нестатический — реальный вложенный
@@ -157,7 +157,7 @@ LD_* и DYLD_* (LD_PRELOAD, LD_AUDIT, LD_LIBRARY_PATH, DYLD_INSERT_LIBRARIES…)
 слово в кавычках без пробелов (`"hash"`) и `$(…)` внутри двойных кавычек по-прежнему читаются
 как код, а при `env` или встроенной команде присваивания текст в кавычках проверяется как
 присваивание. Простое упоминание имени (`grep -r PYTHONPATH .`) проходит. Относительные пути
-помощников, включая `.claude/scripts/load-extensions.sh`, после cd/pushd/popd не доверяются.
+помощников, включая `.qwen/scripts/load-extensions.sh`, после cd/pushd/popd не доверяются.
 
 Известные пределы гейта (issue #1454, ревью 3). Гейт — список запрещённых форм команд
 (denylist), а не песочница: форма, которой нет в списке, проходит, даже если исполняет запись.
@@ -176,8 +176,8 @@ Python-whitelist (issue #460 путь 5, добавлен после того к
 безусловный block ломает `close day` на первом же шаге):
 
 ```
-${IWE_TEMPLATE:-<HOME_DIR>/IWE/FMT-exocortex-template}/.claude/scripts/memory-drift-scan.py
-${IWE_TEMPLATE:-<HOME_DIR>/IWE/FMT-exocortex-template}/.claude/scripts/check-index-health.py
+${IWE_TEMPLATE:-<HOME_DIR>/IWE/FMT-exocortex-template}/.qwen/scripts/memory-drift-scan.py
+${IWE_TEMPLATE:-<HOME_DIR>/IWE/FMT-exocortex-template}/.qwen/scripts/check-index-health.py
 ```
 
 Обе — read-only диагностика (day-close/SKILL.md шаги 1-2), без write-путей в коде
@@ -190,12 +190,12 @@ allow, глотая command substitution маркером раньше, чем �
 сегментировать. `rule-classifier.py` (day-close/SKILL.md шаг «Rule-engine»)
 сознательно НЕ в whitelist — сам SKILL.md документирует, что скрипт вносит правки.
 `{{HOME_DIR}}` в исходнике SKILL.md — шаблонный плейсхолдер репозитория-шаблона
-(setup.sh рендерит только CLAUDE.md, не `.claude/skills/`); ожидается, что
+(setup.sh рендерит только QWEN.md, не `.qwen/skills/`); ожидается, что
 исполняющий агент подставляет реальный путь при формировании Bash-вызова — тот
 же принцип, что у уже существующего `WL_ABS`/`WL_ABS2` (bash-whitelist).
 
-Абсолютный паттерн захардкожен в `$HOME/IWE`, не glob `*/.claude/...` и не
-`$IWE_ROOT` — иначе подложный `/tmp/.claude/scripts/load-extensions.sh` или
+Абсолютный паттерн захардкожен в `$HOME/IWE`, не glob `*/.qwen/...` и не
+`$IWE_ROOT` — иначе подложный `/tmp/.qwen/scripts/load-extensions.sh` или
 env-инъекция `IWE_ROOT=/tmp/evil` прошли бы gate (review-01 High, review-02 H1).
 Пользователи с нестандартным расположением workspace вызывают helper
 относительным путём из корня workspace.
@@ -203,8 +203,8 @@ env-инъекция `IWE_ROOT=/tmp/evil` прошли бы gate (review-01 High
 Реальный (и единственный документированный) вызов `day-close-prepare.sh` —
 `bash "$IWE_SCRIPTS/day-close-prepare.sh"` (day-close/SKILL.md, day-close-details.md).
 `$IWE_SCRIPTS` по умолчанию = `$WORKSPACE_DIR/FMT-exocortex-template/scripts`
-(`scripts/` не копируется в workspace-root, в отличие от `.claude/` — см.
-`.claude/lib/iwe-env-bootstrap.sh:86`), поэтому ни один из двух путей выше сам
+(`scripts/` не копируется в workspace-root, в отличие от `.qwen/` — см.
+`.qwen/lib/iwe-env-bootstrap.sh:86`), поэтому ни один из двух путей выше сам
 по себе не совпадает с реальным вызовом: переменная в кавычках `"$IWE_SCRIPTS/..."`
 попадает под общее схлопывание кавычек (шаг 1 Bash matchers) раньше, чем до неё
 доходит whitelist-case, и превращается в неотличимый токен `QSTR`. Точечная

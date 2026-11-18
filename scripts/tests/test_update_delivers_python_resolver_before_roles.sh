@@ -26,7 +26,7 @@ else
     fail "resolver missing from update-manifest.json — update-only installs will not receive it"
 fi
 
-# 2. Resolver is executable in both delivery topologies. The `.claude/lib`
+# 2. Resolver is executable in both delivery topologies. The `.qwen/lib`
 # copy is what fresh-installed hooks can actually reach; exact equality keeps
 # the two entrypoints from becoming different dependency policies.
 if [ -x "$ROOT/scripts/lib/find-python3.sh" ]; then
@@ -34,12 +34,12 @@ if [ -x "$ROOT/scripts/lib/find-python3.sh" ]; then
 else
     fail "template resolver is not executable"
 fi
-if [ -x "$ROOT/.claude/lib/find-python3.sh" ]; then
+if [ -x "$ROOT/.qwen/lib/find-python3.sh" ]; then
     pass "installed-hook resolver is executable"
 else
     fail "installed-hook resolver is not executable"
 fi
-if cmp -s "$ROOT/scripts/lib/find-python3.sh" "$ROOT/.claude/lib/find-python3.sh"; then
+if cmp -s "$ROOT/scripts/lib/find-python3.sh" "$ROOT/.qwen/lib/find-python3.sh"; then
     pass "template and installed-hook resolvers are byte-identical"
 else
     fail "template and installed-hook resolvers drifted"

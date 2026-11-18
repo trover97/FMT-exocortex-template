@@ -3,7 +3,7 @@
 # see DP.SC.159, DP.ROLE.059
 # style-promote.sh — promote a style snapshot file to the IWE platform template
 #
-# Flow: personal folder/.claude/styles/<file>.md → substitutions → FMT/.claude/styles/<file>.md
+# Flow: personal folder/.qwen/styles/<file>.md → substitutions → FMT/.qwen/styles/<file>.md
 #
 # Usage:
 #   bash style-promote.sh <path-to-style-file> [--dry-run]
@@ -27,7 +27,7 @@ FMT_DIR="${IWE_TEMPLATE:-$IWE/FMT-exocortex-template}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 fname=$(basename "$SRC")
-DEST="$FMT_DIR/.claude/styles/$fname"
+DEST="$FMT_DIR/.qwen/styles/$fname"
 
 echo "🔄 Промоция файла стиля: $fname"
 echo "   Откуда: $SRC"
@@ -70,12 +70,12 @@ fi
 echo "   smoke-check: OK (frontmatter: ${frontmatter_count}×---, контент: ${content_len} символов)"
 
 # Create the directory if missing
-mkdir -p "$FMT_DIR/.claude/styles"
+mkdir -p "$FMT_DIR/.qwen/styles"
 
 # Write the file
 printf '%s\n' "$result" > "$DEST"
 
-echo "✅ Промотирован: FMT/.claude/styles/$fname"
+echo "✅ Промотирован: FMT/.qwen/styles/$fname"
 
 # Write to promotion-status.yaml via the shared library
 COMMON="$SCRIPT_DIR/promote-common.sh"
@@ -83,9 +83,9 @@ if [[ -f "$COMMON" ]]; then
     # shellcheck source=promote-common.sh
     source "$COMMON"
     source_sha=$(cd "$(dirname "$SRC")" && git rev-parse --short HEAD 2>/dev/null || echo "")
-    record_promotion ".claude/styles/$fname" "style" "$source_sha" "" "true"
+    record_promotion ".qwen/styles/$fname" "style" "$source_sha" "" "true"
 fi
 
 echo ""
 echo "Следующий шаг:"
-echo "  cd $FMT_DIR && git add .claude/styles/$fname promotion-status.yaml && git commit -m 'feat(styles): promote $fname to platform'"
+echo "  cd $FMT_DIR && git add .qwen/styles/$fname promotion-status.yaml && git commit -m 'feat(styles): promote $fname to platform'"

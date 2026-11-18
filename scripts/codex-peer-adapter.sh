@@ -411,7 +411,7 @@ if [ "${IWE_PEER_PLAIN:-0}" != "1" ]; then
   # this file does not source common.sh (the existing architecture of this file,
   # not changing it here). The same hook core (response-clarity-hook.sh) via
   # the same wrapper (style-check-text.sh), not a second implementation.
-  _STYLE_WRAPPER="${IWE_ROOT:-$HOME/IWE}/.claude/hooks/style-check-text.sh"
+  _STYLE_WRAPPER="${IWE_ROOT:-$HOME/IWE}/.qwen/hooks/style-check-text.sh"
   if [ -x "$_STYLE_WRAPPER" ]; then
     _STYLE_TMP=$(mktemp) && {
       printf '%s' "$CODEX_OUTPUT" > "$_STYLE_TMP" 2>/dev/null

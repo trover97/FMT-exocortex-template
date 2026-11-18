@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
+# === OFFLINE / NO-SCHEDULER GUARD (qwen-macos-offline) ===
+# Эта ветка: macOS, сознательно без планировщика (launchd) — политика офлайн-сборки.
+# Установка задач по расписанию не выполняется. Рабочие скрипты роли запускаются
+# ВРУЧНУЮ — см. MANUAL-JOBS.md в корне репозитория.
+echo "[$(basename "$(dirname "$0")")] Планировщик отключён (offline-сборка). Запуск задач — вручную, см. MANUAL-JOBS.md" >&2
+exit 0
+# === /GUARD ===
 # routing: server  deterministic=true
 # see DP.SC.159, DP.ROLE.059
 # server-news.sh — cross-platform replacement of WebSearch for server-mode

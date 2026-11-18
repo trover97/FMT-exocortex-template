@@ -21,7 +21,7 @@ set -euo pipefail
 # Load unified environment: WORKSPACE_DIR, IWE_ROOT, IWE_SCRIPTS, etc.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=/dev/null
-source "$SCRIPT_DIR/../.claude/lib/iwe-env-bootstrap.sh" || exit 1
+source "$SCRIPT_DIR/../.qwen/lib/iwe-env-bootstrap.sh" || exit 1
 # issue #545: iwe_sessions_dir (resolver of the journals root per the writer's contract)
 source "$SCRIPT_DIR/lib/common.sh" || {
   echo "FATAL: lib/common.sh not found next to $0 — промотированная копия устарела, обновите её вместе с шаблоном" >&2
@@ -29,16 +29,16 @@ source "$SCRIPT_DIR/lib/common.sh" || {
 }
 GOVERNANCE_REPO="${GOVERNANCE_REPO:-${IWE_GOVERNANCE_REPO:-DS-strategy}}"
 DS_STRATEGY="$WORKSPACE_DIR/$GOVERNANCE_REPO"
-# iwe_claude_project_slug PATH — the directory name Claude Code uses under
-# ~/.claude/projects for PATH: every character that is not an ASCII letter or
+# iwe_claude_project_slug PATH — the directory name Qwen Code uses under
+# ~/.qwen/projects for PATH: every character that is not an ASCII letter or
 # digit becomes "-" (so "/", ".", "_" and " " all do): /Users/alice/IWE → -Users-alice-IWE.
 # issue #869: three scripts used three different rules ("tr /", "tr /_.",
 # "tr /_ "), and none converted a Git Bash path ("/f/notes") to the native form
-# Claude Code actually sees ("F:\notes"). On Windows the native path comes from
+# Qwen Code actually sees ("F:\notes"). On Windows the native path comes from
 # cygpath; the drive-letter case does not matter there, the file system is
 # case-insensitive. A non-ASCII character becomes one dash (python3 counts characters
 # whatever the locale - launchd and cron run with none; the sed fallback does the same
-# only under a UTF-8 locale). Not verified against Claude Code for non-ASCII paths.
+# only under a UTF-8 locale). Not verified against Qwen Code for non-ASCII paths.
 # KEEP IN SYNC with setup.sh and update.sh — the same function body;
 # scripts/tests/test_issue_869_claude_slug.sh fails when the copies diverge.
 iwe_claude_project_slug() {
@@ -57,10 +57,10 @@ iwe_claude_project_slug() {
 # Slug derived from WORKSPACE_DIR (not $HOME) so it matches Claude's project key
 # regardless of workspace location. Override via IWE_MEMORY_SRC if needed.
 WORKSPACE_SLUG=$(iwe_claude_project_slug "$WORKSPACE_DIR")
-MEMORY_SRC="${IWE_MEMORY_SRC:-$HOME/.claude/projects/${WORKSPACE_SLUG}/memory}"
+MEMORY_SRC="${IWE_MEMORY_SRC:-$HOME/.qwen/projects/${WORKSPACE_SLUG}/memory}"
 # issue #1401: the backup reads the same memory the agents write. Agents and
-# .claude/hooks/memory-exocortex-sync.sh go through the $WORKSPACE_DIR/memory
-# link (CLAUDE.md §4); when the slug guess points at a different, stale
+# .qwen/hooks/memory-exocortex-sync.sh go through the $WORKSPACE_DIR/memory
+# link (QWEN.md §4); when the slug guess points at a different, stale
 # project folder, the backup used to copy that folder's old files over the
 # fresh mirror. The link wins, as in the hook; a disagreement is reported.
 MEMORY_SRC_MISMATCH=""
@@ -210,7 +210,7 @@ sync_owned_memory_files() {
   [ -f "$WORKSPACE_DIR/params.yaml" ] && set -- "$@" "params.yaml"
   [ -f "$MEMORY_SRC/day-rhythm-config.yaml" ] && \
     set -- "$@" "day-rhythm-config.yaml"
-  [ -f "$WORKSPACE_DIR/CLAUDE.md" ] && set -- "$@" "CLAUDE.md"
+  [ -f "$WORKSPACE_DIR/QWEN.md" ] && set -- "$@" "QWEN.md"
   [ -f "$WORKSPACE_DIR/AGENTS.md" ] && set -- "$@" "AGENTS.md"
 
   "$STDLIB_PYTHON3" - "$@" <<'PYEOF'
@@ -244,7 +244,7 @@ lock_path = destination_root / ".day-close-backup.lock"
 params_source = Path(sys.argv[5]) if sys.argv[5] else None
 active_special_targets = set(sys.argv[6:])
 protected_files = {
-    "CLAUDE.md",
+    "QWEN.md",
     "AGENTS.md",
     "day-rhythm-config.yaml",
     "params.yaml",
@@ -1684,13 +1684,13 @@ PYEOF
 # from a parent (e.g. workspace at ~/projects/IWE, CLI started in ~/projects)
 # the key slugs the launch cwd instead and the primary guess misses by one
 # level. Tries, in order: (1) the exact WORKSPACE_SLUG match already computed
-# into MEMORY_SRC, (2) the sole memory/ dir among ~/.claude/projects/*/ if
+# into MEMORY_SRC, (2) the sole memory/ dir among ~/.qwen/projects/*/ if
 # there is exactly one (ambiguous with 2+, so skipped rather than guessed),
-# (3) $GOVERNANCE_REPO/memory (the memory/ symlink CLAUDE.md §4 documents).
+# (3) $GOVERNANCE_REPO/memory (the memory/ symlink QWEN.md §4 documents).
 # Prints which tier matched to stderr so a chosen fallback is never silent.
 resolve_memory_src_fallback() {
   local d candidates=()
-  for d in "$HOME"/.claude/projects/*/memory; do
+  for d in "$HOME"/.qwen/projects/*/memory; do
     [ -d "$d" ] && candidates+=("$d")
   done
   if [ "${#candidates[@]}" -eq 1 ]; then
@@ -1706,7 +1706,7 @@ resolve_memory_src_fallback() {
   return 1
 }
 
-# --- Step 1: Backup memory/ + CLAUDE.md → exocortex/ ---
+# --- Step 1: Backup memory/ + QWEN.md → exocortex/ ---
 # do_backup [TARGET] — copies into TARGET (default: the canon's exocortex/). The
 # helpers below read EXOCORTEX_DST, so the local shadows the global for them too.
 # A frozen canon is never written: main() routes that case to do_backup_frozen
@@ -1754,7 +1754,7 @@ do_backup() {
   # exocortex/ is a multi-writer destination: extensions/, fault-profile, hindsight,
   # and legacy decision logs are primary data written by other platform mechanisms.
   # Root-anchored protected paths are ownership boundaries, not copy masks.
-  # CLAUDE.md/AGENTS.md, params.yaml and day-rhythm-config.yaml are excluded
+  # QWEN.md/AGENTS.md, params.yaml and day-rhythm-config.yaml are excluded
   # from this owned set and copied by their dedicated contracts below. Source
   # file symlinks are dereferenced, matching the historical rsync -L contract;
   # destination symlinks are never followed.
@@ -1764,10 +1764,10 @@ do_backup() {
 
   # #380: rules may carry an explicitly legal USER-SPACE block. Mirror them to
   # a dedicated subtree so recovery never confuses platform rules with memory.
-  if [ -d "$WORKSPACE_DIR/.claude/rules" ]; then
+  if [ -d "$WORKSPACE_DIR/.qwen/rules" ]; then
     mkdir -p "$EXOCORTEX_DST/rules"
     if command -v rsync >/dev/null 2>&1; then
-      rsync -a --delete "$WORKSPACE_DIR/.claude/rules/" "$EXOCORTEX_DST/rules/"
+      rsync -a --delete "$WORKSPACE_DIR/.qwen/rules/" "$EXOCORTEX_DST/rules/"
     else
       # issue #1099: Git Bash ships no rsync. Copy into a sibling first and swap
       # only after the copy succeeded, so a failed copy never leaves the mirror
@@ -1776,7 +1776,7 @@ do_backup() {
       rules_old="$EXOCORTEX_DST/rules.old.$$"
       rm -rf "$rules_tmp" "$rules_old"
       if ! { mkdir -p "$rules_tmp" \
-             && cp -pR "$WORKSPACE_DIR/.claude/rules/." "$rules_tmp/"; }; then
+             && cp -pR "$WORKSPACE_DIR/.qwen/rules/." "$rules_tmp/"; }; then
         rm -rf "$rules_tmp"
         echo "ERROR: rules mirror copy failed without rsync" >&2
         return 1
@@ -1805,9 +1805,9 @@ do_backup() {
 
   # issue #217: reverse substitution $HOME -> {{HOME_DIR}} makes the backup OS-agnostic
   # (symmetric to the forward substitution in setup.sh and restore-from-exocortex.sh).
-  if [ -f "$WORKSPACE_DIR/CLAUDE.md" ]; then
+  if [ -f "$WORKSPACE_DIR/QWEN.md" ]; then
     atomic_instruction_backup \
-      "$WORKSPACE_DIR/CLAUDE.md" "$EXOCORTEX_DST/CLAUDE.md" "CLAUDE.md" || return 1
+      "$WORKSPACE_DIR/QWEN.md" "$EXOCORTEX_DST/QWEN.md" "QWEN.md" || return 1
   fi
 
   if [ -f "$WORKSPACE_DIR/AGENTS.md" ]; then
@@ -1824,7 +1824,7 @@ do_backup() {
 }
 
 # issue #1279: the same freeze condition as session-guard.sh FROZEN_CANONICAL_PATHS
-# and .claude/hooks/memory-exocortex-sync.sh (duplicated, KEEP IN SYNC): frozen by
+# and .qwen/hooks/memory-exocortex-sync.sh (duplicated, KEEP IN SYNC): frozen by
 # default, IWE_FROZEN_CANONICAL_PATH="" disables it, another path freezes that one.
 # A run holding --canonical-owner (IWE_CANONICAL_OWNER, set by strategist.sh) may
 # write the canon directly.

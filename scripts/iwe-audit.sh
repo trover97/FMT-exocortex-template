@@ -32,7 +32,7 @@ set -eu
 
 # Load unified environment: WORKSPACE_DIR, IWE_ROOT, IWE_SCRIPTS, etc.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/../.claude/lib/iwe-env-bootstrap.sh" || exit 1
+source "$SCRIPT_DIR/../.qwen/lib/iwe-env-bootstrap.sh" || exit 1
 DRIFT_CRITICAL=""
 
 while [ $# -gt 0 ]; do
@@ -109,8 +109,8 @@ FOUND=0
 CRITICAL_MISSING=0
 OPTIONAL_MISSING=0
 
-# CLAUDE.md — required
-emit_inventory_row "CLAUDE.md" 1 ""
+# QWEN.md — required
+emit_inventory_row "QWEN.md" 1 ""
 
 # MEMORY.md — required; may be a symlink to auto-memory
 # In this installation MEMORY.md lives in memory/ — check both variants
@@ -127,16 +127,16 @@ else
     printf "| \`%s\` | %s | %s |\n" "MEMORY.md" "❌" "не найден ни в корне, ни в memory/"
 fi
 
-# .claude/sync-manifest.yaml — required (source for iwe-drift)
-emit_inventory_row ".claude/sync-manifest.yaml" 1 ""
+# .qwen/sync-manifest.yaml — required (source for iwe-drift)
+emit_inventory_row ".qwen/sync-manifest.yaml" 1 ""
 
 # Rules
-emit_inventory_row ".claude/rules/distinctions.md" 1 ""
-emit_inventory_row ".claude/rules/formatting.md" 1 ""
+emit_inventory_row ".qwen/rules/distinctions.md" 1 ""
+emit_inventory_row ".qwen/rules/formatting.md" 1 ""
 
 # Skills (at least day-open / day-close)
-emit_inventory_row ".claude/skills/day-open/SKILL.md" 1 ""
-emit_inventory_row ".claude/skills/day-close/SKILL.md" 1 ""
+emit_inventory_row ".qwen/skills/day-open/SKILL.md" 1 ""
+emit_inventory_row ".qwen/skills/day-close/SKILL.md" 1 ""
 
 # Protocols
 emit_inventory_row "memory/protocol-open.md" 1 ""
@@ -544,7 +544,7 @@ echo ""
 # 4d. USER-SPACE zones in L1 FMT skills
 echo "### USER-SPACE зоны в L1-скиллах"
 echo ""
-FMT_SKILLS_DIR="$IWE_ROOT/FMT-exocortex-template/.claude/skills"
+FMT_SKILLS_DIR="$IWE_ROOT/FMT-exocortex-template/.qwen/skills"
 if [ ! -d "$FMT_SKILLS_DIR" ]; then
     echo "_FMT-exocortex-template/ не найден — пропуск_"
 else
@@ -826,7 +826,7 @@ else
 $HOME/.config
 $HOME/.iwe-runtime
 $IWE_ROOT/.iwe-runtime
-$IWE_ROOT/.claude
+$IWE_ROOT/.qwen
 "
 
     echo "| Локация | Утечек | Пример |"

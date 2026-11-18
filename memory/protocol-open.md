@@ -13,11 +13,11 @@ description: "Протокол ОРЗ — пошаговые инструкци�
 # Протокол Open (ОРЗ-фрактал)
 
 > **Три масштаба:** День, Неделя и Сессия. Триггер определяет масштаб.
-> **Источник:** CLAUDE.md § 2 (slim) → этот файл. **CGUS (WP-481 Ф5):** порядок шагов ниже = порядок удержания внимания, НЕ порядок исполнения. `[[gate]]`/`[[gate:AR.NNN]]` = предусловие «без этого работы нет» (блокирует); `[[narrative]]` = демонстрационный порядок (skippable). Вход «с середины» штатен, если все gate соблюдены.
+> **Источник:** QWEN.md § 2 (slim) → этот файл. **CGUS (WP-481 Ф5):** порядок шагов ниже = порядок удержания внимания, НЕ порядок исполнения. `[[gate]]`/`[[gate:AR.NNN]]` = предусловие «без этого работы нет» (блокирует); `[[narrative]]` = демонстрационный порядок (skippable). Вход «с середины» штатен, если все gate соблюдены.
 
 ## § Масштаб: День → skill `/day-open`
 
-> **Триггер:** «открывай» / «открывай день». Полный алгоритм → `.claude/skills/day-open/SKILL.md`. **Исполнение:** пошагово через `task_tracker.create` (Host Contract DP.IWE.011 §5), каждый шаг = задача, блокирующее. Close пока вне объёма этой миграции — см. `DP.IWE.011` §9.
+> **Триггер:** «открывай» / «открывай день». Полный алгоритм → `.qwen/skills/day-open/SKILL.md`. **Исполнение:** пошагово через `task_tracker.create` (Host Contract DP.IWE.011 §5), каждый шаг = задача, блокирующее. Close пока вне объёма этой миграции — см. `DP.IWE.011` §9.
 
 > **Вчерашний WakaTime (pending-мультипликатор):** в шаге 1 «Вчера» — проверить наличие `day_close` записи за вчера в Neon (`domain_event WHERE event_type='day_close' AND external_id='day-close-{вчера}'`). Если отсутствует: запросить WakaTime API `summaries?start={вчера}&end={вчера}` → пересчитать мультипликатор → дозаписать в domain_event. Причина: `--today` CLI не даёт данных за прошлый день (WP-299 Ф4 п.3).
 
@@ -81,12 +81,12 @@ python3 "${IWE_SCRIPTS:-$HOME/IWE/scripts}/artifactor.py" "$REQUEST"
    строку. [[gate]]
 3. **Sync Gate (актуализация контекста РП).** Прочитать контекст РП и связанных РП → синхронизировать открытые фазы с тем, что фактически сделано. **Цель:** исключить дублирование работы, ложные блокеры, неверные оценки в Ритуале. [[gate]]
 
-   **Race-guard:** если state-файл `.claude/state/wp-sync-<N>.done` существует И его mtime моложе 8 часов — пропустить (sync уже выполнен в этой сессии). Если файл есть, но mtime старше 8h — считать stale: `rm -f` и продолжить заново. Проверка: `find .claude/state/wp-sync-<N>.done -mmin -480 2>/dev/null` (пустой вывод = нет файла или stale → запускать; непустой = свежий → пропускать).
+   **Race-guard:** если state-файл `.qwen/state/wp-sync-<N>.done` существует И его mtime моложе 8 часов — пропустить (sync уже выполнен в этой сессии). Если файл есть, но mtime старше 8h — считать stale: `rm -f` и продолжить заново. Проверка: `find .qwen/state/wp-sync-<N>.done -mmin -480 2>/dev/null` (пустой вывод = нет файла или stale → запускать; непустой = свежий → пропускать).
    **Ящик входящих (WP-5 Ф69).** Свежий маркер пропускает шаг 3 только если в ящике РП нет новых записей или их отпечаток совпадает с записанным в маркере. Отпечаток считать по серверу, не по рабочей копии: под заморозкой копия отстаёт, и запись, пришедшая на сервер после маркера, иначе не видна до 8 ч (найдено 03.11, Ф69): `GOV_REPO_ROOT="${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}"; git -C "$GOV_REPO_ROOT" fetch -q origin && D=$(bash "${IWE_WORKSPACE:-$HOME/IWE}/scripts/wp-inbox.sh" digest --wp N --repo "$GOV_REPO_ROOT" --rev origin/main)`; пропуск, если `D` пусто ИЛИ `D` равно содержимому файла маркера. Не удался fetch или код скрипта не 0 → не пропускать, запускать шаг 3. Иначе — запускать шаг 3 заново (запись пришла после маркера). Фраза пилота «актуализируй РП-N» запускает шаг 3 вне зависимости от маркера.
 
    **Шаг 3a — Bundle.** Запустить детерминированный сборщик контекста, захватывая exit-код в ТОМ ЖЕ вызове Bash (не `2>&1` — bundle пишет `[WARN]` в stderr до первой строки stdout, слияние потоков ломает контракт «первая строка = машинный статус»):
    ```bash
-   bash "${IWE_WORKSPACE:-$HOME/IWE}/.claude/scripts/wp-sync-bundle.sh" WP-N > /tmp/wp-sync-bundle-$$.md; BUNDLE_RC=$?; head -3 /tmp/wp-sync-bundle-$$.md; echo "bundle_rc=$BUNDLE_RC"
+   bash "${IWE_WORKSPACE:-$HOME/IWE}/.qwen/scripts/wp-sync-bundle.sh" WP-N > /tmp/wp-sync-bundle-$$.md; BUNDLE_RC=$?; head -3 /tmp/wp-sync-bundle-$$.md; echo "bundle_rc=$BUNDLE_RC"
    ```
    Экономичный slug `$$` — только в пределах ОДНОГО вызова Bash-инструмента (переменная не переживает границу между вызовами) — работать с файлом и удалять его в этом же вызове или через путь, зафиксированный в этой же команде.
 
@@ -104,7 +104,7 @@ python3 "${IWE_SCRIPTS:-$HOME/IWE/scripts}/artifactor.py" "$REQUEST"
 
    **Exit 3 — рецепт по среде:** изолированная сессия (свой worktree, `session-guard.sh open --isolate`) → повторить Шаг 3a с `IWE_WORKSPACE` на этот worktree, он обычно свежий от `origin/main`. Канонический чекаут → не форсировать pull (AR.006, Pull-on-Touch); либо `session-guard.sh open --isolate` и повтор оттуда, либо, если пилот явно согласился работать по неполным данным, добавить `--force-sync` к вызову bundle и process дальше — статус `GIT_SYNC_STATUS`/`GIT_SYNC_OVERRIDE` из первых двух строк вывода обязательно процитировать пилоту одной строкой ДО решения, не молчать о нём.
 
-   **Шаг 3b — Override (опционально).** `bash .claude/scripts/load-extensions.sh protocol-open sync` — exit 0 → `Read` файлы (alphabetic), они переопределяют дефолтное поведение шага 3c. Exit 1 → дефолт.
+   **Шаг 3b — Override (опционально).** `bash .qwen/scripts/load-extensions.sh protocol-open sync` — exit 0 → `Read` файлы (alphabetic), они переопределяют дефолтное поведение шага 3c. Exit 1 → дефолт.
 
    **Шаг 3c — Дефолтное поведение по веткам (только при `BUNDLE_RC` = 0; при 3 — см. выше, не входить сюда без `--force-sync` или явного решения пилота):**
    - **Ветка A — тривиальный случай** (≤1 связанных РП И drift-сигналов нет): главный агент сам читает контекст текущего РП и патчит маркеры (`[ ]` → `[x]` для подзадач, ссылающихся на закрытые связанные РП).
@@ -112,7 +112,7 @@ python3 "${IWE_SCRIPTS:-$HOME/IWE/scripts}/artifactor.py" "$REQUEST"
    - **Ветка C — противоречие** (sub-agent вернул раздел «Требует внимания» вместо diff'а, или нашёл «PASS» в одном связанном vs «FAIL» в другом по той же метрике): НЕ применять автоматически, поднять в «Требует внимания» Ритуала.
 
    **Записи ящика после применения правок фаз (WP-5 Ф69).** Перед применением перечитать отпечаток ящика (`GOV_REPO_ROOT="${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}"; git -C "$GOV_REPO_ROOT" fetch -q origin && bash "${IWE_WORKSPACE:-$HOME/IWE}/scripts/wp-inbox.sh" digest --wp N --repo "$GOV_REPO_ROOT" --rev origin/main`) и сверить с тем, что видел актуализатор; изменился — запись пришла во время разбора, вернуться к шагу 3a. После согласия пилота и применения правок пометить каждую разобранную запись: `bash "${IWE_WORKSPACE:-$HOME/IWE}/scripts/wp-inbox.sh" mark --wp N --id K --by "<сессия, коммит>"` (статус меняет только скрипт, не правка текста); ящик лежит рядом с карточкой, поэтому записи помечаются в той же изолированной копии, что и правка карточки.
-   **Шаг 3d — Очистка:** `rm -f /tmp/wp-sync-bundle-$$.md` — всегда. Маркер — **только если `BUNDLE_RC` = 0 И `GIT_SYNC_STATUS: OK`** (не после `--force-sync`, не после `NO_UPSTREAM` — race-guard не должен 8 часов молчать по данным, которые сам bundle не подтвердил как синхронные). В маркер пишется отпечаток ящика с сервера (пусто, если новых записей нет): сначала во временный файл рядом с маркером, замена — только при успехе `fetch` и `digest`, иначе маркер не трогать (сбой ≠ пустой ящик): `GOV_REPO_ROOT="${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}"; M=.claude/state/wp-sync-<N>.done; git -C "$GOV_REPO_ROOT" fetch -q origin && bash "${IWE_WORKSPACE:-$HOME/IWE}/scripts/wp-inbox.sh" digest --wp N --repo "$GOV_REPO_ROOT" --rev origin/main > "$M.tmp" && mv "$M.tmp" "$M" || rm -f "$M.tmp"`.
+   **Шаг 3d — Очистка:** `rm -f /tmp/wp-sync-bundle-$$.md` — всегда. Маркер — **только если `BUNDLE_RC` = 0 И `GIT_SYNC_STATUS: OK`** (не после `--force-sync`, не после `NO_UPSTREAM` — race-guard не должен 8 часов молчать по данным, которые сам bundle не подтвердил как синхронные). В маркер пишется отпечаток ящика с сервера (пусто, если новых записей нет): сначала во временный файл рядом с маркером, замена — только при успехе `fetch` и `digest`, иначе маркер не трогать (сбой ≠ пустой ящик): `GOV_REPO_ROOT="${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}"; M=.qwen/state/wp-sync-<N>.done; git -C "$GOV_REPO_ROOT" fetch -q origin && bash "${IWE_WORKSPACE:-$HOME/IWE}/scripts/wp-inbox.sh" digest --wp N --repo "$GOV_REPO_ROOT" --rev origin/main > "$M.tmp" && mv "$M.tmp" "$M" || rm -f "$M.tmp"`.
 
 
 4. → Ритуал.
@@ -177,7 +177,7 @@ python3 "${IWE_SCRIPTS:-$HOME/IWE/scripts}/artifactor.py" "$REQUEST"
 
 **Шаг 4.5. Декомпозитор (автоматический).** Если класс ∈ {open-loop, problem-framing} И оценка ≥3h → выполнить `/decompose` inline (без вопроса пользователю). Этапную карту вставить в WP context file (секция `## Этапы` в конец файла). Если класс trivial/closed-loop ИЛИ оценка <3h → пропустить молча. [[narrative]]
 
-**EXTENSION POINT (protocol-open after):** `bash .claude/scripts/load-extensions.sh protocol-open after` — exit 0 → `Read` каждый файл из вывода (alphabetic) → выполнить. Exit 1 → пропустить. Поддерживает `extensions/protocol-open.after.md` И `extensions/protocol-open.after.<suffix>.md`. [[gate]]
+**EXTENSION POINT (protocol-open after):** `bash .qwen/scripts/load-extensions.sh protocol-open after` — exit 0 → `Read` каждый файл из вывода (alphabetic) → выполнить. Exit 1 → пропустить. Поддерживает `extensions/protocol-open.after.md` И `extensions/protocol-open.after.<suffix>.md`. [[gate]]
 
 > Продолжение работы над тем же РП — пауза ≤1 календарного дня: повторный Ритуал не нужен. Пауза 1–3 дня: без полного Ритуала, но обязательна актуализация при переоткрытии: сводка изменений + открытые фазы + предложение на сессию → согласование пилота. Пауза >3 дней: та же актуализация плюс Ритуал в форме напоминания — проговорить пилоту уже записанные в карточке роль, РП, целевой переход состояния, класс, метод, ставку и оценку (не предлагать их заново и не пересогласовывать с нуля), и получить подтверждение продолжения. Совсем новый РП — полный Ритуал (Шаг 1-2 выше): предложить все параметры с нуля и дождаться согласования пилота. «Мини-ритуал переоткрытия» заменён этим порядком целиком.
 

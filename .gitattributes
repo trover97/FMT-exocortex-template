@@ -1,0 +1,10 @@
+# Качество переносимости: shell-скрипты и конфиги ВСЕГДА с LF.
+# LF — родная норма macOS/posix; правило заодно защищает от CRLF, который
+# приносят редакторы, настроенные под Windows.
+*.sh    text eol=lf
+*.py    text eol=lf
+*.yaml  text eol=lf
+*.yml   text eol=lf
+*.json  text eol=lf
+*.md    text eol=lf
+.githooks/*  text eol=lf

@@ -17,7 +17,7 @@
 
 # record_promotion — append a record to promotion-status.yaml (idempotent for unfinished SHAs)
 # Parameters:
-#   $1 artifact_path    — path relative to FMT_DIR (e.g.: .claude/skills/bottleneck-pick)
+#   $1 artifact_path    — path relative to FMT_DIR (e.g.: .qwen/skills/bottleneck-pick)
 #   $2 type             — skill|script|hook|rule|protocol|catalog
 #   $3 source_sha       — git short SHA from the author (if any, otherwise "")
 #   $4 fmt_sha          — git short SHA from FMT (assumed the commit is already made)

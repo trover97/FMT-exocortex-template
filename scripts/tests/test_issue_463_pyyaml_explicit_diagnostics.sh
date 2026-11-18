@@ -25,7 +25,7 @@ fi
 echo "PASS (1/2): requirements.txt декларирует pyyaml"
 
 set +e
-OUTPUT=$(PYTHONPATH="$TMP/fakelib" python3 "$ROOT/.claude/scripts/memory-drift-scan.py" --memory /nonexistent 2>&1)
+OUTPUT=$(PYTHONPATH="$TMP/fakelib" python3 "$ROOT/.qwen/scripts/memory-drift-scan.py" --memory /nonexistent 2>&1)
 CODE=$?
 set -e
 

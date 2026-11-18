@@ -47,7 +47,7 @@ for name in SUBJECT_DIGEST REPO_NAME REPO_ID HEAD_SHA BASE_SHA POLICY_ID POLICY_
   # ${name,,} (bash 4+ lowercase expansion) is a "bad substitution" syntax
   # error on stock macOS, whose /bin/bash is 3.2.57 (issue #1108) — portable
   # lowercase idiom (tr) matches the rest of this codebase, e.g.
-  # .claude/hooks/sql-pii-guard.sh, update.sh.
+  # .qwen/hooks/sql-pii-guard.sh, update.sh.
   [ -n "${!name}" ] || { echo "ERROR: --$(printf '%s' "$name" | tr '[:upper:]' '[:lower:]') is required" >&2; usage; }
 done
 

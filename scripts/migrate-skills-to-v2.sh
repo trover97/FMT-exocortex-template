@@ -9,7 +9,7 @@
 # Does NOT change: name, description, SKILL.md body, existing fields.
 #
 # layer is determined automatically:
-#   - skill exists in FMT-exocortex-template/.claude/skills/ -> L1
+#   - skill exists in FMT-exocortex-template/.qwen/skills/ -> L1
 #   - skill only in the personal IWE -> L3
 #
 # Usage:
@@ -18,8 +18,8 @@
 set -uo pipefail
 
 IWE="${IWE_WORKSPACE:-$HOME/IWE}"
-SKILLS_DIR="${IWE}/.claude/skills"
-FMT_SKILLS="${IWE_TEMPLATE:-${IWE}/FMT-exocortex-template}/.claude/skills"
+SKILLS_DIR="${IWE}/.qwen/skills"
+FMT_SKILLS="${IWE_TEMPLATE:-${IWE}/FMT-exocortex-template}/.qwen/skills"
 dry_run=false
 only_skill=""
 

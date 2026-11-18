@@ -1,285 +1,76 @@
 #!/bin/bash
-# update-sh-integrity: end-marker-required
-# Exocortex Update — pull platform updates from FMT-exocortex-template
+# Exocortex Update — OFFLINE-режим (ветка qwen-macos-offline / Qwen Code / macOS).
 #
-# Usage:
-#   bash update.sh              # Preview + apply (with confirmation)
-#   bash update.sh --check      # Preview only (no changes)
-#   bash update.sh --yes        # Apply without confirmation
-#   bash update.sh --dry-run    # Alias for --check
+# Обновляет УЖЕ УСТАНОВЛЕННУЮ среду из обновлённого FMT-репо, СОХРАНЯЯ
+# пользовательские данные (память, настройки, governance). В отличие от
+# setup-offline.sh (первая установка) — update.sh идемпотентен и не затирает
+# накопленное.
 #
-# Works with template repos (created via "Use this template") —
-# does not require shared git history with upstream.
+# === Как обновляться (offline, без GitHub) ===
+#   1. На машине с сетью открой ветку qwen-macos-offline форка → «Code» → «Download ZIP».
+#   2. Перенеси ZIP, распакуй. Замени папку FMT новой версией:
+#        rm -rf ~/IWE/FMT-exocortex-template
+#        cp -r /путь/к/распакованному ~/IWE/FMT-exocortex-template
+#   3. Запусти отсюда:
+#        cd ~/IWE/FMT-exocortex-template
+#        bash update.sh --check     # превью без изменений
+#        bash update.sh             # применить
 #
-set -e
+# Модель: FMT-репо (где лежит этот скрипт) = ИСТОЧНИК новых файлов.
+#         WORKSPACE (родительская папка) = установленная среда (приёмник).
+#         setup-offline.sh = первая установка; update.sh = обновление.
+#
+# Что СОХРАНЯЕТСЯ (не перезаписывается):
+#   memory/MEMORY.md, memory/day-rhythm-config.yaml, params.yaml,
+#   .qwen/settings.local.json, DS-strategy/, extensions/.
+# Перед записью в каталог памяти делается бэкап (<memory>.bak-<timestamp>).
+# Бэкапы старше IWE_MEMORY_BACKUP_KEEP_DAYS дней (30) удаляются, три последних остаются.
+#
+# Использование:
+#   bash update.sh              # превью + применение (с подтверждением)
+#   bash update.sh --check      # только превью (alias --dry-run)
+#   bash update.sh --yes        # применить без подтверждения
+#   bash update.sh --version
+#   bash update.sh --help
+#
+set -eo pipefail
 
-# issue #1411: Python helpers print "→", "✅" and Cyrillic; a Windows console in
-# cp1251 cannot encode them and the helper crashed after doing its work.
-export PYTHONIOENCODING="${PYTHONIOENCODING:-utf-8}"
+VERSION="3.0.0-offline"   # offline-порт upstream update.sh Step 6 (WP-25)
 
-# Named exit codes (issue #31): improve diagnostics for non-obvious failures.
-EXIT_OK=0
-EXIT_USAGE=1
-EXIT_NETWORK=2
-EXIT_RUNTIME=3   # build-runtime.sh failed — transaction left open (WP-529 F6)
-EXIT_TAINTED=4   # peer-session 2026-08-21-09: grep-fallback manifest parsing ran
-                 # (no Python), so file integrity was never verified by sha256 —
-                 # only file names were compared. Overrides EXIT_OK specifically;
-                 # a real operational error (network/conflict/runtime) still
-                 # takes priority over this code, it never masks one.
+# Named exit code, значение совпадает с апстримным (update.sh, EXIT_CONFLICT=49):
+# «обновление доставлено, но QWEN.md требует ваших рук» — это НЕ то же самое, что
+# «скрипт упал» (bare exit 1). Разводим их, иначе вызывающая сторона не отличит.
 EXIT_CONFLICT=49
-EXIT_CANARY_FAILED=5   # issue #718: --check's registry-sync canary (see run_sync_canary)
-                       # found the WP-Registry unreadable/unparseable for a real WP —
-                       # a silently lost fix in that path would look identical to a
-                       # healthy one without this check.
-EXIT_GENERAL=1
-GITHUB_API_AUTH_FAILURE=90
-GITHUB_API_INVALID_TOKEN=91
-GITHUB_API_UNSAFE_CURL_OPTIONS=92
-
-trap 'echo "ОШИБКА: update.sh прервался на строке ${LINENO}: ${BASH_COMMAND}" >&2' ERR
-
-VERSION="2.4.1"  # fix (WP-401): deprecated-file removal now checks is_protected_user_file() — a protected file (e.g. sessions/00-index.md) listed in deprecated_files by mistake could previously be deleted despite the "Не затрагиваются" report claiming otherwise; fix #229 (superseded by #965/#967: the owner: marker no longer decides; a memory file is refreshed when proven untouched and kept when edited); fix #228: hot-budget validator warns when memory/*.md horizon:hot lines exceed threshold
-REPO="TserenTserenov/FMT-exocortex-template" # UPSTREAM-CONST: do not substitute
-BRANCH="main"
-# Delivery channel (WP-529 F7, pilot decision 2026-08-21, prompted by an
-# external user's report): "release" (default) pins the delivery to the last
-# published release tag — users must not receive unreleased, possibly red,
-# main. IWE_UPDATE_CHANNEL=main is the ONLY way onto the moving branch
-# (author/dev workflow) — a failed release lookup aborts fail-closed (#501),
-# it never falls back to main automatically.
-UPDATE_CHANNEL="${IWE_UPDATE_CHANNEL:-release}"
-# WP-529 F26: an unknown channel used to fall through to the main branch
-# silently — a typo (IWE_UPDATE_CHANNEL=realese) delivered unreleased main to a
-# user who explicitly asked for the pinned release. Fail closed and name the
-# accepted values instead of guessing which one was meant.
-case "$UPDATE_CHANNEL" in
-    release|main|rc) ;;
-    *)
-        echo "✗ Неизвестный канал обновления: IWE_UPDATE_CHANNEL='$UPDATE_CHANNEL'" >&2
-        echo "  Допустимые значения:" >&2
-        echo "    release — последний опубликованный выпуск (по умолчанию)" >&2
-        echo "    rc      — кандидат в выпуск (для тестировщиков; ставит ровно то, что проверяется перед релизом)" >&2
-        echo "    main    — движущаяся ветка разработки (только для автора)" >&2
-        echo "  Обновление остановлено: неизвестное значение раньше молча уводило на main." >&2
-        exit "$EXIT_USAGE"
-        ;;
-esac
-RAW_BASE="https://raw.githubusercontent.com/$REPO/$BRANCH"
-API_BASE="https://api.github.com/repos/$REPO"
-
-# issue #863: release commit SHA, set by resolve_delivery_ref for rollback detection.
-RELEASE_SHA=""
 
 CHECK_ONLY=false
-STRICT_CHECK=false   # WP-529 Phase 220: --dry-run-strict — structural check of the delivery plan, not a manual list
 AUTO_YES=false
-FAST_CHECK=false
-# Stage B opt-ins (WP-7 F71, settings-merge behavior corrected by issue
-# #738): by default (no flags, interactive run) both are off —
-# the pipeline only observes (stage A) and writes nothing to user
-# files. --yes enables settings-merge automatically (see below, after argument
-# parsing) — a provably additive merge is no riskier than everything else
-# that --yes already applies without confirmation.
-APPLY_SETTINGS_MERGE=false
-NO_SETTINGS_MERGE=false
-REFRESH_STALE=false
-
-# #533: governance compatibility entrypoints are upgraded as one ownership
-# unit.  The updater may write them only after every target passes the same
-# provenance/import-consumer preflight; no member is migrated independently.
-AGENT_FAULT_LEGACY_SHIMS=(
-    "scripts/iwe_checklist_memory.py"
-    "scripts/sync_feedback_to_memory.py"
-    "scripts/agent_fault_remind.py"
-    "scripts/agent_fault_remind.sh"
-)
-AGENT_FAULT_SHIM_PREFLIGHT_PATHS=()
-AGENT_FAULT_SHIM_TARGET_SNAPSHOTS=()
-AGENT_FAULT_SHIM_GIT_READY=()
-AGENT_FAULT_SHIM_GIT_PATHSPECS=()
-AGENT_FAULT_SHIM_TRACKED_SNAPSHOTS=()
-AGENT_FAULT_SHIM_STATUS_SNAPSHOTS=()
-
-# Allow extra curl flags via env var (e.g. CURL_OPTS="--insecure" for Windows corporate firewall).
-# --max-time 20: without it a stalled/slow connection hangs update.sh forever with no
-# output (found 2026-07-22, WP-5 Ubuntu-audit — an interactive run produced zero output
-# and had to be killed). CURL_OPTS overrides the whole string, so a caller who needs a
-# different timeout can still set it explicitly.
-# shellcheck disable=SC2086  # $CURL_BASE_OPTS intentionally unquoted (multi-token flag)
-CURL_BASE_OPTS="${CURL_OPTS:---max-time 20}"
-
-# Windows (msys/cygwin) schannel backend may fail with CRYPT_E_NO_REVOCATION_CHECK.
-# Detect the best available SSL revocation flag without making a network call.
-_CURL_SSL_OPT=""
-case "${OSTYPE:-}" in
-  msys*|cygwin*)
-    # issue #1150: the short `curl --help` lists only the common options and
-    # never shows these two; the full list is `curl --help all`.
-    _CURL_HELP_ALL=$(curl --help all 2>&1 || true)
-    if printf '%s\n' "$_CURL_HELP_ALL" | grep -q "ssl-revoke-best-effort"; then
-      _CURL_SSL_OPT="--ssl-revoke-best-effort"
-    elif printf '%s\n' "$_CURL_HELP_ALL" | grep -q "ssl-no-revoke"; then
-      _CURL_SSL_OPT="--ssl-no-revoke"
-    fi
-    ;;
-esac
-
-# curl_failure_note RC ERRFILE — the cause of a failed curl call, as one line: its exit code
-# plus the last line of its stderr (issue #980). `2>/dev/null` used to hide the cause, so
-# every failure read as "check your internet" even when the network was fine and the write
-# to a temp path failed. Callers send curl's stderr to ERRFILE (curl -sS keeps the error
-# message and drops the progress meter) and print this note only when the call failed.
-curl_failure_note() {
-    local rc="$1" errf="$2" err_line=""
-    if [ -s "$errf" ]; then
-        # tr -d '\r': a native Windows curl ends its stderr lines with CRLF.
-        err_line=$(tail -n 1 "$errf" | tr -d '\r' | cut -c1-200)
-    fi
-    printf 'curl код %s%s' "$rc" "${err_line:+; $err_line}"
-}
-
-# fetch_update_manifest URL DEST — download the update manifest (issue #943).
-# curl's stderr used to go to /dev/null, so every failure looked like "check the
-# internet"; a Windows user could not tell a timeout from a write error. Now: up to
-# 3 attempts; each failed attempt prints curl's exit code, the HTTP status and the
-# last stderr line. Only transient failures are retried (network exit codes, HTTP
-# 5xx/429); a 4xx or a certificate error stops at once. After a write failure (curl
-# exit 23, or success with an empty file) the next attempt writes through a shell
-# redirect instead of curl -o: a labelled diagnostic experiment for "the file curl
-# opens itself is blocked", it does not change TLS. The file is moved into place only
-# when complete and JSON-shaped. On failure FETCH_MANIFEST_DIAG holds the last cause.
-FETCH_MANIFEST_DIAG=""
-fetch_update_manifest() {
-    local url="$1" dest="$2"
-    local part="$dest.part" errf="$dest.err"
-    local max_attempts=3 attempt=1 mode="file" rc http err_line transient write_failure
-    while [ "$attempt" -le "$max_attempts" ]; do
-        rc=0; http="n/a"
-        if [ "$mode" = "file" ]; then
-            # shellcheck disable=SC2086  # CURL_BASE_OPTS/_CURL_SSL_OPT intentionally unquoted (multi-token flags)
-            http=$(curl $CURL_BASE_OPTS $_CURL_SSL_OPT -sSfL -w '%{http_code}' -o "$part" "$url" 2>"$errf") || rc=$?
-        else
-            # shellcheck disable=SC2086
-            curl $CURL_BASE_OPTS $_CURL_SSL_OPT -sSfL "$url" >"$part" 2>"$errf" || rc=$?
-        fi
-        # tr -d '\r': a native Windows curl ends its stderr lines with CRLF (issue #1150).
-        err_line=$(tail -n 1 "$errf" 2>/dev/null | tr -d '\r' | cut -c1-200)
-        if [ "$rc" -eq 0 ] && [ ! -s "$part" ]; then
-            err_line="curl завершился без ошибки, но файл пуст"
-        elif [ "$rc" -eq 0 ] && [ "$(tr -d ' \t\r\n' < "$part" | head -c 1)" != "{" ]; then
-            FETCH_MANIFEST_DIAG="ответ не похож на JSON (прокси или страница входа в сеть?), HTTP $http"
-            echo "  ⚠ Попытка $attempt из $max_attempts: $FETCH_MANIFEST_DIAG"
-            rm -f "$part" "$errf"
-            return 1
-        elif [ "$rc" -eq 0 ]; then
-            if ! mv -f "$part" "$dest" 2>"$errf"; then
-                FETCH_MANIFEST_DIAG="манифест скачан, но не записан на место: $(tail -n 1 "$errf" | tr -d '\r' | cut -c1-200)"
-                echo "  ⚠ Попытка $attempt из $max_attempts: $FETCH_MANIFEST_DIAG"
-                rm -f "$part" "$errf"
-                return 1
-            fi
-            rm -f "$errf"
-            return 0
-        fi
-        FETCH_MANIFEST_DIAG="curl код $rc, HTTP $http, запись: $mode${err_line:+; $err_line}"
-        echo "  ⚠ Попытка $attempt из $max_attempts: $FETCH_MANIFEST_DIAG"
-
-        transient=false; write_failure=false
-        case "$rc" in
-            5|6|7|18|28|35|52|55|56) transient=true ;;
-            # The redirect mode cannot report the HTTP status ("n/a"): a 22 there may be a 503
-            # as well as a 404, so it is retried once more rather than given up.
-            22) case "$http" in 5??|429|n/a) transient=true ;; esac ;;
-            23) write_failure=true ;;
-            0) write_failure=true ;;   # success with an empty file
-        esac
-        if $write_failure && [ "$mode" = "file" ]; then
-            mode="stdout"
-            echo "  … диагностика: повтор с записью через перенаправление вместо curl -o"
-        elif $transient; then
-            sleep "${IWE_FETCH_RETRY_SLEEP:-2}"
-        else
-            break
-        fi
-        attempt=$((attempt + 1))
-    done
-    rm -f "$part" "$errf"
-    return 1
-}
-
 for arg in "$@"; do
     case "$arg" in
-        --check|--dry-run)  CHECK_ONLY=true ;;
-        --dry-run-strict)   CHECK_ONLY=true; STRICT_CHECK=true ;;
-        --fast)             FAST_CHECK=true ;;
-        --yes)              AUTO_YES=true ;;
-        --apply-settings-merge) APPLY_SETTINGS_MERGE=true ;;
-        --no-settings-merge)    NO_SETTINGS_MERGE=true ;;
-        --refresh-stale)    REFRESH_STALE=true ;;
-        --version)          echo "exocortex-update v$VERSION"; exit 0 ;;
-        --help|-h)
-            echo "Usage: update.sh [OPTIONS]"
-            echo ""
-            echo "Options:"
-            echo "  --check     Показать доступные обновления без применения; в конце строка «ВЕРДИКТ: …»"
-            echo "              (ставить можно только при коде 0 и строке «ВЕРДИКТ: можно ставить»)"
-            echo "  --dry-run-strict  С --check: структурная проверка плана доставки (целевые файлы на месте, пути безопасны)"
-            echo "  --fast      С --check: сравнить только версию манифеста (без скачивания 300+ файлов, issue #230)"
-            echo "  --yes       Применить обновления без подтверждения (включает settings.json merge, см. --no-settings-merge)"
-            echo "  --apply-settings-merge  Применить слияние settings.json отдельно от --yes (бэкап + пост-валидация; без флага и без --yes — только предпросмотр)"
-            echo "  --no-settings-merge     С --yes: НЕ применять слияние settings.json (оставить только предпросмотр, старое поведение --yes)"
-            echo "  --refresh-stale         author_mode: обновить файлы «отстал от шаблона, правок нет» (бэкап; блок при «неизвестно» > 0)"
-            echo "  --version   Версия скрипта"
-            echo "  --help      Эта справка"
-            exit 0
-            ;;
+        --check|--dry-run) CHECK_ONLY=true ;;
+        --yes)             AUTO_YES=true ;;
+        --version)         echo "exocortex-update (offline) v$VERSION"; exit 0 ;;
+        --help|-h)         sed -n '2,33p' "$0"; exit 0 ;;
     esac
 done
 
-# issue #738: --apply-settings-merge stayed opt-in even under --yes, so an
-# automatic `update.sh --yes` delivered new hook files into .claude/hooks/
-# but did not register them in settings.json — the blocking protective hooks
-# (destructive-guard.sh, pull-on-touch.sh) silently stayed disabled.
-# The merge is additive for everything the user owns (settings-merge-preview.py: union over
-# hooks/permissions, on conflict the user's value wins); it replaces only what the platform
-# itself shipped and withdrew (a retired permission value, a hook regrouped by the template),
-# and says so in plain words (WP-529 Ф270, rc.14 red team) — no riskier
-# than everything else that --yes already applies without confirmation. An explicit
-# --apply-settings-merge remains a separate knob for running the merge without
-# the rest of the --yes pipeline (e.g. a re-run after --check).
-# --no-settings-merge — explicit opt-out for those who deliberately kept
-# settings.json under manual control and ran --yes only for the rest of the
-# pipeline (Codex, review of this fix, turn 3): preserves the old --yes behavior
-# narrowly, without giving up auto-applying the other updates.
-if [ "$AUTO_YES" = "true" ] && [ "$NO_SETTINGS_MERGE" != "true" ]; then
-    APPLY_SETTINGS_MERGE=true
-fi
-
-# === Cross-platform sed -i ===
+# === sed: BSD (штатный macOS) с fallback на GNU, если поставлен через brew ===
+# BSD sed -i требует пустого аргумента-суффикса; GNU-форма на нём падает.
 if sed --version >/dev/null 2>&1; then
     sed_inplace() { sed -i "$@"; }
 else
     sed_inplace() { sed -i '' "$@"; }
 fi
 
-# issue #755: `A 2>/dev/null | cut ... || B` never ran B on a missing `shasum`
-# (Alpine/busybox and similar minimal images have neither `shasum` nor
-# `perl`) -- `cut`'s own exit code (0, even on empty stdin) is what `||`
-# checked, not shasum's. hash_file() silently returned "" for every file, both
-# sides of every comparison in this script came out equal ("" = ""), and the
-# whole run finished EXIT=0 having verified nothing (754 files reported as
-# "unchanged" on one real report, 100% false). Fail loudly here, once, up
-# front, instead of at each of the dozens of call sites below.
+# === Cross-platform hash ===
+# Port of upstream issue #755 (main aa870ed). `A 2>/dev/null | cut ... || B` never ran
+# B when shasum was missing: `||` checked cut's exit code (0 on empty stdin), so every
+# hash came out "", both sides of every comparison matched, and the run reported all
+# files "unchanged" having verified nothing. Fail loudly once, up front.
 if ! command -v shasum >/dev/null 2>&1 && ! command -v sha256sum >/dev/null 2>&1; then
     echo "ОШИБКА: ни shasum, ни sha256sum не найдены — проверка целостности файлов невозможна." >&2
-    echo "  Установите coreutils (sha256sum) или perl (даёт shasum) и повторите." >&2
-    exit "$EXIT_RUNTIME"
+    echo "  В macOS они входят в стандартную поставку; проверьте PATH и повторите." >&2
+    exit 1
 fi
-
-# === Cross-platform hash ===
-# KEEP IN SYNC with setup.sh — the same function body (setup.sh writes the first record of installed
-# memory versions with it); setup/test-update-edge-cases.sh (T47) fails when the copies diverge.
 hash_file() {
     if command -v shasum >/dev/null 2>&1; then
         shasum -a 256 "$1" | cut -d' ' -f1
@@ -288,28 +79,11 @@ hash_file() {
     fi
 }
 
-# reinject_user_section FILE USER_SECTION — replace FILE's own USER-SPACE block
-# with the user's one: drop the shipped block, squash trailing blank lines,
-# append the user block. render_skill_with_user_section UPSTREAM USER_SECTION
-# OUT builds the same file from an upstream copy. One definition for every
-# apply path and for the change detector, so a skill with a user block is not
-# reported as "updated" on every run (issue #1010 F10).
-reinject_user_section() {
-    perl -i -0pe 's/^<!-- USER-SPACE -->.*?^<!-- \/USER-SPACE -->//ms' "$1"
-    perl -i -0pe 's/\n+$/\n/' "$1"
-    printf '\n%s\n' "$2" >> "$1"
-}
-render_skill_with_user_section() {
-    cp "$1" "$3"
-    reinject_user_section "$3" "$2"
-}
-
-# === Cross-platform Python resolution (issue #402) ===
-# On Windows Git Bash, `command -v python3` finds the Microsoft Store App
-# Execution Alias stub (prints "Python was not found..." and exits non-zero)
-# even when a real interpreter is installed and reachable as `python`
-# (Windows python.org installer does not ship a `python3` shim). A presence
-# check alone is not enough — probe that the candidate actually runs code.
+# === Cross-platform Python resolution ===
+# A presence check alone is not enough: on macOS a stale shim on PATH can print an
+# error and exit non-zero, so probe that the candidate actually runs code (upstream
+# issue #402). Candidate list is POSIX-only: `py -3` is a Windows launcher and does
+# not exist here.
 PY_BIN=""
 for _py_candidate in python3 python; do
     if command -v "$_py_candidate" >/dev/null 2>&1 && "$_py_candidate" -c 'pass' >/dev/null 2>&1; then
@@ -317,129 +91,23 @@ for _py_candidate in python3 python; do
         break
     fi
 done
-if [ -z "$PY_BIN" ] && command -v py >/dev/null 2>&1 && py -3 -c 'pass' >/dev/null 2>&1; then
-    PY_BIN="py -3"
-fi
 unset _py_candidate
 py_available() { [ -n "$PY_BIN" ]; }
 
-# sed_escape_replacement STR — escapes &, | and \ for safe substitution of
-# STR as a replacement in `sed s|...|STR|` (issue #269 verify fix). Without this,
-# a value from .exocortex.env containing & (sed: "the whole match") or | (our
-# delimiter) silently corrupts the substitution instead of failing explicitly.
-sed_escape_replacement() {
-    printf '%s' "$1" | sed -e 's/[\&|]/\\&/g'
+# Деградация до grep-разбора манифеста сообщается один раз за прогон, а не на файл
+# (тот же приём, что у апстрима с классификатором пропусков). Без сообщения отказ
+# был бы тихим: список устаревших файлов молча пустеет, чистка не выполняется.
+PY_DEGRADED_WARNED=false
+warn_py_degraded() {
+    [ "$PY_DEGRADED_WARNED" = false ] || return 0
+    PY_DEGRADED_WARNED=true
+    echo "  ⚠ Разбор манифеста через Python не удался (проверены python3, python)." >&2
+    echo "    Список файлов собран запасным способом (grep), список снятых с поставки файлов недоступен —" >&2
+    echo "    удаление устаревших файлов в этом прогоне не выполнится." >&2
 }
 
-# substitute_claude_placeholders SRC DST — creates only a workspace copy.
-# The template repo and its merge-base always stay raw with {{PLACEHOLDER}} (#381).
-substitute_claude_placeholders() {
-    local src="$1" dst="$2"
-    local env_file=""
-    [ -f "$WORKSPACE_DIR/.exocortex.env" ] && env_file="$WORKSPACE_DIR/.exocortex.env"
-    [ -z "$env_file" ] && [ -f "$SCRIPT_DIR/.exocortex.env" ] && env_file="$SCRIPT_DIR/.exocortex.env"
-
-    cp "$src" "$dst"
-    [ -z "$env_file" ] && return 0
-    grep -qE '^\s*(source|eval|exec|\.|`|;|\$\()' "$env_file" 2>/dev/null && return 0
-
-    local key value
-    while IFS= read -r line; do
-        case "$line" in \#*|"") continue ;; esac
-        key="${line%%=*}"; value="${line#*=}"
-        key=$(echo "$key" | tr -d '[:space:]')
-        # issue #316-fix2: values in .exocortex.env have been quoted since #223 —
-        # this parser reads the file line by line, not via `source`, so the quotes
-        # remain part of the value literally (not syntax but data) and
-        # would be substituted into CLAUDE.md as-is, e.g. {{TIMEZONE_DESC}} → "4:00 UTC".
-        # The same quote-stripping pattern already applied to this file in another
-        # non-source parser (see ENV_WS/ENV_GOV further down the file).
-        value=$(echo "$value" | tr -d '"' | tr -d "'")
-        [ -z "$key" ] && continue
-        declare "SUBST_$key=$value"
-    done < "$env_file"
-
-    sed_inplace \
-        -e "s|{{GITHUB_USER}}|$(sed_escape_replacement "${SUBST_GITHUB_USER:-}")|g" \
-        -e "s|{{WORKSPACE_DIR}}|$(sed_escape_replacement "${SUBST_WORKSPACE_DIR:-$WORKSPACE_DIR}")|g" \
-        -e "s|{{CLAUDE_PATH}}|$(sed_escape_replacement "${SUBST_CLAUDE_PATH:-}")|g" \
-        -e "s|{{CLAUDE_PROJECT_SLUG}}|$(sed_escape_replacement "${SUBST_CLAUDE_PROJECT_SLUG:-$CLAUDE_PROJECT_SLUG}")|g" \
-        -e "s|{{TIMEZONE_HOUR}}|$(sed_escape_replacement "${SUBST_TIMEZONE_HOUR:-}")|g" \
-        -e "s|{{TIMEZONE_DESC}}|$(sed_escape_replacement "${SUBST_TIMEZONE_DESC:-}")|g" \
-        -e "s|{{HOME_DIR}}|$(sed_escape_replacement "${SUBST_HOME_DIR:-$HOME}")|g" \
-        -e "s|{{GOVERNANCE_REPO}}|$(sed_escape_replacement "${SUBST_GOVERNANCE_REPO:-}")|g" \
-        -e "s|{{IWE_TEMPLATE}}|$(sed_escape_replacement "${SUBST_IWE_TEMPLATE:-$SCRIPT_DIR}")|g" \
-        -e "s|{{IWE_RUNTIME}}|$(sed_escape_replacement "${SUBST_IWE_RUNTIME:-}")|g" \
-        "$dst"
-}
-
-# restore_claude_placeholders SRC DST — migration of forks that the old setup
-# polluted with install-values. The reverse substitution is targeted: only values from the current
-# .exocortex.env, so the user's delta around them is preserved.
-restore_claude_placeholders() {
-    local src="$1" dst="$2" env_file="" key value escaped
-    [ -f "$WORKSPACE_DIR/.exocortex.env" ] && env_file="$WORKSPACE_DIR/.exocortex.env"
-    [ -z "$env_file" ] && [ -f "$SCRIPT_DIR/.exocortex.env" ] && env_file="$SCRIPT_DIR/.exocortex.env"
-    cp "$src" "$dst"
-    [ -n "$env_file" ] || return 0
-    for key in WORKSPACE_DIR HOME_DIR CLAUDE_PATH IWE_TEMPLATE IWE_RUNTIME; do
-        value=$(grep -E "^${key}=" "$env_file" 2>/dev/null | head -1 | cut -d= -f2- | sed -E 's/^"//; s/"$//; s/^'"'"'//; s/'"'"'$//')
-        [ -n "$value" ] || continue
-        escaped=$(printf '%s' "$value" | sed -e 's/[\&|]/\\&/g')
-        sed_inplace "s|${escaped}|{{${key}}}|g" "$dst"
-    done
-}
-
-# detect_claude_silent_loss BASE PRE_MERGE_CURRENT MERGED — issue #555: a
-# "clean" `git merge-file` exit (no <<<<<<< markers) can still make a pilot's
-# customized line vanish from the result — reported live with a stale
-# `.claude.md.base` where diff3 resolved a genuine conflict in the platform's
-# favor without ever surfacing markers. This does not try to explain WHY
-# (diff3's line-alignment heuristic is opaque and was not reliably
-# reproducible in isolation) — it verifies the OUTCOME instead: every line
-# the pilot added or changed relative to BASE must still be present
-# somewhere in MERGED. Prints one warning line per lost line to stderr,
-# echoes the lost-line count to stdout for the caller to branch on.
-detect_claude_silent_loss() {
-    local base="$1" before="$2" merged="$3" lost=0 line
-    while IFS= read -r line; do
-        [ -n "$line" ] || continue
-        grep -qF -- "$line" "$merged" || {
-            echo "    ⚠ пользовательская строка пропала при слиянии без маркеров конфликта: $line" >&2
-            lost=$((lost + 1))
-        }
-    done < <(LC_ALL=C comm -13 <(LC_ALL=C sort -u "$base") <(LC_ALL=C sort -u "$before"))
-    echo "$lost"
-}
-
-# Protected user files (issue #154): once seeded, these hold user-authored content
-# (permissions, memory, peer-session journal) — update.sh must never touch them again,
-# neither overwrite (download loop) nor delete (deprecated-file cleanup). Single source
-# of truth for both checks — a file listed here but not the other used to silently lose
-# its delete-protection (bug found 2026-07-23, sessions/00-index.md deleted despite being
-# in the "Не затрагиваются" report section — see WP-401 Phase 6.1 write-up).
-is_protected_user_file() {
-    case "$1" in
-        params.yaml|memory/MEMORY.md|.claude/settings.local.json|sessions/00-index.md) return 0 ;;
-        *) return 1 ;;
-    esac
-}
-
-# A template directory can also be a Git mirror of the canonical repository.
-# In that role, removing a path that upstream still tracks makes the mirror dirty
-# on every update and prevents its next fast-forward sync.  A conventional
-# `upstream` remote is an explicit signal of that role, so leave deprecated-file
-# cleanup to the canonical history instead of changing the mirror locally.
-is_upstream_git_mirror() {
-    git -C "$SCRIPT_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 1
-    git -C "$SCRIPT_DIR" remote get-url upstream >/dev/null 2>&1
-}
-
-# Personal L4 configs in memory/: update.sh seeds them when ABSENT (fresh install),
-# but NEVER overwrites an existing one — it holds the user's personal edits
-# (e.g. calendar_ids, slot settings in day-rhythm-config.yaml).
-# The file itself declares "L4 Personal. Override defaults from IWE Template".
-# MEMORY.md is protected by a separate check below. See the issue about the day-rhythm-config clobber.
+# === Личные L4-конфиги в памяти: сеять при отсутствии, НИКОГДА не перезаписывать ===
+# (персональные правки — calendar_ids, slot-настройки). MEMORY.md защищён отдельно.
 is_personal_config() {
     case "$1" in
         day-rhythm-config.yaml) return 0 ;;
@@ -447,1567 +115,147 @@ is_personal_config() {
     esac
 }
 
-# is_author_mode — true when WORKSPACE_DIR/params.yaml declares author_mode: true.
-# The author edits L1 directly until promotion into the template — a hash mismatch here is not staleness.
-# See inbox/bugs/bug-2026-07-11-update-sh-author-mode-blind-clobber.md.
-is_author_mode() {
-    local params_file="$WORKSPACE_DIR/params.yaml"
-    [ -f "$params_file" ] || return 1
-    grep -qE '^author_mode:[[:space:]]*true' "$params_file"
-}
+# === owner: user в memory-файлах — пилот владеет файлом, не перезаписываем (upstream #229) ===
+# Порт из шаблона. Раньше защищались только MEMORY.md и day-rhythm-config.yaml, а ветка
+# несёт 13 файлов памяти с owner: user — их обновление молча затирало правки пилота.
+# Читатель frontmatter (.qwen/lib/frontmatter.sh) подключается ниже, после SCRIPT_DIR.
 
-# === Memory policy (issues #965/#967) ===
-# One rule decides every memory/* file the manifest ships, in Step 6 and in repair_pass() alike:
-# a deployed copy the pilot has not changed is refreshed from the template after a backup; a
-# changed copy, or one nothing proves unchanged, is left alone with one line that says why, a diff
-# to compare and a ready command to accept the template version. The owner: marker in the copy no
-# longer decides: an untouched owner:user file used to stay behind release after release (#965),
-# and an edited owner:platform one used to be replaced (#967). The one-time owner:user ->
-# owner:platform migration of the platform files old releases shipped as owner:user (#354/#384)
-# is the same rule, not a second overwrite path: an untouched copy is replaced (its marker changes
-# with the file), an edited one stays (navigation.md keeps the installation's addresses).
-# MEMORY.md, personal configs and author_mode never reach the rule: the callers keep their own
-# branches for them.
-#
-# "Not changed" is proven by any of:
-#   (a) the record MEMORY_DEPLOYED_RECORD ($WORKSPACE_DIR/.memory-deployed.tsv) keeps, per file,
-#       the hash of what setup.sh or update.sh last put into memory or found equal to the
-#       template, and the deployed copy still has it. The record outlives a run: it proves a copy
-#       that a broken-off run left behind (code 49 or Ctrl-C between Step 5 and Step 6) and a
-#       copy several releases behind, which the clone's history does not know when update.sh
-#       brought them (it never commits what it applies). A copy gets its line the moment it
-#       becomes true - not at the end of the run - and never while it is kept: an edited copy
-#       stays provably edited, and one the pilot turns back by hand is untouched again.
-#   (b) OLD_HASH: the hash the file had in the template clone before this run replaced it (Step 2
-#       records it in this run's temporary directory; only Step 6 has it). Before Step 5 it is also
-#       copied into the record for every copy it proves, so a run broken off before Step 6 does not
-#       take it along (remember_untouched_memory_before_apply).
-#   (c) the shipped classifier says uptodate or stale: the copy equals a version in the history of
-#       the clone's current branch.
-# Each proof can also match the pilot's own edit made in the template clone (#963): an accepted
-# residual risk, covered by the backup taken before every replacement, which the line and the
-# closing summary name. An installation without the record gets it file by file, as its copies
-# are refreshed or found equal to the template; until then (b) and (c) decide.
-MEMORY_POLICY_SEEN=""      # paths decided in this run, each followed by a newline
-MEMORY_REPLACED=()         # replaced in this run (report_memory_policy_summary)
-MEMORY_KEPT=()             # left as they were although they differ from the template
-MEMORY_RECORD_WARNED=false # the record could not be written: said once per run
-
-# Reject an unusable proof record before parsing it; never truncate it (#1010).
-# KEEP IN SYNC with setup.sh/update.sh.
-memory_record_size_ok() {
-    local file="$1" size
-    [ ! -L "$file" ] && [ -f "$file" ] && [ -r "$file" ] || return 1
-    size=$(stat -c %s "$file" 2>/dev/null || stat -f %z "$file" 2>/dev/null) || return 1
-    case "$size" in ''|*[!0-9]*) return 1 ;; esac
-    [ "$size" -le 1048576 ]
-}
-
-# memory_record_put FILE KEY HASH — FILE holds one "key<TAB>sha256" line per memory file (bash
-# 3.2 has no associative arrays); afterwards its line for KEY says HASH. FILE is rewritten through
-# a temporary file next to it and mv, so a broken-off run leaves the old record or the new one,
-# never half of one; lines that do not parse are dropped. A FILE that is a symbolic link, is no
-# regular file or cannot be read is left as it is: rewriting it would drop every other file's line
-# or replace the link. Returns non-zero, without a word, when HASH is not a sha256 or FILE is not
-# written: the caller decides how to say so.
-# KEEP IN SYNC with setup.sh — the same function body; setup/test-update-edge-cases.sh (T47) fails
-# when the copies diverge.
-memory_record_put() {
-    local file="$1" key="$2" hash="$3" tmp line value tab
-    tab=$(printf '\t')
-    case "$hash" in *[!0-9a-f]*|'') return 1 ;; esac
-    [ "${#hash}" -eq 64 ] || return 1
-    if [ -L "$file" ] || { [ -e "$file" ] && { [ ! -f "$file" ] || [ ! -r "$file" ]; }; }; then
-        return 1
-    fi
-    if [ -e "$file" ]; then
-        memory_record_size_ok "$file" || return 1
-    fi
-    tmp=$(mktemp "$file.XXXXXX" 2>/dev/null) || return 1
-    if [ -f "$file" ]; then
-        while IFS= read -r line || [ -n "$line" ]; do
-            case "$line" in *"$tab"*) ;; *) continue ;; esac
-            value="${line##*"$tab"}"
-            case "$value" in *[!0-9a-f]*|'') continue ;; esac
-            [ "${#value}" -eq 64 ] || continue
-            [ "${line%"$tab"*}" = "$key" ] || printf '%s\n' "$line"
-        done < "$file" > "$tmp" || { rm -f "$tmp"; return 1; }
-    fi
-    if printf '%s\t%s\n' "$key" "$hash" >> "$tmp" \
-        && memory_record_size_ok "$tmp" && mv -f "$tmp" "$file"; then
-        return 0
-    fi
-    rm -f "$tmp"
-    return 1
-}
-
-# memory_record_get FILE KEY — the sha256 that FILE keeps for KEY, or nothing: no FILE, a symbolic
-# link (memory_record_put never writes through one, and a link to a file somebody else filled
-# would "prove" a pilot's edit untouched: red team of the 0.41.1 candidate), an unreadable or
-# malformed one, no line for KEY. The hash follows the last tab of its line, so a tab inside a path
-# cannot shift it. Reading never fails the caller.
-memory_record_get() {
-    local file="$1" key="$2" line value tab found=""
-    tab=$(printf '\t')
-    memory_record_size_ok "$file" || return 0
-    while IFS= read -r line || [ -n "$line" ]; do
-        case "$line" in *"$tab"*) ;; *) continue ;; esac
-        [ "${line%"$tab"*}" = "$key" ] || continue
-        value="${line##*"$tab"}"
-        case "$value" in *[!0-9a-f]*|'') continue ;; esac
-        [ "${#value}" -eq 64 ] && found="$value"
-    done < "$file"
-    [ -z "$found" ] || printf '%s\n' "$found"
-    return 0
-}
-
-# record_memory_old_hash FPATH HASH — Step 2: FPATH's hash in the template clone before this run
-# replaces it (proof b), kept in this run's temporary MEMORY_OLD_HASHES. A failed write costs the
-# file only this proof.
-record_memory_old_hash() {
-    [ -n "${MEMORY_OLD_HASHES:-}" ] || return 0
-    memory_record_put "$MEMORY_OLD_HASHES" "$1" "$2" \
-        || echo "  ⚠ $1 — не удалось запомнить прежнюю версию шаблона; решат другие доказательства" >&2
-}
-
-# memory_old_hash FPATH — the hash record_memory_old_hash() kept for FPATH, or nothing.
-memory_old_hash() {
-    memory_record_get "${MEMORY_OLD_HASHES:-}" "$1"
-}
-
-# remember_memory_deployed FPATH HASH — proof (a) for the next runs: the deployed copy of FPATH now
-# holds HASH. Nothing is written when the record already says so. A record that cannot be written
-# is reported once per run, and the update goes on: only proof (a) is lost.
-remember_memory_deployed() {
-    [ -n "${MEMORY_DEPLOYED_RECORD:-}" ] || return 0
-    [ "$(memory_record_get "$MEMORY_DEPLOYED_RECORD" "$1")" = "$2" ] && return 0
-    memory_record_put "$MEMORY_DEPLOYED_RECORD" "$1" "$2" && return 0
-    if [ "$MEMORY_RECORD_WARNED" != true ]; then
-        echo "  ⚠ не удалось записать $MEMORY_DEPLOYED_RECORD — обновление идёт дальше; без этой записи часть нетронутых файлов памяти позже не удастся отличить от изменённых" >&2
-        MEMORY_RECORD_WARNED=true
-    fi
-    return 0
-}
-
-# remember_untouched_memory_before_apply — review-12 of #965/#967, C1: before Step 5 replaces the
-# template clone, every memory copy that still equals the version this run is about to replace
-# (proof b) gets its record line. Proof (b) lives in this run's temporary directory: a run broken off
-# between Step 5 and Step 6 (code 49, Ctrl-C) used to lose it, and on an installation without the
-# record yet the next run could not tell such a copy from an edited one. An edited copy, MEMORY.md
-# and the personal configs get no line; author_mode records nothing.
-remember_untouched_memory_before_apply() {
-    local f fname dst old_hash
-    [ -d "$CLAUDE_MEMORY_DIR" ] || return 0
-    is_author_mode && return 0
-    for f in ${UPDATED_FILES[@]+"${UPDATED_FILES[@]}"}; do
-        case "$f" in memory/*.md|memory/*.yaml|memory/*.yml) ;; *) continue ;; esac
-        fname=$(basename "$f")
-        if [ "$fname" = "MEMORY.md" ] || is_personal_config "$fname"; then
-            continue
-        fi
-        dst="$CLAUDE_MEMORY_DIR/${f#memory/}"
-        old_hash=$(memory_old_hash "$f")
-        if [ -n "$old_hash" ] && [ -f "$dst" ] && [ "$(hash_file "$dst")" = "$old_hash" ]; then
-            remember_memory_deployed "$f" "$old_hash"
-        fi
-    done
-    return 0
-}
-
-# backup_clone_memory_edits_before_apply — WP-529 Ф270, F3 of the v0.42.0-rc.6 red team: Step 5
-# replaces a memory file in the template clone with the new template version, and an edit the
-# pilot made right there was gone; the Step 6 line pointed at the backup of the deployed copy,
-# which never held it. A clone memory file whose hash differs from the previous release's
-# manifest is an edit: it is copied into this run's memory backup under template-clone/ first, and
-# the line names the copy. A manifest without a fingerprint for the file (0.36 manifests carry
-# none, finding 3 of the v0.42.0-rc.14 red team) cannot tell an edit from the delivered version:
-# such files are still backed up (cheap, and an edit is never lost on a guess), but are not each
-# called "your edit" — one line says how many were kept and where.
-# author_mode skips: the author's clone is their git work.
-backup_clone_memory_edits_before_apply() {
-    local f src released backup unproven=0
-    is_author_mode && return 0
-    for f in ${UPDATED_FILES[@]+"${UPDATED_FILES[@]}"}; do
-        case "$f" in memory/*.md|memory/*.yaml|memory/*.yml) ;; *) continue ;; esac
-        src="$SCRIPT_DIR/$f"
-        [ -f "$src" ] || continue
-        released=$(manifest_sha256_of "$SCRIPT_DIR/update-manifest.json" "$f" 2>/dev/null) || released=""
-        [ -n "$released" ] && [ "$(hash_file "$src")" = "$released" ] && continue
-        if [ -z "$MEMORY_BACKUP_RUN" ]; then
-            MEMORY_BACKUP_RUN="$WORKSPACE_DIR/.backups/memory-pre-update/$(date -u +%Y%m%dT%H%M%SZ)-$$"
-        fi
-        backup="$MEMORY_BACKUP_RUN/template-clone/${f#memory/}"
-        if ! { mkdir -p "$(dirname "$backup")" && cp -p "$src" "$backup"; }; then
-            echo "  ⚠ $f — копию файла памяти из папки шаблона сохранить не удалось; обновление не начато, файлы не менялись" >&2
-            return 1
-        fi
-        if [ -n "$released" ]; then
-            echo "  ⚠ $f — в папке шаблона была ваша правка; файл шаблона заменяется новой версией, правка сохранена: $backup"
-        else
-            unproven=$((unproven + 1))
-        fi
-    done
-    if [ "$unproven" -gt 0 ]; then
-        echo "  ℹ️  файлов памяти в папке шаблона заменяется новой версией: $unproven. Отпечатков прежней версии для них нет, поэтому правку от доставленной версии не отличить, и прежние копии сохранены на случай, если вы их правили: $MEMORY_BACKUP_RUN/template-clone/"
-    fi
-    return 0
-}
-
-# memory_decided_once FPATH — true the first time FPATH comes up in this run, false after it: Step 6
-# and the repair pass after it walk the same paths, and a file gets one decision and one line per run.
-memory_decided_once() {
-    local nl='
-'
-    case "$nl$MEMORY_POLICY_SEEN" in *"$nl$1$nl"*) return 1 ;; esac
-    MEMORY_POLICY_SEEN="$MEMORY_POLICY_SEEN$1$nl"
-}
-
-# memory_reason_text CODE — the classifier's "unknown" reason (see classify-workspace-copy.sh) in
-# the user's words: the line it goes into is Russian.
-memory_reason_text() {
+# Исключение из защиты (upstream #354/#384): эти файлы ведёт платформа, но старые релизы
+# шаблона поставляли их с owner: user. Legacy-маркер не должен навсегда заморозить
+# платформенные правки. Список точный и совпадает с шаблоном: личный стиль, авторские
+# различения, снимки FPF и прочая настоящая память пилота остаются защищены.
+# roles.md исключён из списка (upstream #470): файл несёт каталог ролей платформы ВМЕСТЕ
+# с авторским разделом пользователя (личные роли, нумерация от R400) — блайнд-миграция
+# стирала пользовательский раздел без предупреждения. Теперь под обычной защитой owner:user.
+is_migrated_platform_memory_path() {
     case "$1" in
-        shallow) echo "клон шаблона сделан с --depth, его истории нет" ;;
-        no-git) echo "каталог шаблона — не git-клон" ;;
-        no-history) echo "в истории клона шаблона нет этого файла" ;;
-        history_truncated) echo "у файла больше 200 версий в истории клона, они не просмотрены" ;;
-        git-error) echo "git не смог прочитать историю клона" ;;
-        no-classifier) echo "нет классификатора истории" ;;
-        '') echo "классификатор не дал ответа" ;;
-        *) echo "причина: $1" ;;
+        memory/protocol-open.md|memory/protocol-work.md|memory/protocol-close.md|memory/protocol-month-close.md|\
+        memory/agent-architecture-framework.md|memory/agent-vendor-connect-pattern.md|memory/checklists.md|\
+        memory/dry-run-contract.md|memory/feedback_response_clarity_for_pilot.md|memory/hooks-design.md|\
+        memory/navigation.md|memory/reference/agent-core.md|memory/repo-type-rules.md|\
+        memory/r-questionnaire.md|memory/t-checklist.md|memory/templates-dayplan.md) return 0 ;;
+        *) return 1 ;;
     esac
 }
 
-# memory_copy_verdict FPATH DST DST_HASH OLD_HASH — may the deployed copy DST of template file FPATH
-# (hash DST_HASH, which differs from the template) be replaced? Prints "untouched <proof>" when
-# one of the proofs (a)-(c) holds, "keep <reason>" otherwise. The classifier's verdict is only as
-# strong as the history of the clone's CURRENT branch (git rev-list HEAD for this path), so the
-# texts promise no more: "authored" names both causes it can have - the pilot's edits, or a
-# release update.sh applied without committing it (and without the record, on an older install).
-memory_copy_verdict() {
-    local fpath="$1" dst="$2" dst_hash="$3" old_hash="$4" recorded
-    local classifier="$SCRIPT_DIR/.claude/scripts/classify-workspace-copy.sh" classify_out="" verdict="" reason="no-classifier"
-    # This run's own proof (b) first: remember_untouched_memory_before_apply() copies it into the
-    # record, and the line should name the version the copy is checked against in this run.
-    if [ -n "$old_hash" ] && [ "$old_hash" = "$dst_hash" ]; then
-        echo "untouched равен прошлой версии шаблона"
-        return 0
-    fi
-    recorded=$(memory_record_get "${MEMORY_DEPLOYED_RECORD:-}" "$fpath")
-    if [ -n "$recorded" ] && [ "$recorded" = "$dst_hash" ]; then
-        echo "untouched равен версии, установленной в прошлый раз"
-        return 0
-    fi
-    if [ -f "$classifier" ]; then
-        # </dev/null: repair_pass() feeds its loop from stdin; nothing else may take it.
-        classify_out=$(bash "$classifier" "$SCRIPT_DIR" "$fpath" "$dst" </dev/null 2>/dev/null || true)
-        verdict="${classify_out%% *}"
-        reason="${classify_out#* }"
-    fi
-    case "$verdict" in
-        uptodate|stale) echo "untouched равен версии из истории клона шаблона" ;;
-        authored) echo "keep не совпадает ни с одной версией в истории текущей ветки клона (ваши правки или уже применённый прошлый релиз)" ;;
-        *) echo "keep не удалось проверить, менялся ли файл ($(memory_reason_text "$reason"))" ;;
+# owner_is_user FILE — true, если у развёрнутой копии во frontmatter стоит owner: user.
+# Fail-open: нет читателя frontmatter или файл нечитаем → не защищаем (иначе первое
+# обновление со старой версии заморозило бы вообще всю память).
+owner_is_user() {
+    command -v get_field >/dev/null 2>&1 || return 1
+    [ -r "$1" ] || return 1
+    [ "$(get_field "$1" owner 2>/dev/null)" = "user" ]
+}
+
+# Сохранение пользовательской секции при перезаписи платформенного файла (upstream 3318d72,
+# 4ae0906). Маркеры USER-SPACE несут 35 файлов скиллов ветки; без этого правки пилота
+# в них исчезали при каждом обновлении. sed вместо perl — тот же приём, что ниже в QWEN.md,
+# без дополнительной зависимости от perl.
+has_user_space_slot() {
+    case "$1" in
+        .qwen/skills/*|.qwen/rules/*) return 0 ;;
+        *) return 1 ;;
     esac
 }
 
-# replace_memory_copy SRC DST — put SRC's content at DST without ever leaving DST cut short: write
-# a temporary file next to DST (with DST's mode, or a plain copy's mode for a new file), then mv it
-# over DST, which is atomic within one directory. A symbolic link is written through, as before:
-# the pilot pointed it elsewhere on purpose.
-replace_memory_copy() {
-    local src="$1" dst="$2" tmp
-    if [ -L "$dst" ]; then
-        cp "$src" "$dst"
-        return
-    fi
-    tmp=$(mktemp "$dst.update-XXXXXX") || return 1
-    if [ -e "$dst" ]; then
-        cp -p "$dst" "$tmp" || { rm -f "$tmp"; return 1; }
-    else
-        rm -f "$tmp"
-    fi
-    if cp "$src" "$tmp" && mv -f "$tmp" "$dst"; then
-        return 0
-    fi
-    rm -f "$tmp"
-    return 1
-}
+# === Каталоги ===
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"   # FMT-репо = источник новых файлов
+WORKSPACE_DIR="$(dirname "$SCRIPT_DIR")"       # установленная среда = приёмник
+ENV_FILE="$WORKSPACE_DIR/.exocortex.env"
 
-# saving_cp_command SOURCE TARGET — the command line the reports offer for refreshing TARGET
-# from SOURCE: first save TARGET next to itself, then replace it. The user's shell runs it, so
-# each path goes through printf %q: the shell receives exactly these paths whatever they hold
-# (spaces, quotes, $, backticks, backslashes) and expands nothing inside them. The saved copy's
-# name comes from mktemp (TARGET.before-update-XXXXXX), which creates the file under a name no
-# other run has, atomically: two runs, even within one second and with the same random seed, can
-# never write into one copy, so the second run cannot replace the only copy of the user's edits
-# with the refreshed file (issue #967). Only "$bak" is left for the user's shell to expand.
-saving_cp_command() {
-    local source_q target_q
-    printf -v source_q '%q' "$1"
-    printf -v target_q '%q' "$2"
-    # shellcheck disable=SC2016  # "$bak" is meant for the user's shell, which runs this command
-    printf 'bak=$(mktemp %s.before-update-XXXXXX) && cp -p %s "$bak" && cp %s %s' "$target_q" "$target_q" "$source_q" "$target_q"
-}
+# Читатель frontmatter для owner_is_user (upstream #229). Source мягкий: установка,
+# обновляющаяся с версии до этого фикса, ещё не имеет файла на диске — он приезжает
+# этим же прогоном. Без него owner_is_user отдаёт «не user», то есть прежнее поведение.
+[ -f "$SCRIPT_DIR/.qwen/lib/frontmatter.sh" ] && . "$SCRIPT_DIR/.qwen/lib/frontmatter.sh"
 
-# apply_memory_policy FPATH DST [OLD_HASH] — the memory policy above for one file: DST is the
-# deployed copy of template file FPATH, OLD_HASH its proof (b) when the caller has one. A missing
-# DST is copied, an identical one left alone; both are then recorded (proof a). Returns 0 when DST
-# was written, 1 otherwise (identical, kept, backup or copy failed, or decided earlier in this run).
-apply_memory_policy() {
-    local fpath="$1" mem_dst="$2" old_hash="${3:-}" src src_hash dst_hash verdict src_q dst_q
-    memory_decided_once "$fpath" || return 1
-    src="$SCRIPT_DIR/$fpath"
-    src_hash=$(hash_file "$src")
-    if [ -z "$src_hash" ]; then
-        echo "  ⚠ $fpath — НЕ обновлён: не удалось прочитать шаблонный файл $src; проверьте клон шаблона и повторите update.sh"
-        MEMORY_KEPT+=("$fpath")
-        return 1
-    fi
-
-    if [ ! -f "$mem_dst" ]; then
-        if mkdir -p "$(dirname "$mem_dst")" && replace_memory_copy "$src" "$mem_dst"; then
-            echo "  ⟲ $fpath → memory/ (файла не было, скопирован)"
-            remember_memory_deployed "$fpath" "$src_hash"
-            return 0
-        fi
-        echo "  ⚠ $fpath — НЕ доставлен: не удалось скопировать в $mem_dst; поправьте права или освободите место и повторите update.sh"
-        MEMORY_KEPT+=("$fpath")
-        return 1
-    fi
-    dst_hash=$(hash_file "$mem_dst")
-    if [ "$dst_hash" = "$src_hash" ]; then
-        remember_memory_deployed "$fpath" "$src_hash"
-        return 1
-    fi
-
-    verdict=$(memory_copy_verdict "$fpath" "$mem_dst" "$dst_hash" "$old_hash")
-    case "$verdict" in
-        untouched\ *) ;;
-        *)
-            # The file will not refresh itself: nothing will prove it untouched later either (a kept
-            # copy never gets a record line). So the line says so, gives the diff first and the
-            # command second, conditional on there being no edits (an agent must not run it blind).
-            printf -v src_q '%q' "$src"
-            printf -v dst_q '%q' "$mem_dst"
-            echo "  ⚠ $fpath — НЕ обновлён: ${verdict#keep }. Сам он не обновится. Сверьте: diff $src_q $dst_q. Если ваших правок там нет, примите версию шаблона (прежняя копия останется рядом): $(saving_cp_command "$src" "$mem_dst")"
-            MEMORY_KEPT+=("$fpath")
-            return 1
-            ;;
-    esac
-    if ! backup_memory_file_before_overwrite "$fpath" "$mem_dst"; then
-        echo "  ⚠ $fpath — НЕ обновлён: не удалось сохранить прежнюю версию (${MEMORY_BACKUP_FILE:-путь не определён}), замена отменена; поправьте права или освободите место и повторите update.sh"
-        MEMORY_KEPT+=("$fpath")
-        return 1
-    fi
-    if ! replace_memory_copy "$src" "$mem_dst"; then
-        echo "  ⚠ $fpath — НЕ обновлён: копирование не удалось (прежняя версия сохранена в $MEMORY_BACKUP_FILE); повторите update.sh"
-        MEMORY_KEPT+=("$fpath")
-        return 1
-    fi
-    echo "  ⟲ $fpath → memory/ — обновлён (не менялся: ${verdict#untouched }; если в клоне шаблона была ваша правка, она в прежней версии); прежняя версия: $MEMORY_BACKUP_FILE"
-    MEMORY_REPLACED+=("$fpath")
-    remember_memory_deployed "$fpath" "$src_hash"
-    return 0
-}
-
-# prune_memory_backups — keep .backups/memory-pre-update/ from growing for ever (issue #1006).
-# Every run that replaces a memory file saves the old copy in its own dated directory; nothing
-# removed them. Remove run directories older than IWE_MEMORY_BACKUP_KEEP_DAYS (default 30), but
-# always keep the newest three. Only directories named like a run (YYYYMMDDTHHMMSSZ-PID) are touched.
-prune_memory_backups() {
-    local root="$WORKSPACE_DIR/.backups/memory-pre-update" days="${IWE_MEMORY_BACKUP_KEEP_DAYS:-30}" d n=0
-    [ -d "$root" ] || return 0
-    case "$days" in ''|*[!0-9]*) days=30 ;; esac
-    while IFS= read -r d; do
-        n=$((n + 1))
-        [ "$n" -le 3 ] && continue
-        case "$d" in
-            [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]T[0-9][0-9][0-9][0-9][0-9][0-9]Z-*) ;;
-            *) continue ;;
-        esac
-        [ -d "$root/$d" ] || continue
-        [ -n "$(find "$root/$d" -maxdepth 0 -mtime +"$days" 2>/dev/null)" ] && rm -rf -- "$root/$d"
-    done < <(ls -1t "$root" 2>/dev/null)
-    return 0
-}
-
-# report_memory_policy_summary — the closing lines of the memory pass: every file this run
-# replaced with the backup directory, and every file it left as it was. repair_pass() prints them:
-# it runs after Step 6 on every path that writes memory, so the lists are complete there.
-report_memory_policy_summary() {
-    local f replaced="" kept=""
-    for f in ${MEMORY_REPLACED[@]+"${MEMORY_REPLACED[@]}"}; do replaced="${replaced:+$replaced, }$f"; done
-    for f in ${MEMORY_KEPT[@]+"${MEMORY_KEPT[@]}"}; do kept="${kept:+$kept, }$f"; done
-    # issue #1006: the closing lines of the memory pass are the one place every run goes through,
-    # so old backup runs are pruned here (the run just made is the newest and always stays).
-    prune_memory_backups
-    if [ -n "$replaced" ]; then
-        # issue #1006: only a copy proven untouched is ever replaced (apply_memory_policy), so this
-        # is a note, not a warning: no edit of the user's was lost; the old copies stay in the backup.
-        echo "  ℹ Заменено файлов памяти: ${#MEMORY_REPLACED[@]} ($replaced); ваших правок в них не было (заменяются только неизменённые копии), прежние версии сохранены в $MEMORY_BACKUP_RUN"
-    fi
-    if [ -n "$kept" ]; then
-        echo "  ⚠ Не обновлено файлов памяти: ${#MEMORY_KEPT[@]} ($kept); почему и что сделать — в строке каждого файла выше"
-    fi
-    return 0
-}
-
-# === Governance script policy (WP-485 Phase 17) ===
-# backfill_governance_seed_script() decided "safe to replace" from the deployed copy's git
-# status: clean-tracked was always treated as ours. git status cannot tell "untouched by
-# us" from "a human's own commit that happens to be clean right now" -- it replaced a
-# pilot's own committed, more-advanced version with an older seed (live on a governance
-# repo, found 2026-10-05) for exactly that reason. A hard stop on any mismatch also meant one
-# ambiguous file aborted the whole run -- the reported user incident (two different error
-# texts because update.sh self-updated between the user's two attempts, #939 vs its fix).
-#
-# This reuses the memory/* policy's classifier (content vs. the template clone's own
-# history at the seed path, not git status of the deployed copy) and its never-abort-the-
-# run contract, through the same generic memory_copy_verdict/memory_record_put/
-# memory_record_get/saving_cp_command helpers above -- those already take explicit paths,
-# nothing here is memory-specific. Kept separate from apply_memory_policy itself (own
-# arrays, own backup root, own summary line): a kept governance script must never be
-# reported as a kept "файл памяти", and the two must never block on each other's path.
-# .memory-deployed.tsv is shared as-is -- its keys are the fpath string, and "scripts/..."
-# never collides with "memory/...".
-#
-# Dropped on purpose: the old function's case-insensitive tracked-alias detection (it
-# read the deployed copy's git index to find a same-name sibling in another case). That
-# question needed git status of the deployed copy, which is exactly what this policy
-# stops consulting. The gap is inert, not destructive: on a case-sensitive filesystem
-# where such a sibling exists, the worst outcome is a second, oddly-cased file next to it
-# -- never data loss -- and the common case-insensitive filesystems (macOS, Windows) make
-# the scenario moot (both names are the same path).
-GOVSCRIPT_REPLACED=()      # replaced in this run (report_governance_script_policy_summary)
-GOVSCRIPT_KEPT=()          # left as they were although they differ from the template seed
-GOVSCRIPT_BACKUP_RUN=""
-
-# backup_governance_script_before_overwrite DST — same shape as backup_memory_file_before_overwrite,
-# a separate function (not a generalization of it) because that one self-filters to
-# memory/*.md|.yaml|.yml and silently no-ops for any other path (update.sh:2809) -- calling
-# it here would skip the backup without saying so.
-backup_governance_script_before_overwrite() {
-    local dst="$1"
-    GOVSCRIPT_BACKUP_FILE=""
-    [ -f "$dst" ] || return 0
-    if [ -z "$GOVSCRIPT_BACKUP_RUN" ]; then
-        GOVSCRIPT_BACKUP_RUN="$WORKSPACE_DIR/.backups/governance-script-pre-update/$(date -u +%Y%m%dT%H%M%SZ)-$$"
-    fi
-    GOVSCRIPT_BACKUP_FILE="$GOVSCRIPT_BACKUP_RUN/$(basename "$dst")"
-    mkdir -p "$(dirname "$GOVSCRIPT_BACKUP_FILE")" && cp -p "$dst" "$GOVSCRIPT_BACKUP_FILE"
-}
-
-# apply_governance_script_policy RELATIVE_PATH — RELATIVE_PATH is the governance repo's own
-# copy path (e.g. "scripts/generate-executor-catalog.py"); its seed source is
-# "seed/strategy/$RELATIVE_PATH", which is also what the classifier walks: check-seed-drift.sh
-# keeps seed byte-identical to scripts/<basename> (minus the SNAPSHOT marker line), so every
-# content the template ever shipped as current already has a commit on the seed path itself --
-# no separate history to resolve, no templated-placeholder path to a different file either
-# (none of the three governance scripts contain "{{", verified 2026-10-05).
-apply_governance_script_policy() {
-    local relative_path="$1" governance_repo governance_dir fpath src dst
-    local src_hash dst_hash verdict src_q dst_q
-    governance_repo="${EFFECTIVE_GOVERNANCE_REPO:-$(effective_governance_repo)}"
-    governance_dir="$WORKSPACE_DIR/$governance_repo"
-    fpath="seed/strategy/$relative_path"
-    dst="$governance_dir/$relative_path"
-
-    if [ -L "$governance_dir" ]; then
-        echo "  ✗ $relative_path не обновлён: governance repo является symlink." >&2
-        GOVSCRIPT_KEPT+=("$relative_path")
-        return 1
-    fi
-    if [ ! -d "$governance_dir" ]; then
-        echo "  ○ $governance_repo: governance repo не найден, доставка $relative_path пропущена."
-        return 0
-    fi
-    src="$SCRIPT_DIR/$fpath"
-    if [ -L "$src" ] || [ ! -f "$src" ]; then
-        echo "  ✗ $relative_path не доставлен в целевом release payload." >&2
-        GOVSCRIPT_KEPT+=("$relative_path")
-        return 1
-    fi
-    if [ -L "$governance_dir/scripts" ] || [ -L "$dst" ]; then
-        echo "  ✗ $relative_path не обновлён: цель или её каталог — symlink." >&2
-        GOVSCRIPT_KEPT+=("$relative_path")
-        return 1
-    fi
-
-    src_hash=$(hash_file "$src")
-    if [ -z "$src_hash" ]; then
-        echo "  ⚠ $relative_path — НЕ обновлён: не удалось прочитать $src; проверьте клон шаблона и повторите update.sh"
-        GOVSCRIPT_KEPT+=("$relative_path")
-        return 1
-    fi
-
-    if [ ! -f "$dst" ]; then
-        if mkdir -p "$(dirname "$dst")" && atomic_copy_executable "$src" "$dst"; then
-            echo "  ⟲ $relative_path → $governance_repo (файла не было, доставлен)"
-            remember_memory_deployed "$fpath" "$src_hash"
-            GOVSCRIPT_REPLACED+=("$relative_path")
-            return 0
-        fi
-        echo "  ⚠ $relative_path — НЕ доставлен: не удалось скопировать в $dst; поправьте права или освободите место и повторите update.sh"
-        GOVSCRIPT_KEPT+=("$relative_path")
-        return 1
-    fi
-
-    dst_hash=$(hash_file "$dst")
-    if [ "$dst_hash" = "$src_hash" ]; then
-        remember_memory_deployed "$fpath" "$src_hash"
-        return 0
-    fi
-
-    verdict=$(memory_copy_verdict "$fpath" "$dst" "$dst_hash" "$(memory_old_hash "$fpath")")
-    case "$verdict" in
-        untouched\ *) ;;
-        *)
-            printf -v src_q '%q' "$src"
-            printf -v dst_q '%q' "$dst"
-            echo "  ⚠ $relative_path — НЕ обновлён: ${verdict#keep }. Сам он не обновится. Сверьте: diff $src_q $dst_q. Если ваших правок там нет, примите версию шаблона (прежняя копия останется рядом): $(saving_cp_command "$src" "$dst")"
-            GOVSCRIPT_KEPT+=("$relative_path")
-            return 1
-            ;;
-    esac
-
-    if ! backup_governance_script_before_overwrite "$dst"; then
-        echo "  ⚠ $relative_path — НЕ обновлён: не удалось сохранить прежнюю версию, замена отменена; поправьте права или освободите место и повторите update.sh"
-        GOVSCRIPT_KEPT+=("$relative_path")
-        return 1
-    fi
-    if ! atomic_copy_executable "$src" "$dst"; then
-        echo "  ⚠ $relative_path — НЕ обновлён: копирование не удалось (прежняя версия сохранена в $GOVSCRIPT_BACKUP_FILE); повторите update.sh"
-        GOVSCRIPT_KEPT+=("$relative_path")
-        return 1
-    fi
-    echo "  ⟲ $relative_path → $governance_repo — обновлён (не менялся: ${verdict#untouched }; если в клоне шаблона была ваша правка, она в прежней версии); прежняя версия: $GOVSCRIPT_BACKUP_FILE"
-    GOVSCRIPT_REPLACED+=("$relative_path")
-    remember_memory_deployed "$fpath" "$src_hash"
-    return 0
-}
-
-# report_governance_script_policy_summary — same shape as report_memory_policy_summary, its
-# own lines so a kept/replaced governance script never reads as a kept/replaced "файл памяти".
-report_governance_script_policy_summary() {
-    local f replaced="" kept=""
-    for f in ${GOVSCRIPT_REPLACED[@]+"${GOVSCRIPT_REPLACED[@]}"}; do replaced="${replaced:+$replaced, }$f"; done
-    for f in ${GOVSCRIPT_KEPT[@]+"${GOVSCRIPT_KEPT[@]}"}; do kept="${kept:+$kept, }$f"; done
-    if [ -n "$replaced" ]; then
-        echo "  ⚠ Заменено скриптов governance-репо: ${#GOVSCRIPT_REPLACED[@]} ($replaced); прежние версии сохранены в $GOVSCRIPT_BACKUP_RUN"
-    fi
-    if [ -n "$kept" ]; then
-        echo "  ⚠ Не обновлено скриптов governance-репо: ${#GOVSCRIPT_KEPT[@]} ($kept); почему и что сделать — в строке каждого файла выше"
-    fi
-    return 0
-}
-
-# is_user_owned_memory DST — the deployed copy declares owner: user. Only author_mode's report reads
-# it (report_author_user_memory); the update itself never does.
-is_user_owned_memory() {
-    [ "$(get_field "$1" owner)" = "user" ]
-}
-
-# report_author_user_memory FPATH DST — author_mode writes no memory copy. For an owner: user copy it
-# keeps the report the template had before #965/#967: one line when the copy differs from the
-# template, and none of report_author_skip()'s counters, so the copy neither swells the author_mode
-# summary nor blocks --refresh-stale. One line per run (Step 6 and the repair pass both get here).
-report_author_user_memory() {
-    local fpath="$1" dst="$2" src_q dst_q
-    memory_decided_once "$fpath" || return 0
-    [ "$(hash_file "$SCRIPT_DIR/$fpath")" = "$(hash_file "$dst")" ] && return 0
-    printf -v src_q '%q' "$SCRIPT_DIR/$fpath"
-    printf -v dst_q '%q' "$dst"
-    echo "  ⚠ $fpath — author_mode, owner: user: рабочая копия не тронута, отличается от шаблона. Сверь: diff $src_q $dst_q"
-}
-
-# author_diverged FPATH — author_mode: SCRIPT_DIR is the git clone of this very template
-# from which upstream is downloaded. Git is the exact arbiter of "locally stale vs the author has reworked it",
-# not a list of protected paths (issue #238, the same class of bug that wiped 66 files —
-# guard 86cf080 protected only .claude/*, while the manifest carries roles/docs/pack-templates/
-# and other directories outside the list). Divergence = (1) file is dirty/untracked, OR (2) committed
-# locally but not in origin/$BRANCH (not yet promoted). Fail-closed: not a git repo
-# or fetch failed → protect (treat as diverged) so data is not lost silently.
-_AUTHOR_FETCH_DONE=false
-author_diverged() {
-    local fpath="$1"
-    is_author_mode || return 1
-    git -C "$SCRIPT_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 0
-    if [ "$_AUTHOR_FETCH_DONE" = false ]; then
-        git -C "$SCRIPT_DIR" fetch --quiet origin "$BRANCH" 2>/dev/null || true
-        _AUTHOR_FETCH_DONE=true
-    fi
-    [ -n "$(git -C "$SCRIPT_DIR" status --porcelain --untracked-files=all -- "$fpath" 2>/dev/null)" ] && return 0
-    [ -n "$(git -C "$SCRIPT_DIR" log --oneline "origin/$BRANCH..HEAD" -- "$fpath" 2>/dev/null)" ] && return 0
-    return 1
-}
-
-# author_release_regression FPATH PAYLOAD — bug-2026-09-17-tsekh1-release-
-# regression: author_diverged() above only catches commits NOT YET reaching
-# origin/$BRANCH — if the author's fix is already merged into main, that
-# check reports "no divergence" even though the release channel is about to
-# overwrite the file with an OLDER release snapshot (release_tag can trail
-# main by any number of unreleased commits). Live incident: an author's fix
-# landed on origin/main, update.sh (release channel, default) applied the
-# release payload anyway and silently reverted it — noticed only by manually
-# re-reading the file, not by any warning.
-#
-# The check needs no reference to whichever ref the release payload actually
-# came from: PAYLOAD is already the downloaded release content
-# ($TMPDIR_UPDATE/files/$f), so comparing it directly against origin/$BRANCH
-# HEAD answers the only question that matters — "does applying this payload
-# move the file away from what main already has?". Fires only when the local
-# file already equals origin/$BRANCH HEAD (author_diverged already covers
-# "has local edits") but the payload does not match that same HEAD. Reuses
-# the fetch done by author_diverged() via $_AUTHOR_FETCH_DONE — no extra
-# network round-trip.
-author_release_regression() {
-    local fpath="$1" payload="$2" head_sha local_sha payload_sha
-    [ "$UPDATE_CHANNEL" = "release" ] || return 1
-    is_author_mode || return 1
-    git -C "$SCRIPT_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 1
-    if [ "$_AUTHOR_FETCH_DONE" = false ]; then
-        git -C "$SCRIPT_DIR" fetch --quiet origin "$BRANCH" 2>/dev/null || true
-        _AUTHOR_FETCH_DONE=true
-    fi
-    head_sha=$(git -C "$SCRIPT_DIR" rev-parse "origin/$BRANCH:$fpath" 2>/dev/null) || return 1
-    local_sha=$(git -C "$SCRIPT_DIR" hash-object "$SCRIPT_DIR/$fpath" 2>/dev/null) || return 1
-    [ "$local_sha" = "$head_sha" ] || return 1
-    payload_sha=$(git -C "$SCRIPT_DIR" hash-object "$payload" 2>/dev/null) || return 1
-    [ "$payload_sha" != "$head_sha" ]
-}
-
-# manifest_version FILE — the first "version" value of an update-manifest.json (empty when
-# there is none). One reader for every place that needs it: the upstream manifest (Step 1),
-# the installed one for --check --fast, and the installed one when histories cannot be
-# ordered by git (rollback_by_version, #963).
-manifest_version() {
-    grep '"version"' "$1" | head -1 | sed 's/.*"version"[[:space:]]*:[[:space:]]*"//;s/".*//'
-}
-
-# manifest_sha256_of MANIFEST PATH — the sha256 MANIFEST lists for PATH (one reader for the
-# upstream manifest in the install-path guard and for the installed one in
-# claude_template_copy_is_pristine). Prints nothing and returns 1 when there is no such entry,
-# the entries disagree or the manifest cannot be read.
-manifest_sha256_of() {
-    local manifest="$1" want="$2"
-    if py_available; then
-        "$PY_BIN" - "$manifest" "$want" <<'PYEOF'
-import json, sys
-try:
-    with open(sys.argv[1], encoding='utf-8') as f:
-        data = json.load(f)
-except Exception:
-    sys.exit(1)
-matches = [e.get('sha256') for e in data.get('files', []) if e.get('path') == sys.argv[2]]
-uniq = set(m for m in matches if m)
-if len(uniq) != 1:
-    sys.exit(1)
-print(uniq.pop())
-PYEOF
-        return $?
-    fi
-    # Shell fallback (no python3/python): not a general JSON parser — relies
-    # on the fixed layout of our own generate-manifest.sh
-    # (json.dump(indent=2), "path" immediately before "sha256" in the same
-    # object, one key per line). If the manifest format ever
-    # drifts from this assumption, the E2E test for a no-python environment
-    # will catch it (WP-529 Phase 16, B3 codex).
-    awk -v want="$want" '
-        /"path"[[:space:]]*:/ {
-            line = $0
-            sub(/^[^"]*"path"[[:space:]]*:[[:space:]]*"/, "", line)
-            sub(/".*$/, "", line)
-            cur_path = line
-            next
-        }
-        /"sha256"[[:space:]]*:/ && cur_path == want {
-            line = $0
-            sub(/^[^"]*"sha256"[[:space:]]*:[[:space:]]*"/, "", line)
-            sub(/".*$/, "", line)
-            if (found && line != found_val) { ambiguous = 1 }
-            found = 1
-            found_val = line
-        }
-        END {
-            if (found && !ambiguous) { print found_val; exit 0 }
-            exit 1
-        }
-    ' "$manifest"
-}
-
-# issue #1037: a fork with core.fileMode=false records new executables as
-# 100644 after plain git add, even when the working copy has +x. Print exact
-# repair commands for manifest files without staging the user's fork.
-report_executable_index_mismatches() {
-    local source="${1:-applied}" repo_prefix file mode unmerged index_entries staged_delete reported=0
-    local -a candidates=()
-    command -v git >/dev/null 2>&1 || return 0
-    [ "$(git -C "$SCRIPT_DIR" config --bool core.fileMode 2>/dev/null)" = false ] || return 0
-    repo_prefix=$(git -C "$SCRIPT_DIR" rev-parse --show-prefix 2>/dev/null) || return 0
-    [ -z "$repo_prefix" ] || return 0
-
-    if [ "$source" = manifest ]; then
-        [ -f "${MANIFEST_PARSED:-}" ] || return 0
-        while IFS='|' read -r file _; do
-            candidates+=("$file")
-        done < "$MANIFEST_PARSED"
-    else
-        candidates=("${APPLIED_PATHS[@]}")
-    fi
-
-    for file in "${candidates[@]}"; do
-        case "$file" in
-            *.sh|.githooks/*|.claude/bin/*|scripts/wp-list.py|scripts/check-claude-md-links.py) ;;
-            *) continue ;;
-        esac
-        [ -f "$SCRIPT_DIR/$file" ] && [ -x "$SCRIPT_DIR/$file" ] || continue
-        if ! unmerged=$(git -C "$SCRIPT_DIR" ls-files -u -- ":(top,literal)$file" 2>/dev/null); then
-            printf '  ⚠ %s: не удалось проверить индекс Git; команды не предлагаются.\n' "$file"
-            continue
-        fi
-        if [ -n "$unmerged" ]; then
-            printf '  ⚠ %s: в индексе неразрешённый конфликт; сначала разрешите его вручную. Команды добавления файла не предлагаются.\n' "$file"
-            continue
-        fi
-        if ! index_entries=$(git -C "$SCRIPT_DIR" ls-files --stage -- ":(top,literal)$file" 2>/dev/null); then
-            printf '  ⚠ %s: не удалось проверить режим в индексе Git; команды не предлагаются.\n' "$file"
-            continue
-        fi
-        mode=$(printf '%s\n' "$index_entries" | awk '$3 == 0 { print $1; exit }')
-        [ "$mode" = 100755 ] && continue
-        if [ -z "$mode" ]; then
-            if ! staged_delete=$(git -C "$SCRIPT_DIR" diff --cached --diff-filter=D --name-only -- ":(top,literal)$file" 2>/dev/null); then
-                printf '  ⚠ %s: не удалось проверить подготовленное удаление; команды не предлагаются.\n' "$file"
-                continue
-            fi
-            if [ -n "$staged_delete" ]; then
-                printf '  ⚠ %s: удаление уже подготовлено в Git; команда добавления файла не предлагается.\n' "$file"
-                continue
-            fi
-        fi
-        if [ "$reported" -eq 0 ]; then
-            echo "  ⚠ Git этого форка игнорирует права файла (core.fileMode=false)."
-            echo "    Для следующих исполняемых файлов шаблона нужен режим 100755 в индексе:"
-            reported=1
-        fi
-        printf '    %s (сейчас: %s)\n' "$file" "${mode:-ещё не добавлен}"
-        if [ -z "$mode" ]; then
-            printf '    git -C %q add -- %q\n' "$SCRIPT_DIR" ":(top,literal)$file"
-        fi
-        printf '    git -C %q update-index --chmod=+x -- %q\n' "$SCRIPT_DIR" "$file"
-    done
-    [ "$reported" -eq 0 ] || echo "    Выполните команды после проверки файлов; порядок важен. Затем проверьте: git ls-files --stage."
-    return 0
-}
-
-# version_compare A B — compare two plain X.Y.Z versions numerically. Prints -1, 0 or 1 (A is
-# older than, equal to, newer than B) and returns 0; returns 2 and prints nothing when either
-# argument is not digits-only X.Y.Z (at most 9 digits per part, so the arithmetic cannot
-# overflow). "0.9.0" is older than "0.10.0": a string comparison says the opposite.
-version_compare() {
-    local a="$1" b="$2" part_a part_b re='^[0-9]{1,9}\.[0-9]{1,9}\.[0-9]{1,9}$'
-    [[ $a =~ $re ]] && [[ $b =~ $re ]] || return 2
-    while [ -n "$a" ]; do
-        part_a=${a%%.*}
-        part_b=${b%%.*}
-        # 10#: a part such as "08" is the decimal 8, not an invalid octal literal.
-        if [ $((10#$part_a)) -lt $((10#$part_b)) ]; then echo -1; return 0; fi
-        if [ $((10#$part_a)) -gt $((10#$part_b)) ]; then echo 1; return 0; fi
-        case "$a" in
-            *.*) a=${a#*.}; b=${b#*.} ;;
-            *) a="" ;;
-        esac
-    done
-    echo 0
-}
-
-# rollback_by_version — issue #963: when the installed copy and the release share no commit
-# (a fork whose history was rewritten, e.g. a different root commit), git merge-base cannot
-# order them; order them by manifest version instead: the installed update-manifest.json
-# against UPSTREAM_VERSION (set in Step 1, before the rollback check runs).
-# Exit codes (the same contract as detect_release_rollback):
-#   0 - the release is strictly older than the installed version: a rollback
-#   1 - the release is newer or equal (equal versions do not prove a rollback)
-#   2 - cannot tell: a shallow clone (a real ancestor may be cut off), no installed manifest,
-#       or a version that is not plain X.Y.Z
-rollback_by_version() {
-    local installed cmp
-    # A shallow clone reports "no common ancestor" also for histories that do share one.
-    [ "$(git -C "$SCRIPT_DIR" rev-parse --is-shallow-repository 2>/dev/null)" = "false" ] || return 2
-    [ -f "$SCRIPT_DIR/update-manifest.json" ] || return 2
-    installed=$(manifest_version "$SCRIPT_DIR/update-manifest.json")
-    cmp=$(version_compare "${UPSTREAM_VERSION:-}" "$installed") || return 2
-    [ "$cmp" = "-1" ]
-}
-
-# rollback_without_release_commit — issue #1411: the release commit is neither in the local
-# object store nor fetchable from origin. An install made with GitHub "Use this template" has
-# an origin of its own that holds no template commit, so the fetch can never succeed there.
-# In a complete (non-shallow) clone a commit that is absent locally cannot be an ancestor of
-# HEAD, so ancestry cannot show a rollback; order by manifest version instead. A network
-# failure looks the same as "not in this remote" here, so only a strictly newer release
-# counts as a normal update; equal or unreadable versions stay "cannot determine".
-# Exit codes (the same contract as detect_release_rollback): 0 - release older (a rollback),
-# 1 - release strictly newer, 2 - cannot tell (shallow clone, no manifest, equal/bad version).
-rollback_without_release_commit() {
-    local installed cmp
-    [ "$(git -C "$SCRIPT_DIR" rev-parse --is-shallow-repository 2>/dev/null)" = "false" ] || return 2
-    [ -f "$SCRIPT_DIR/update-manifest.json" ] || return 2
-    installed=$(manifest_version "$SCRIPT_DIR/update-manifest.json")
-    cmp=$(version_compare "${UPSTREAM_VERSION:-}" "$installed") || return 2
-    case "$cmp" in
-        1) return 1 ;;
-        -1) return 0 ;;
-        *) return 2 ;;
-    esac
-}
-
-# rollback_channel_hint — WP-529 Ф270 (RT2-4): the rollback warning used to send everyone to
-# IWE_UPDATE_CHANNEL=main, which from a candidate install is itself a rollback. Name the channel
-# that matches what is installed; every channel now asks for ROLLBACK when it would go back.
-rollback_channel_hint() {
-    echo "   Ставили кандидат выпуска — обновляйтесь его каналом: IWE_UPDATE_CHANNEL=rc bash update.sh"
-    echo "   Следите за основной веткой — её каналом: IWE_UPDATE_CHANNEL=main bash update.sh"
-    echo "   Любой канал, который вернёт установку назад, тоже спросит ROLLBACK."
-}
-
-# issue #863: detect when the default release channel would roll back an install
-# that is already newer than the latest published release. Fires in release
-# channel when SCRIPT_DIR is a git repo and local HEAD contains commits that are
-# not present in the release (i.e. the release is strictly behind local). When the
-# two histories share no commit at all (#963) the versions in the manifests decide.
-#
-# Exit codes:
-#   0 - rollback detected: the release is a strict ancestor of local HEAD, or (no common
-#       ancestor) its manifest version is older than the installed one
-#   1 - no rollback (release is HEAD, ahead, or, with no common ancestor, not older by version)
-#   2 - cannot determine (network/history missing, unreadable versions, a shallow clone with
-#       no visible common ancestor) -> caller must block --yes
-# A release commit that cannot be fetched from origin (#1411) is ordered by version too, see
-# rollback_without_release_commit.
-detect_release_rollback() {
-    # WP-529 Ф261 (finding 3 of the 10.11 pipeline review): an installed manifest newer than
-    # the release is a rollback whatever git ancestry says. update.sh never moves HEAD of the
-    # template folder, so a clone checked out at v0.41.11 can carry 0.42 files and a 0.42
-    # manifest; ancestry then reads "release == HEAD" and reports no rollback, and the files
-    # are rewritten without ROLLBACK. Versions are compared first, ancestry stays the second
-    # signal (equal versions, local commits ahead of the release: #863).
-    # WP-529 Ф270 (RT2-4 of the rc.2 red team): the version comparison runs on every channel.
-    # From a candidate install, IWE_UPDATE_CHANNEL=main (main still at 0.41.11 until the
-    # release merge) rewrote the files to 0.41.11 without ROLLBACK and left a mixed state.
-    local installed_version version_order
-    if [ -f "$SCRIPT_DIR/update-manifest.json" ]; then
-        installed_version=$(manifest_version "$SCRIPT_DIR/update-manifest.json")
-        if version_order=$(version_compare "${UPSTREAM_VERSION:-}" "$installed_version") \
-           && [ "$version_order" = "-1" ]; then
-            return 0
-        fi
-    fi
-    # Ancestry is a release-channel signal only: main and rc move ahead of the release by design.
-    [ "$UPDATE_CHANNEL" = "release" ] || return 1
-    [ -n "$RELEASE_SHA" ] || return 1
-    git -C "$SCRIPT_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 1
-    local local_sha release_sha merge_base commit_json
-    local_sha=$(git -C "$SCRIPT_DIR" rev-parse HEAD 2>/dev/null) || return 1
-    [ -n "$local_sha" ] || return 1
-
-    release_sha="$RELEASE_SHA"
-    # Resolve a tag/branch ref to the actual commit SHA via the delivery API.
-    # A full SHA is already resolved; local resolution is not enough because
-    # the install's `origin` may point to a different fork or the local tag may
-    # differ from the published one.
-    if ! printf '%s' "$release_sha" | grep -qxE '[0-9a-f]{40}'; then
-        commit_json=$(github_api_get "$API_BASE/commits/$release_sha") || return 2
-        # Prefer JSON parsing; fall back to sed only when Python is unavailable.
-        # Guard the assignment with || return 2: under set -e a bare failing
-        # command-substitution aborts the whole script when this function is
-        # not invoked from an if/|| context (WP-529 review of #863).
-        if py_available; then
-            release_sha=$(printf '%s\n' "$commit_json" | "$PY_BIN" -c '
-import json, re, sys
-try:
-    doc = json.load(sys.stdin)
-except json.JSONDecodeError:
-    raise SystemExit(1)
-sha = doc.get("sha", "") if isinstance(doc, dict) else ""
-if not re.fullmatch(r"[0-9a-f]{40}", sha):
-    raise SystemExit(1)
-print(sha)') || return 2
-        else
-            # Non-greedy: take the first 40-hex sha field only (head -1).
-            release_sha=$(printf '%s\n' "$commit_json" | \
-                sed -n 's/.*"sha"[[:space:]]*:[[:space:]]*"\([0-9a-f]\{40\}\)".*/\1/p' | head -1) || return 2
-        fi
-        [ -n "$release_sha" ] || return 2
-    fi
-
-    # Ensure the release commit object is available locally for merge-base.
-    if ! git -C "$SCRIPT_DIR" cat-file -e "$release_sha" 2>/dev/null; then
-        if ! git -C "$SCRIPT_DIR" fetch --quiet origin "$release_sha" 2>/dev/null; then
-            rollback_without_release_commit
-            return $?
-        fi
-    fi
-
-    # git merge-base: 0 = found, 1 = no common ancestor, anything else (128...) = an error.
-    local merge_base_rc=0
-    merge_base=$(git -C "$SCRIPT_DIR" merge-base "$local_sha" "$release_sha" 2>/dev/null) || merge_base_rc=$?
-    case "$merge_base_rc" in
-        0) ;;
-        1) rollback_by_version; return $? ;;
-        *) return 2 ;;
-    esac
-    [ -n "$merge_base" ] || return 2
-
-    # Rollback if the release commit is an ancestor of local HEAD but not equal
-    # to it (local has additional commits after the release).
-    if [ "$merge_base" = "$release_sha" ] && [ "$local_sha" != "$release_sha" ]; then
-        return 0
-    fi
-    return 1
-}
-
-# author_mode skip classification (WP-7 F71 stage A, peer-session 2026-08-14-05):
-# tell the author WHY each file was skipped (authored edits vs merely stale vs
-# undecidable) instead of one generic warning per file — Konstantin's live
-# 0.36.1→0.38.3 report: 43 skipped files triaged by hand for an hour.
-# Delegates to the shipped classifier; a missing classifier degrades loudly
-# (one warning per run), never silently.
-AUTHOR_SKIP_AUTHORED=0
-AUTHOR_SKIP_STALE=0
-AUTHOR_SKIP_UNKNOWN=0
-AUTHOR_STALE_PAIRS=()   # "fpath|dst" — collected for --refresh-stale (stage B)
-CLASSIFIER_DEGRADED_WARNED=false
-report_author_skip() {
-    local fpath="$1" dst="$2" mode="${3:-raw}"
-    local classifier="$SCRIPT_DIR/.claude/scripts/classify-workspace-copy.sh"
-    local verdict="" reason=""
-    if [ ! -x "$classifier" ]; then
-        if [ "$CLASSIFIER_DEGRADED_WARNED" = false ]; then
-            echo "  ⚠ классификатор пропусков недоступен ($classifier) — деградация до общего сообщения"
-            CLASSIFIER_DEGRADED_WARNED=true
-        fi
-        echo "  ⚠ $fpath — author_mode: рабочая копия не тронута. Сверь: diff \"$SCRIPT_DIR/$fpath\" \"$dst\""
-        AUTHOR_SKIP_UNKNOWN=$((AUTHOR_SKIP_UNKNOWN + 1))
-        return 0
-    fi
-    local classify_out
-    if [ "$mode" = "templated" ]; then
-        classify_out=$(bash "$classifier" --templated "$SCRIPT_DIR" "$fpath" "$dst" 2>/dev/null || true)
-    else
-        classify_out=$(bash "$classifier" "$SCRIPT_DIR" "$fpath" "$dst" 2>/dev/null || true)
-    fi
-    verdict="${classify_out%% *}"
-    reason="${classify_out#* }"
-    case "$verdict" in
-        uptodate)
-            # Byte-identical to the template — not a real skip, no warning needed.
-            ;;
-        stale)
-            # The same saving command as apply_memory_policy() offers for a kept copy: a bare cp loses
-            # the copy when the verdict misleads, and a fixed backup name is overwritten by a rerun.
-            echo "  ⚠ $fpath — author_mode: отстал от шаблона, авторских правок нет. Обновить: $(saving_cp_command "$SCRIPT_DIR/$fpath" "$dst")"
-            AUTHOR_SKIP_STALE=$((AUTHOR_SKIP_STALE + 1))
-            AUTHOR_STALE_PAIRS+=("$fpath|$dst")
-            ;;
-        authored)
-            echo "  ⚠ $fpath — author_mode: есть авторские правки, не тронут. Сверь: diff \"$SCRIPT_DIR/$fpath\" \"$dst\""
-            AUTHOR_SKIP_AUTHORED=$((AUTHOR_SKIP_AUTHORED + 1))
-            ;;
-        *)
-            echo "  ⚠ $fpath — author_mode: происхождение копии не установлено (${reason:-нет вердикта}), не тронут. Сверь: diff \"$SCRIPT_DIR/$fpath\" \"$dst\""
-            AUTHOR_SKIP_UNKNOWN=$((AUTHOR_SKIP_UNKNOWN + 1))
-            ;;
-    esac
-    return 0
-}
-
-# Author hosts can keep workspace .claude/ subdirectories as a read-only mirror
-# delivered from the author's own config repository (e.g. hooks/, skills/,
-# scripts/ are r-x, refreshed by another sync). A NEW template file there used
-# to hit `cp: Permission denied` and abort the whole run with the
-# .update-incomplete marker left behind — the marker of 22.10 then blocked the
-# morning Strategist for ten days (WP-568 F11). In author_mode such a target is
-# skipped with one line; outside author_mode a read-only workspace stays a real
-# error, as before.
-AUTHOR_SKIP_READONLY=0
-AUTHOR_READONLY_SEEN=$'\n'   # paths already reported: Step 6 and repair_pass meet the same file in one run
-skip_author_readonly_target() {  # <fpath> <dst>; 0 = skipped, caller continues
-    local fpath="$1" dst="$2" dir
-    is_author_mode || return 1
-    dir=$(dirname "$dst")
-    while [ ! -d "$dir" ] && [ "$dir" != "/" ] && [ "$dir" != "." ]; do
-        dir=$(dirname "$dir")
-    done
-    [ -w "$dir" ] && [ -x "$dir" ] && return 1
-    case "$AUTHOR_READONLY_SEEN" in *$'\n'"$fpath"$'\n'*) return 0 ;; esac
-    AUTHOR_READONLY_SEEN="$AUTHOR_READONLY_SEEN$fpath"$'\n'
-    echo "  ⚠ $fpath — author_mode: каталог рабочей копии только для чтения ($dir), новый файл не создан; доставьте его своим источником этого каталога"
-    AUTHOR_SKIP_READONLY=$((AUTHOR_SKIP_READONLY + 1))
-    return 0
-}
-
-report_author_skip_summary() {
-    local total=$((AUTHOR_SKIP_AUTHORED + AUTHOR_SKIP_STALE + AUTHOR_SKIP_UNKNOWN + AUTHOR_SKIP_READONLY))
-    [ "$total" -gt 0 ] || return 0
-    echo ""
-    echo "  author_mode: пропущено $total файл(ов) — авторских $AUTHOR_SKIP_AUTHORED, отставших $AUTHOR_SKIP_STALE, неизвестно $AUTHOR_SKIP_UNKNOWN, в каталогах только для чтения $AUTHOR_SKIP_READONLY"
-    if [ "$AUTHOR_SKIP_STALE" -gt 0 ] && [ "$REFRESH_STALE" != "true" ]; then
-        echo "  Отставшие можно обновить автоматически (с бэкапом): bash update.sh --refresh-stale"
-    fi
-    apply_refresh_stale
-}
-
-# --refresh-stale (stage B, WP-7 F71): applied AFTER the full classification —
-# the 14.08 consensus safeguard "block when unknown > 0" requires knowing
-# all verdicts before the first write, so applying lives on the summary, not in the loop.
-apply_refresh_stale() {
-    [ "$REFRESH_STALE" = "true" ] || return 0
-    if [ "$AUTHOR_SKIP_UNKNOWN" -gt 0 ]; then
-        echo "  ✗ --refresh-stale отклонён: $AUTHOR_SKIP_UNKNOWN файл(ов) с неустановленным происхождением — сначала разбери их вручную (diff выше) и повтори"
-        return 0
-    fi
-    if [ ${#AUTHOR_STALE_PAIRS[@]} -eq 0 ]; then
-        echo "  --refresh-stale: отставших файлов нет, обновлять нечего"
-        return 0
-    fi
-    local ts backup_root pair fpath dst refreshed=0
-    ts=$(date -u +%Y%m%dT%H%M%SZ)
-    backup_root="$WORKSPACE_DIR/.backups/refresh-stale/$ts"
-    for pair in ${AUTHOR_STALE_PAIRS[@]+"${AUTHOR_STALE_PAIRS[@]}"}; do
-        fpath="${pair%%|*}"
-        dst="${pair#*|}"
-        mkdir -p "$backup_root/$(dirname "$fpath")"
-        if ! cp "$dst" "$backup_root/$fpath"; then
-            echo "  ⚠ $fpath — бэкап не записался, файл НЕ обновлён"
-            continue
-        fi
-        if cp "$SCRIPT_DIR/$fpath" "$dst"; then
-            case "$fpath" in *.sh) chmod +x "$dst" ;; esac
-            echo "  ⟲ $fpath — обновлён из шаблона (refresh-stale)"
-            refreshed=$((refreshed + 1))
-        else
-            echo "  ⚠ $fpath — копирование не удалось, прежняя копия цела"
-        fi
-    done
-    echo "  --refresh-stale: обновлено $refreshed из ${#AUTHOR_STALE_PAIRS[@]}, бэкап: $backup_root"
-}
-
-# --apply-settings-merge (stage B): applied regardless of whether the template's
-# settings.json changed in THIS run — the live e2e run of 14.08 showed that
-# the user path "saw the preview → re-ran with the flag" otherwise
-# does nothing (the template was already updated by the previous run, the file is not in UPDATED).
-apply_settings_merge_if_requested() {
-    [ "$APPLY_SETTINGS_MERGE" = "true" ] || return 0
-    local src="$SCRIPT_DIR/.claude/settings.json"
-    local dst="$WORKSPACE_DIR/.claude/settings.json"
-    local applier="$SCRIPT_DIR/.claude/scripts/settings-merge-apply.sh"
-    if [ ! -f "$src" ] || [ ! -f "$dst" ]; then
-        echo "  ⚠ --apply-settings-merge: нет одной из копий settings.json, применять нечего"
-        return 0
-    fi
-    if cmp -s "$src" "$dst"; then
-        echo "  --apply-settings-merge: settings.json уже совпадает с шаблоном, слияние не требуется"
-        return 0
-    fi
-    if ! py_available || [ ! -f "$applier" ]; then
-        echo "  ⚠ --apply-settings-merge: python3 или $applier недоступны — слияние не применено"
-        return 0
-    fi
-    local apply_rc=0 apply_out dst_before
-    dst_before=$(hash_file "$dst")
-    apply_out=$(bash "$applier" "$src" "$dst" "$PY_BIN" 2>&1) || apply_rc=$?
-    printf '%s\n' "$apply_out" | sed 's/^/    /'
-    if [ "$apply_rc" -eq 0 ] && [ "$(hash_file "$dst")" = "$dst_before" ]; then
-        # Own hooks keep the file different from the template while the merge adds nothing; the
-        # line said "обновлён" after every rollback re-run (WP-529 Ф270, RT5-4 of the rc.5 red team).
-        echo "  .claude/settings.json — слияние ничего не изменило, файл прежний"
-    elif [ "$apply_rc" -eq 0 ]; then
-        echo "  ✓ .claude/settings.json — обновлён слиянием (--apply-settings-merge)"
-        explain_applied_settings_merge "$apply_out"
-    else
-        echo "  ⚠ .claude/settings.json — слияние не применено (см. причину выше), workspace-копия цела"
-        report_settings_merge_preview "$src" "$dst"
-    fi
-    return 0
-}
-
-# settings.json merge PREVIEW (WP-7 F71 stage A): generate a merged candidate
-# next to the real file and report the differences. The real settings.json is
-# intentionally left untouched (bug-2026-07-11 clobber guard stays in force);
-# auto-apply is a separate flag-gated stage B.
-#
-# Split into build + print (issue #1089) so report_settings_merge_drift can
-# inspect the counts before deciding whether to warn at all, without running
-# the merger script twice in the common (quiet) case.
-#
-# preview_path is an explicit parameter, not a hardcoded workspace path
-# (cold review, Fable): the merger ALWAYS writes its merged candidate to
-# whatever path it's given (settings-merge-preview.py:217-228, unconditional
-# atomic write) -- a caller that only wants to know whether there's drift,
-# without actually offering a candidate file to the pilot, must pass a
-# throwaway path, never the real $WORKSPACE_DIR/.claude/settings.merged.preview.json.
-# The first version of this function hardcoded that real path here, so the
-# probe call in report_settings_merge_drift left a stray file behind on
-# every quiet run and silently wrote one during --check too, contradicting
-# its own "предпросмотр не записан" message.
-build_settings_merge_report() {
-    local src="$1" dst="$2" preview_path="$3"
-    local merger="$SCRIPT_DIR/.claude/scripts/settings-merge-preview.py"
-    py_available && [ -f "$merger" ] || return 1
-    local report_file="$TMPDIR_UPDATE/settings-merge-report.json"
-    "$PY_BIN" "$merger" "$src" "$dst" "$preview_path" > "$report_file" 2>/dev/null || return 1
-    printf '%s\n' "$report_file"
-}
-
-print_settings_merge_report() {
-    local report_file="$1"
-    "$PY_BIN" - "$report_file" <<'PY' 2>/dev/null || true
-import json, sys
-with open(sys.argv[1], encoding="utf-8") as handle:
-    r = json.load(handle)
-print(f"    → предпросмотр слияния: {r['preview']}")
-print(f"    + из шаблона: ключей {r['keys_added_from_template']}, hook-записей {r['hooks_added_from_template']}, permissions {r['permissions_added_from_template']}")
-if r.get("hooks_only_in_workspace"):
-    print(f"    ℹ️  в вашей копии есть {r['hooks_only_in_workspace']} hook-записей, которых сейчас нет в шаблоне (может быть обычной личной настройкой)")
-if r.get("retired_defaults_replaced"):
-    print("    ⚠ режим правок агента: старая установка разрешала агенту менять файлы без вашего подтверждения"
-          " (так её настраивала платформа до 0.38.4); слияние вернёт обычный режим с подтверждением:"
-          " bash update.sh --apply-settings-merge")
-if r.get("hooks_regrouped"):
-    print(f"    + хуков, которые шаблон перенёс в другую группу: {r['hooks_regrouped']} (дубль не появится)")
-if r["conflicts"]:
-    print(f"    ⚠ конфликты (оставлено ваше значение): {', '.join(r['conflicts'])}")
-PY
-}
-
-# explain_applied_settings_merge APPLY_OUTPUT — after the merge was applied, the plain-words line for
-# a permission value the platform withdrew (WP-529 Ф270, finding 1 of the rc.14 red team: an install
-# made by 0.36–0.38.3 kept acceptEdits after the update, and the only trace was the machine word
-# "conflicts"). The applier prints the merger's JSON report as its first line.
-explain_applied_settings_merge() {
-    printf '%s\n' "$1" | "$PY_BIN" -c '
-import json, sys
-r = {}
-for line in sys.stdin:
-    if line.lstrip().startswith("{"):
-        try:
-            r = json.loads(line)
-            break
-        except ValueError:
-            continue
-if r.get("retired_defaults_replaced"):
-    print("  ✓ Режим правок агента: агент снова спрашивает подтверждение перед изменением файлов."
-          " В общих настройках стоял режим правок без подтверждения — платформа ставила его сама до 0.38.4.")
-    print("    Если этот режим нужен вам, держите его в личных настройках .claude/settings.local.json"
-          " (обновление их не трогает): \"defaultMode\": \"acceptEdits\" в разделе permissions.")
-' 2>/dev/null || true
-}
-
-report_settings_merge_preview() {
-    local src="$1" dst="$2"
-    local report_file
-    report_file=$(build_settings_merge_report "$src" "$dst" \
-        "$WORKSPACE_DIR/.claude/settings.merged.preview.json") || {
-        echo "    ⚠ предпросмотр слияния не построен (битый JSON в одном из файлов)"
-        return 0
-    }
-    print_settings_merge_report "$report_file"
-    return 0
-}
-
-# True (exit 0) only when the merge would add nothing from the template,
-# leave no conflicting existing value, and the workspace has no hook entry
-# the template no longer mentions -- i.e. workspace and template agree on
-# content even though the raw bytes/array order differ (issue #1089). The
-# hooks_only_in_workspace check (cold review, Fable) is the one case the
-# earlier byte-for-byte `cmp -s` caught by accident and this content-aware
-# check otherwise missed: template drops a hook, workspace still has it.
-settings_merge_report_is_quiet() {
-    local report_file="$1"
-    "$PY_BIN" - "$report_file" <<'PY' 2>/dev/null
-import json, sys
-with open(sys.argv[1], encoding="utf-8") as handle:
-    r = json.load(handle)
-quiet = (
-    r["keys_added_from_template"] == 0
-    and r["hooks_added_from_template"] == 0
-    and r["permissions_added_from_template"] == 0
-    and r.get("hooks_only_in_workspace", 0) == 0
-    and not r.get("retired_defaults_replaced")
-    and r.get("hooks_regrouped", 0) == 0
-    and not r["conflicts"]
-)
-sys.exit(0 if quiet else 1)
-PY
-}
-
-# The settings merge warning must compare the template with the workspace, not
-# depend on this run having downloaded a changed template file.  Forks normally
-# fast-forward their template mirror before update.sh, which otherwise leaves
-# UPDATED_FILES empty and hides this actionable drift forever.
-report_settings_merge_drift() {
-    [ "$APPLY_SETTINGS_MERGE" = "true" ] && return 0
-    local src="$SCRIPT_DIR/.claude/settings.json"
-    local dst="$WORKSPACE_DIR/.claude/settings.json"
-    [ -f "$src" ] && [ -f "$dst" ] || return 0
-    cmp -s "$src" "$dst" && return 0
-
-    # issue #1089: a byte-for-byte mismatch can still be the same set of
-    # hooks/permissions in a different array order. Probe the merge into a
-    # throwaway file first -- NEVER the real workspace preview path (cold
-    # review, Fable: the merger writes unconditionally, so building the
-    # report with the real path here would create/overwrite that file on
-    # every run, including a quiet one and a --check one, regardless of
-    # whether anything is actually shown to the pilot). When the merger
-    # agrees there is nothing to report, skip the warning silently -- same
-    # as the cmp -s match above. A merger failure does NOT count as quiet
-    # (that would hide real drift behind a parse error); it falls through
-    # to the existing warn path below.
-    local probe_file quiet=false
-    if probe_file=$(build_settings_merge_report "$src" "$dst" \
-        "$TMPDIR_UPDATE/settings-merge-probe.json"); then
-        settings_merge_report_is_quiet "$probe_file" && quiet=true
-    fi
-    $quiet && return 0
-
-    echo "  ⚠ .claude/settings.json — платформа обновила hooks/permissions, workspace-копия НЕ тронута (несёт пользовательские хуки)."
-    if $CHECK_ONLY; then
-        echo "    Режим --check: предпросмотр не записан. Запустите update.sh без --check, чтобы получить безопасный план слияния."
-        return 0
-    fi
-    # Real preview, real path -- only reached when there is something to
-    # show and we are actually allowed to write it. A second merger run
-    # (the probe above already ran once) is the price of keeping the
-    # throwaway probe from ever touching the workspace; this path is the
-    # rare one (real drift), not the common one (quiet).
-    report_settings_merge_preview "$src" "$dst"
-}
-
-# === Detect directories ===
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-
-# issue #229: shared frontmatter reader (get_field), sourced by SCRIPT_DIR-relative
-# path. Soft here (no || exit 1): an install upgrading from a pre-2.4.0 version
-# won't have this file locally yet on its very first run — Step 0 self-update
-# replaces update.sh itself and re-execs it before any file propagation happens,
-# so this line runs before the file can exist on disk. Step 5 Apply delivers it
-# (it's now in the manifest) and re-sources it below, right after copying files —
-# that call is the hard-required one, by which point the file is guaranteed present.
-[ -f "$SCRIPT_DIR/.claude/lib/frontmatter.sh" ] && source "$SCRIPT_DIR/.claude/lib/frontmatter.sh"
-
-if [ ! -f "$SCRIPT_DIR/CLAUDE.md" ]; then
-    echo "ОШИБКА: Запускайте из корня экзокортекс-репо."
-    echo "  cd /path/to/your-exocortex && bash update.sh"
+# Guard: запуск из FMT-репо установленной среды
+if [ ! -f "$SCRIPT_DIR/QWEN.md" ]; then
+    echo "ОШИБКА: запускайте из корня FMT-репо (где лежит QWEN.md)." >&2
+    echo "  cd ~/IWE/FMT-exocortex-template && bash update.sh" >&2
+    exit 1
+fi
+if [ ! -f "$ENV_FILE" ]; then
+    echo "ОШИБКА: $ENV_FILE не найден — среда не установлена в этом workspace." >&2
+    echo "  Сначала выполните первую установку:  bash setup-offline.sh" >&2
     exit 1
 fi
 
-WORKSPACE_DIR="$(dirname "$SCRIPT_DIR")"
-RULES_BACKUP_RUN=""
-RULES_SAFE_TO_UPDATE="|"
-HOOKS_BACKUP_RUN=""
-HOOK_BACKUP_FILE=""
-HOOKS_REPLACED=()
-MEMORY_BACKUP_RUN=""
-# The record of installed memory versions, proof (a) of the memory policy (issues #965/#967).
-# The workspace is not a git repository: the record stays local to this installation.
-MEMORY_DEPLOYED_RECORD="$WORKSPACE_DIR/.memory-deployed.tsv"
-UPDATE_INCOMPLETE_MARKER="$SCRIPT_DIR/.update-incomplete"
-UPDATE_TRANSACTION_STARTED=false
+MANIFEST="$SCRIPT_DIR/update-manifest.json"
+if [ ! -f "$MANIFEST" ]; then
+    echo "ОШИБКА: $MANIFEST не найден (неполная распаковка FMT?)." >&2
+    exit 1
+fi
+# Манифест передаётся Python как есть: на macOS настоящий абсолютный путь
+# всегда начинается с «/», MSYS-перевод (/c/... → c:/...) не нужен.
+MANIFEST_PY="$MANIFEST"
 
-# issue #768: a full update.sh run, launched from a disposable copy of the
-# workspace, silently retargeted the REAL ~/Library/LaunchAgents and
-# ~/.zshenv onto the copy — WORKSPACE_DIR correctly points at the copy, but
-# nothing checks whether host-global resources (a real per-user shell rc
-# file, real launchd jobs) already belong to a DIFFERENT, already-configured
-# workspace before rewriting them. Absence of evidence is not evidence of
-# being the primary install — this only detects a conflict with a workspace
-# already on record; a virgin machine still lets the first run claim
-# ownership (peer-session 2026-09-10-09-fmt-issues-triage, Kimi+Codex).
-HOST_GLOBAL_OWNER_CONFLICT=false
-HOST_GLOBAL_OWNER_CONFLICT_REASON=""
-
-canonical_workspace_path() {
-    if [ -d "$1" ]; then
-        (cd "$1" 2>/dev/null && pwd -P)
-    else
-        printf '%s\n' "${1%/}"
-    fi
+# === Значения из .exocortex.env (безопасное чтение KEY=VALUE) ===
+# Surrounding quotes are stripped the same way setup/build-runtime.sh env_get does:
+# setup-offline.sh writes quoted values since WP-47 (upstream issue #781).
+env_get() {
+    local raw
+    # `|| true`: under `set -eo pipefail` a key missing from the file (an older install, a
+    # hand-edited one) made grep fail the pipeline and ended the whole update without a word.
+    # A missing key reads as empty, and every caller has its own default (cycle 12).
+    raw=$(grep -E "^$1=" "$ENV_FILE" 2>/dev/null | head -1 | cut -d= -f2-) || true
+    case "$raw" in
+        \"*\") [ ${#raw} -ge 2 ] && raw="${raw#\"}" && raw="${raw%\"}" ;;
+        \'*\') [ ${#raw} -ge 2 ] && raw="${raw#\'}" && raw="${raw%\'}" ;;
+    esac
+    printf '%s\n' "$raw"
 }
 
-mark_host_global_conflict() {
-    if [ -n "$HOST_GLOBAL_OWNER_CONFLICT_REASON" ]; then
-        HOST_GLOBAL_OWNER_CONFLICT_REASON="$HOST_GLOBAL_OWNER_CONFLICT_REASON; $1"
-    else
-        HOST_GLOBAL_OWNER_CONFLICT_REASON="$1"
-    fi
-    HOST_GLOBAL_OWNER_CONFLICT=true
-}
-
-detect_host_global_owner_conflict() {
-    local current_root existing_root plist plist_root zsh_roots
-    current_root="$(canonical_workspace_path "$WORKSPACE_DIR")"
-
-    if [ -f "$HOME/.zshenv" ]; then
-        zsh_roots=$(awk '
-          /^# IWE environment \(WP-219, DP.FM.009\):/ { managed=1; next }
-          managed && /^_IWE_ROOT="/ {
-              value=$0
-              sub(/^_IWE_ROOT="/, "", value)
-              sub(/"$/, "", value)
-              print value
-          }
-          managed && /^unset _IWE_ROOT$/ { managed=0 }
-        ' "$HOME/.zshenv")
-
-        while IFS= read -r existing_root; do
-            [ -n "$existing_root" ] || continue
-            if [ "$(canonical_workspace_path "$existing_root")" != "$current_root" ]; then
-                mark_host_global_conflict "~/.zshenv points to $existing_root"
-            fi
-        done <<EOF
-$zsh_roots
-EOF
-    fi
-
-    # Only IWE-owned launchd job names — an unrelated ~/Library/LaunchAgents
-    # entry with a similar prefix from another tool is not this contract.
-    for plist in \
-        "$HOME/Library/LaunchAgents"/com.exocortex.*.plist \
-        "$HOME/Library/LaunchAgents"/com.strategist.*.plist \
-        "$HOME/Library/LaunchAgents"/com.extractor.*.plist
-    do
-        [ -f "$plist" ] || continue
-
-        if [ -x /usr/libexec/PlistBuddy ]; then
-            plist_root=$(/usr/libexec/PlistBuddy \
-                -c 'Print :EnvironmentVariables:IWE_WORKSPACE' \
-                "$plist" 2>/dev/null || true)
-        elif command -v plutil >/dev/null 2>&1; then
-            plist_root=$(plutil -extract EnvironmentVariables.IWE_WORKSPACE raw -o - \
-                "$plist" 2>/dev/null || true)
-        else
-            plist_root=""
-        fi
-
-        if [ -z "$plist_root" ]; then
-            # Neither parser available, or the key isn't there — cannot prove
-            # this plist belongs to the current workspace. Fail closed: treat
-            # as a conflict rather than silently assume ownership.
-            mark_host_global_conflict "$(basename "$plist"): владелец не определён"
-        elif [ "$(canonical_workspace_path "$plist_root")" != "$current_root" ]; then
-            mark_host_global_conflict "$(basename "$plist") points to $plist_root"
-        fi
+# Port of upstream issue #781: setup-offline.sh used to write values
+# unquoted, and a profile path with a space ("/Users/Ivan Petrov") breaks
+# every `source` of this file — the manual role scripts from MANUAL-JOBS.md do exactly
+# that (strategist.sh, extractor.sh). Re-quote existing files once; values without
+# whitespace are left as they are.
+if ! $CHECK_ONLY; then
+    for _key in HOME_DIR WORKSPACE_DIR CLAUDE_PATH CLAUDE_PROJECT_SLUG TIMEZONE_DESC \
+                GITHUB_USER GOVERNANCE_REPO IWE_TEMPLATE IWE_RUNTIME; do
+        _raw_value=$(grep -E "^${_key}=" "$ENV_FILE" 2>/dev/null | head -1 | cut -d= -f2-) || true  # see env_get
+        case "$_raw_value" in
+            \"*\"|\'*\'|"") continue ;;
+            *[[:space:]]*)
+                _escaped=$(printf '%s' "$_raw_value" | sed 's/[&|\\]/\\&/g')
+                sed_inplace "s|^${_key}=.*|${_key}=\"${_escaped}\"|" "$ENV_FILE"
+                echo "  ✓ $_key взят в кавычки в .exocortex.env (значение содержало пробел)"
+                ;;
+        esac
     done
-}
-
-if [ "${IWE_ALLOW_FOREIGN_WORKSPACE:-0}" != "1" ]; then
-    detect_host_global_owner_conflict
-fi
-if $HOST_GLOBAL_OWNER_CONFLICT; then
-    echo "⚠ Host-global ресурсы IWE (~/.zshenv, launchd) принадлежат другому или неопределённому workspace:"
-    echo "  $HOST_GLOBAL_OWNER_CONFLICT_REASON"
-    echo "  ~/.zshenv и планировщики задач НЕ будут изменены этим прогоном."
-    echo "  Если это осознанный перенос основной установки: IWE_ALLOW_FOREIGN_WORKSPACE=1 bash update.sh"
+    unset _key _raw_value _escaped
 fi
 
-# WP-529 F6 (peer-session 2026-08-19-01, Evgenii post-update defect #5):
-# build-runtime is part of the update transaction. Its failure used to be
-# fully swallowed — the status flowed through `| sed`, so even the old warning
-# branch checked sed's exit code, not build-runtime's — and the TOTAL_CHANGES=0
-# recovery branch never invoked it at all. Contract now: failure keeps
-# .update-incomplete, prints remediation and exits EXIT_RUNTIME; rerunning
-# update.sh after fixing the cause converges (same contract as issue #459).
-run_build_runtime_or_die() {
-    [ -f "$SCRIPT_DIR/setup/build-runtime.sh" ] || return 0
-    echo ""
-    echo "Generated runtime (.iwe-runtime/)..."
-    local brt_out brt_status
-    if brt_out=$(bash "$SCRIPT_DIR/setup/build-runtime.sh" \
-        --workspace "$WORKSPACE_DIR" \
-        --env-file "${WORKSPACE_DIR}/.exocortex.env" \
-        --quiet 2>&1); then
-        brt_status=0
-    else
-        brt_status=$?
-    fi
-    [ -n "$brt_out" ] && printf '%s\n' "$brt_out" | sed 's/^/  /'
-    if [ "$brt_status" -ne 0 ]; then
-        # Cold review 2026-08-19 (High): the marker line must not lie — on a
-        # no-op run no transaction was opened and there is no marker to keep.
-        if [ -f "$UPDATE_INCOMPLETE_MARKER" ]; then
-            echo "✗ build-runtime.sh завершился с ошибкой (код $brt_status). Обновление НЕ завершено: маркер .update-incomplete сохранён." >&2
-        else
-            echo "✗ build-runtime.sh завершился с ошибкой (код $brt_status)." >&2
-        fi
-        echo "  Проверьте .exocortex.env (значения placeholders) и повторите: bash $SCRIPT_DIR/update.sh." >&2
-        echo "  Если .exocortex.env ещё не создавался — сначала: bash $SCRIPT_DIR/setup.sh" >&2
-        exit "$EXIT_RUNTIME"
-    fi
-}
+HOME_DIR="$(env_get HOME_DIR)";              HOME_DIR="${HOME_DIR:-$HOME}"
+GOVERNANCE_REPO="$(env_get GOVERNANCE_REPO)"; GOVERNANCE_REPO="${GOVERNANCE_REPO:-DS-strategy}"
+GITHUB_USER="$(env_get GITHUB_USER)";        GITHUB_USER="${GITHUB_USER:-local}"
+CLAUDE_PROJECT_SLUG="$(env_get CLAUDE_PROJECT_SLUG)"
+IWE_RUNTIME_PATH="$WORKSPACE_DIR/.iwe-runtime"
+
+# === Каталог памяти Qwen (формула только в scripts/link-memory.sh, правило A14) ===
+# Не дублируем sanitizeCwd здесь: на macOS регистр сохраняется, корень — ближайший
+# предок с .git. Любая копия формулы рано или поздно разойдётся с оригиналом.
+QWEN_MEMORY_DIR="$(bash "$SCRIPT_DIR/scripts/link-memory.sh" --workspace "$WORKSPACE_DIR" --print-target)"
+QWEN_PROJECT_ID="$(bash "$SCRIPT_DIR/scripts/link-memory.sh" --workspace "$WORKSPACE_DIR" --print-id)"
+QWEN_BASE_DIR="${QWEN_CODE_MEMORY_BASE_DIR:-${QWEN_RUNTIME_DIR:-${QWEN_HOME:-$HOME/.qwen}}}"
+
+# === Маркер незавершённого обновления (upstream 30efdb5, v0.38.2) ===
+# В $WORKSPACE_DIR, не в $SCRIPT_DIR: папка FMT-репо при офлайн-обновлении заменяется
+# целиком следующей распаковкой ZIP, маркер там не пережил бы прогон, который должен
+# его увидеть. Без этого обрыв прогона (сеть/Ctrl-C/ошибка на середине) не оставлял
+# следа — пилот не узнавал, что часть файлов обновилась, а часть нет.
+UPDATE_INCOMPLETE_MARKER="$WORKSPACE_DIR/.update-incomplete"
+UPDATE_TRANSACTION_STARTED=false
 
 begin_update_transaction() {
     if [ ! -f "$UPDATE_INCOMPLETE_MARKER" ]; then
         {
             echo "started_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-            echo "local_version=${LOCAL_VERSION:-unknown}"
-            echo "upstream_version=${UPSTREAM_VERSION:-unknown}"
+            echo "local_version=$VERSION"
             echo "state=applying"
         } > "$UPDATE_INCOMPLETE_MARKER"
     fi
     UPDATE_TRANSACTION_STARTED=true
-}
-
-# WP-529 F244: read-only classification of the configuration, shared by
-# require_env_before_update() and --check, so a preview cannot report green for
-# an install the real run refuses. Prints the reason on stdout. Returns 0 when
-# the config is usable (workspace file or legacy migration), 1 when it blocks
-# the update outright, 2 when it is missing — the apply gate then writes a
-# draft and still stops. Never writes anything.
-env_preflight_reason() {
-    if [ -L "$WORKSPACE_DIR/.exocortex.env" ]; then
-        echo ".exocortex.env является символической ссылкой: $WORKSPACE_DIR/.exocortex.env"
-        return 1
-    fi
-    if [ -e "$WORKSPACE_DIR/.exocortex.env" ]; then
-        [ -f "$WORKSPACE_DIR/.exocortex.env" ] && return 0
-        echo ".exocortex.env существует, но не является обычным файлом: $WORKSPACE_DIR/.exocortex.env"
-        return 1
-    fi
-    if [ -L "$SCRIPT_DIR/.exocortex.env" ]; then
-        echo "legacy .exocortex.env является символической ссылкой: $SCRIPT_DIR/.exocortex.env"
-        return 1
-    fi
-    [ -f "$SCRIPT_DIR/.exocortex.env" ] && return 0  # legacy migration
-    echo "отсутствует .exocortex.env: обновление создаст черновик и остановится до его заполнения: $WORKSPACE_DIR/.exocortex.env"
-    return 2
-}
-
-# #1028: a missing configuration used to be generated in Step 5b, after the
-# template and workspace CLAUDE.md had already changed. Stop before any apply
-# or repair-pass write, and leave a private draft for the operator to complete.
-require_env_before_update() {
-    local reason env_status=0
-    reason=$(env_preflight_reason) || env_status=$?
-    case "$env_status" in
-        0) return 0 ;;
-        1) echo "ОШИБКА: $reason" >&2
-           exit "$EXIT_RUNTIME" ;;
-    esac
-
-    # setup.sh and some consumers source this file as shell. Their other
-    # readers treat values as raw text, so shell escaping would corrupt paths.
-    # Decline automatic generation when a detected value cannot round-trip in
-    # plain double quotes; the operator can supply a safe config explicitly.
-    local draft claude_path user_name value
-    claude_path=$(command -v claude 2>/dev/null || echo 'claude')
-    user_name=$(id -un 2>/dev/null || true)
-    for value in "$WORKSPACE_DIR" "$HOME" "$claude_path" "$user_name"; do
-        case "$value" in
-            *'$'*|*'`'*|*'"'*|*'\'*|*$'\n'*|*$'\r'*)
-                echo "ОШИБКА: путь или имя содержит символы, опасные для автосоздания .exocortex.env; обновление не начато." >&2
-                echo "  Создайте $WORKSPACE_DIR/.exocortex.env вручную с безопасно записанными значениями и повторите обновление." >&2
-                exit "$EXIT_RUNTIME"
-                ;;
-        esac
-    done
-    draft=$(mktemp "$WORKSPACE_DIR/.exocortex.env.tmp.XXXXXX") || {
-        echo "ОШИБКА: не удалось подготовить черновик .exocortex.env; обновление не начато." >&2
-        exit "$EXIT_RUNTIME"
-    }
-    if ! chmod 600 "$draft"; then
-        rm -f "$draft"
-        echo "ОШИБКА: не удалось защитить черновик .exocortex.env; обновление не начато." >&2
-        exit "$EXIT_RUNTIME"
-    fi
-    if ! cat > "$draft" <<ENVEOF
-# Exocortex configuration (draft generated before update.sh applies files)
-# Check GITHUB_USER and other values, then rerun update.sh. Do not commit.
-GITHUB_USER="your-username"
-WORKSPACE_DIR="$WORKSPACE_DIR"
-CLAUDE_PATH="$claude_path"
-CLAUDE_PROJECT_SLUG="$(iwe_claude_project_slug "$WORKSPACE_DIR")"
-TIMEZONE_HOUR="4"
-TIMEZONE_DESC="4:00 (местное время)"
-HOME_DIR="$HOME"
-USER_NAME="$user_name"
-L4_BACKEND=
-L4_DATABASE_URL=
-ENVEOF
-    then
-        rm -f "$draft"
-        echo "ОШИБКА: не удалось записать черновик .exocortex.env; обновление не начато." >&2
-        exit "$EXIT_RUNTIME"
-    fi
-    # Same-directory hard link publishes the complete 0600 draft only when the
-    # destination is still absent; a concurrent creator wins without overwrite.
-    if ! ln "$draft" "$WORKSPACE_DIR/.exocortex.env" 2>/dev/null; then
-        rm -f "$draft"
-        echo "ОШИБКА: не удалось создать .exocortex.env без перезаписи; обновление не начато." >&2
-        exit "$EXIT_RUNTIME"
-    fi
-    rm -f "$draft"
-    echo "ОШИБКА: отсутствует .exocortex.env; обновление не начато, остальные файлы установки не менялись." >&2
-    echo "  Черновик создан с правами 600: $WORKSPACE_DIR/.exocortex.env" >&2
-    echo "  Укажите свой GITHUB_USER и проверьте пути/время в этом файле." >&2
-    printf '  Затем повторите тот же канал: IWE_UPDATE_CHANNEL=%s bash %q --yes\n' \
-        "$UPDATE_CHANNEL" "$SCRIPT_DIR/update.sh" >&2
-    exit "$EXIT_RUNTIME"
-}
-
-# issue #1326 item 4: a .backups/ root the update can't write into used to be
-# discovered mid-apply, by the first backup call that happened to need it —
-# some files already replaced by then. Stop before Step 5 touches anything.
-#
-# WP-529 F244: read-only classification shared with --check. Returns 1 when
-# .backups has the wrong type (the gate refuses outright), 2 when the permission
-# bits say the write will fail. Bits are a necessary condition only, so on 2 the
-# gate still goes through its own mkdir -p and real write probe.
-backup_root_preflight_reason() {
-    local backup_root="$WORKSPACE_DIR/.backups" parent
-    if [ -L "$backup_root" ]; then
-        echo ".backups является символической ссылкой: $backup_root"
-        return 1
-    fi
-    if [ -e "$backup_root" ] && [ ! -d "$backup_root" ]; then
-        echo ".backups существует, но не является каталогом: $backup_root"
-        return 1
-    fi
-    if [ -d "$backup_root" ]; then
-        [ -w "$backup_root" ] && [ -x "$backup_root" ] && return 0
-        echo "каталог резервных копий недоступен на запись: $backup_root"
-        return 2
-    fi
-    parent=$(dirname "$backup_root")
-    [ -w "$parent" ] && [ -x "$parent" ] && return 0
-    echo "не удалось создать каталог резервных копий: $backup_root"
-    return 2
-}
-
-require_backup_root_writable() {
-    local backup_root="$WORKSPACE_DIR/.backups" probe reason type_status=0
-    reason=$(backup_root_preflight_reason) || type_status=$?
-    if [ "$type_status" -eq 1 ]; then
-        echo "ОШИБКА: $reason" >&2
-        exit "$EXIT_RUNTIME"
-    fi
-    if ! mkdir -p "$backup_root" 2>/dev/null; then
-        echo "ОШИБКА: не удалось создать каталог резервных копий: $backup_root" >&2
-        echo "  Обновление не начато, файлы не менялись." >&2
-        exit "$EXIT_RUNTIME"
-    fi
-    # Re-check right after mkdir -p: narrows (does not close) the window
-    # where something swaps the path between the checks above and here.
-    if [ -L "$backup_root" ] || [ ! -d "$backup_root" ]; then
-        echo "ОШИБКА: .backups изменился во время проверки: $backup_root" >&2
-        exit "$EXIT_RUNTIME"
-    fi
-    probe=$(mktemp -d "$backup_root/.write-probe.XXXXXXXXXX" 2>/dev/null) || {
-        echo "ОШИБКА: каталог резервных копий недоступен на запись: $backup_root" >&2
-        echo "  Обновление не начато, файлы не менялись. Проверьте права доступа и повторите." >&2
-        exit "$EXIT_RUNTIME"
-    }
-    rmdir "$probe" 2>/dev/null || true
 }
 
 finish_update_transaction() {
@@ -2018,2000 +266,53 @@ finish_update_transaction() {
     UPDATE_TRANSACTION_STARTED=false
 }
 
-effective_governance_repo() {
-    local configured="${ENV_GOVERNANCE_REPO:-}"
-    local env_file
-
-    # Normal installs keep the file in the workspace root. Older installs can
-    # still have it inside the template repository, so a zero-diff recovery
-    # must honour the same fallback as the main update path. Parse only the one
-    # data line; never source either file.
-    for env_file in "$WORKSPACE_DIR/.exocortex.env" "$SCRIPT_DIR/.exocortex.env"; do
-        [ -z "$configured" ] || break
-        [ -f "$env_file" ] || continue
-        configured=$(grep -E '^GOVERNANCE_REPO=' "$env_file" 2>/dev/null \
-            | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'")
-    done
-    configured="${configured:-${IWE_GOVERNANCE_REPO:-DS-strategy}}"
-    case "$configured" in
-        ""|.|..|.*|*/*|*[!A-Za-z0-9._-]*)
-            echo "ОШИБКА: GOVERNANCE_REPO должен быть именем каталога, не путём: $configured" >&2
-            return 1
-            ;;
-    esac
-    if [ -L "$WORKSPACE_DIR/$configured" ]; then
-        echo "ОШИБКА: governance repo является symlink; backfill запрещён: $WORKSPACE_DIR/$configured" >&2
-        return 1
-    fi
-    if [ -d "$WORKSPACE_DIR/$configured" ] && [ -d "$SCRIPT_DIR" ]; then
-        local governance_real script_real
-        governance_real=$(cd -P "$WORKSPACE_DIR/$configured" 2>/dev/null && pwd -P) || return 1
-        script_real=$(cd -P "$SCRIPT_DIR" 2>/dev/null && pwd -P) || return 1
-        if [ "$governance_real" = "$script_real" ]; then
-            echo "ОШИБКА: GOVERNANCE_REPO указывает на template repo; backfill запрещён: $configured" >&2
-            return 1
-        fi
-    fi
-    printf '%s\n' "$configured"
-}
-
-atomic_copy_executable() {
-    if [ "$#" -ne 2 ]; then
-        echo "ОШИБКА: atomic_copy_executable требует <source> <target>" >&2
-        return 1
-    fi
-    local source_path="$1" target_path="$2" target_dir temporary_path
-    target_dir=$(dirname "$target_path")
-    if [ -L "$target_dir" ]; then
-        echo "ОШИБКА: каталог назначения является symlink: $target_dir" >&2
-        return 1
-    fi
-    if ! mkdir -p "$target_dir"; then
-        echo "ОШИБКА: не удалось создать каталог $target_dir" >&2
-        return 1
-    fi
-    if ! temporary_path=$(mktemp "$target_dir/.iwe-update-copy.XXXXXX"); then
-        echo "ОШИБКА: не удалось создать временный файл рядом с $target_path" >&2
-        return 1
-    fi
-    if ! cp "$source_path" "$temporary_path" || \
-       ! chmod +x "$temporary_path" || \
-       ! mv -f "$temporary_path" "$target_path"; then
-        rm -f "$temporary_path"
-        echo "ОШИБКА: атомарная доставка $target_path не завершена" >&2
-        return 1
-    fi
-}
-
-agent_fault_git() {
-    if [ "$#" -lt 2 ]; then
-        echo "ОШИБКА: agent_fault_git требует <repo> <git-args...>" >&2
-        return 1
-    fi
-    local repository="$1"
-    shift
-    env -u GIT_INDEX_FILE -u GIT_DIR -u GIT_WORK_TREE -u GIT_COMMON_DIR \
-        -u GIT_OBJECT_DIRECTORY -u GIT_ALTERNATE_OBJECT_DIRECTORIES \
-        -u GIT_CEILING_DIRECTORIES \
-        GIT_OPTIONAL_LOCKS=0 \
-        GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null \
-        git -C "$repository" "$@"
-}
-
-agent_fault_target_snapshot() {
-    if [ "$#" -ne 1 ] || [ -z "${PY_BIN:-}" ]; then
-        echo "agent-fault target snapshot requires Python 3 and one path" >&2
-        return 2
-    fi
-    # PY_BIN can intentionally be the two-word Windows launcher `py -3`.
-    # shellcheck disable=SC2086
-    $PY_BIN -c '
-import hashlib
-import json
-import os
-import stat
-import sys
-
-path = sys.argv[1]
-try:
-    before = os.lstat(path)
-except FileNotFoundError:
-    print("missing")
-    raise SystemExit(0)
-if not stat.S_ISREG(before.st_mode):
-    print(json.dumps(["non-regular", before.st_dev, before.st_ino, before.st_mode]))
-    raise SystemExit(0)
-# O_BINARY exists on Windows only: without it the descriptor is in text mode (\r\n translation, Ctrl-Z ends
-# the file) and the hash below would not be the hash of the actual bytes.
-flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0)
-descriptor = os.open(path, flags)
-try:
-    opened = os.fstat(descriptor)
-    identity = (
-        before.st_dev, before.st_ino, before.st_mode, before.st_size,
-        before.st_mtime_ns, before.st_ctime_ns,
-    )
-    # Since CPython 3.12 on Windows lstat() reports the creation time as st_ctime and fstat() the metadata
-    # change time, so the two can disagree for a file modified after it was created (issue #989): the
-    # cross-API comparison is POSIX only. The lstat taken after the read below, compared with the one above,
-    # still catches a swap that is in place by then.
-    if os.name != "nt" and (
-        opened.st_dev, opened.st_ino, opened.st_mode, opened.st_size,
-        opened.st_mtime_ns, opened.st_ctime_ns,
-    ) != identity:
-        raise RuntimeError("target identity changed before snapshot")
-    digest = hashlib.sha256()
-    while True:
-        chunk = os.read(descriptor, 1024 * 1024)
-        if not chunk:
-            break
-        digest.update(chunk)
-finally:
-    os.close(descriptor)
-after = os.lstat(path)
-after_identity = (
-    after.st_dev, after.st_ino, after.st_mode, after.st_size,
-    after.st_mtime_ns, after.st_ctime_ns,
-)
-if after_identity != identity:
-    raise RuntimeError("target identity changed during snapshot")
-print(json.dumps(["file", *identity, digest.hexdigest()], separators=(",", ":")))
-' "$1"
-}
-
-agent_fault_legacy_hash_is_blessed() {
-    if [ "$#" -ne 2 ]; then
-        return 1
-    fi
-    local relative_path="$1" digest="$2"
-    # Exact bytes formerly shipped by FMT.  Keep provenance per path: a digest
-    # valid for one legacy command never authorizes replacement of another.
-    # c180e6a (v0.33.0): Python reminder + feedback importer + shell reminder.
-    # ceca611: shell reminder gained its platform routing header.
-    case "$relative_path:$digest" in
-        scripts/agent_fault_remind.py:9e4e354e3829c558fa4c35659084fdc6b024d3fb1dd69ff1640e9c58d7c98b60|\
-        scripts/sync_feedback_to_memory.py:776a18c30c45ba164e21376e17872b5070274aab72a911d5ad1363773c48ad67|\
-        scripts/agent_fault_remind.sh:913779508fc0144cfae0f345ec9e733b95d64333c74b42d17c84ed5d9ce0f03d|\
-        scripts/agent_fault_remind.sh:632ef75c7d1ed5d3bbb5546c279edf58b730a15706ee8e47ee5240bbe4b17cc3)
-            return 0
-            ;;
-        *)
-            return 1
-            ;;
-    esac
-}
-
-scan_legacy_agent_fault_import_consumers() {
-    if [ "$#" -ne 2 ] || [ -z "${PY_BIN:-}" ]; then
-        echo "agent-fault consumer scan requires Python 3" >&2
-        return 2
-    fi
-    local scripts_dir="$1" workspace_dir="$2"
-    [ -d "$scripts_dir" ] || return 0
-    # PY_BIN can intentionally be the two-word Windows launcher `py -3`.
-    # shellcheck disable=SC2086
-    $PY_BIN -c '
-import ast
-import os
-import sys
-from pathlib import Path
-
-root = Path(sys.argv[1])
-# issue #661: a FILE symlink whose target resolves INSIDE the workspace
-# (e.g. a script shared between two sibling governance repos) is not the
-# escape hazard this scan guards against — only a symlink whose target
-# resolves outside the workspace can expose content the scan was never
-# meant to read. Boundary is the workspace root, not scripts_dir itself: a
-# legitimate shared script commonly lives in a sibling repo under the same
-# workspace, not under this scripts_dir.
-#
-# Directory symlinks stay unconditionally refused, in- or out-of-workspace
-# (cold-context review finding): os.walk(followlinks=False) never descends
-# into a symlinked directory regardless of this boundary check, so
-# "allowing" one would silently skip scanning its contents — a legacy
-# `iwe_checklist_memory` import hiding behind such a directory would slip
-# past with no warning instead of forcing a human to look. Refusing keeps
-# the previous, safer behavior for directories; only individual file
-# symlinks (whose content os.walk DOES read either way) get the new
-# workspace-boundary leniency.
-workspace_real = os.path.realpath(sys.argv[2])
-matches = []
-
-def is_legacy_module(name):
-    return name == "iwe_checklist_memory" or name.endswith(".iwe_checklist_memory")
-
-def resolves_inside_workspace(path):
-    real = os.path.realpath(path)
-    return real == workspace_real or real.startswith(workspace_real + os.sep)
-
-try:
-    for directory, names, files in os.walk(root, followlinks=False):
-        for name in names:
-            candidate_directory = Path(directory, name)
-            if candidate_directory.is_symlink():
-                print(
-                    f"consumer scan refused symlinked directory: {candidate_directory}",
-                    file=sys.stderr,
-                )
-                raise SystemExit(2)
-        for name in files:
-            if not name.endswith(".py"):
-                continue
-            candidate = Path(directory, name)
-            if candidate.is_symlink() and not resolves_inside_workspace(candidate):
-                print(
-                    f"consumer scan refused symlinked Python file escaping workspace: {candidate}",
-                    file=sys.stderr,
-                )
-                raise SystemExit(2)
-            text = candidate.read_text(encoding="utf-8", errors="replace")
-            try:
-                tree = ast.parse(text, filename=str(candidate))
-            except (SyntaxError, ValueError) as exc:
-                line = getattr(exc, "lineno", None) or 1
-                message = getattr(exc, "msg", type(exc).__name__)
-                print(
-                    f"consumer scan failed to parse {candidate}:{line}: {message}",
-                    file=sys.stderr,
-                )
-                raise SystemExit(2)
-            for node in ast.walk(tree):
-                if isinstance(node, ast.Import):
-                    found = any(is_legacy_module(alias.name) for alias in node.names)
-                elif isinstance(node, ast.ImportFrom):
-                    found = bool(node.module and is_legacy_module(node.module)) or any(
-                        is_legacy_module(alias.name) for alias in node.names
-                    )
-                else:
-                    found = False
-                if found:
-                    matches.append(f"{candidate}:{node.lineno}")
-except OSError as exc:
-    print(f"consumer scan failed: {exc}", file=sys.stderr)
-    raise SystemExit(2)
-print("\n".join(matches))
-' "$scripts_dir" "$workspace_dir"
-}
-
-print_legacy_agent_fault_manual_remediation() {
-    if [ "$#" -ne 1 ]; then
-        return 1
-    fi
-    local governance_dir="$1" relative_path source_path target_path backup_path
-    echo "  Manual remediation prerequisites (do not run copy commands yet):" >&2
-    echo "    1. Migrate every listed legacy import consumer to canonical immutable read_faults(...)." >&2
-    echo "    2. Review each source/target diff and keep a backup." >&2
-    echo "  Only after both reviews, run the applicable command:" >&2
-    for relative_path in "${AGENT_FAULT_LEGACY_SHIMS[@]}"; do
-        source_path="$SCRIPT_DIR/seed/strategy/$relative_path"
-        target_path="$governance_dir/$relative_path"
-        backup_path="$target_path.before-fmt-533"
-        if [ -f "$target_path" ] && [ ! -L "$target_path" ]; then
-            printf '    mkdir -p %q && cp -p %q %q && cp %q %q && chmod +x %q\n' \
-                "$(dirname "$backup_path")" "$target_path" "$backup_path" \
-                "$source_path" "$target_path" "$target_path" >&2
-        else
-            printf '    mkdir -p %q && cp %q %q && chmod +x %q\n' \
-                "$(dirname "$target_path")" "$source_path" "$target_path" \
-                "$target_path" >&2
-        fi
-    done
-}
-
-preflight_legacy_agent_fault_shims() {
-    if [ "$#" -ne 1 ]; then
-        echo "ОШИБКА: preflight_legacy_agent_fault_shims требует <governance-dir>" >&2
-        return 1
-    fi
-    local governance_dir="$1" relative_path source_path target_path digest
-    local target_snapshot
-    local git_prefix git_relative_path git_pathspec tracked_paths
-    local git_ready=false tracked=false status_output consumer_matches
-    local blocked=0
-    AGENT_FAULT_SHIMS_TO_APPLY=()
-    AGENT_FAULT_SHIM_PREFLIGHT_PATHS=()
-    AGENT_FAULT_SHIM_TARGET_SNAPSHOTS=()
-    AGENT_FAULT_SHIM_GIT_READY=()
-    AGENT_FAULT_SHIM_GIT_PATHSPECS=()
-    AGENT_FAULT_SHIM_TRACKED_SNAPSHOTS=()
-    AGENT_FAULT_SHIM_STATUS_SNAPSHOTS=()
-
-    if [ -L "$governance_dir" ] || [ ! -d "$governance_dir" ]; then
-        echo "  ✗ governance must be an existing real directory; legacy shim migration refused." >&2
-        print_legacy_agent_fault_manual_remediation "$governance_dir"
-        return 1
-    fi
-    if [ -L "$governance_dir/scripts" ] || \
-       { [ -e "$governance_dir/scripts" ] && [ ! -d "$governance_dir/scripts" ]; }; then
-        echo "  ✗ governance/scripts must be a real directory; legacy shim migration refused." >&2
-        print_legacy_agent_fault_manual_remediation "$governance_dir"
-        return 1
-    fi
-    if agent_fault_git "$governance_dir" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-        git_ready=true
-        if ! git_prefix=$(agent_fault_git "$governance_dir" rev-parse --show-prefix); then
-            echo "  ✗ cannot resolve governance path inside Git; legacy shim migration refused." >&2
-            print_legacy_agent_fault_manual_remediation "$governance_dir"
-            return 1
-        fi
-    fi
-
-    for relative_path in "${AGENT_FAULT_LEGACY_SHIMS[@]}"; do
-        source_path="$SCRIPT_DIR/seed/strategy/$relative_path"
-        target_path="$governance_dir/$relative_path"
-        if [ -L "$source_path" ] || [ ! -f "$source_path" ]; then
-            echo "  ✗ release payload is missing a real $relative_path shim." >&2
-            blocked=1
-            continue
-        fi
-        if [ -L "$target_path" ]; then
-            echo "  ✗ $relative_path is a symlink; automatic migration refused." >&2
-            blocked=1
-            continue
-        fi
-        if [ -e "$target_path" ] && [ ! -f "$target_path" ]; then
-            echo "  ✗ $relative_path is not a regular file; automatic migration refused." >&2
-            blocked=1
-            continue
-        fi
-        if ! target_snapshot=$(agent_fault_target_snapshot "$target_path"); then
-            echo "  ✗ cannot snapshot $relative_path before migration." >&2
-            blocked=1
-            continue
-        fi
-        tracked=false
-        tracked_paths=""
-        status_output=""
-        git_pathspec=""
-        if $git_ready; then
-            git_relative_path="${git_prefix}${relative_path}"
-            git_pathspec=":(top,icase,literal)${git_relative_path}"
-            if ! tracked_paths=$(agent_fault_git "$governance_dir" ls-files -- "$git_pathspec"); then
-                echo "  ✗ cannot inspect tracked paths for $relative_path; automatic migration refused." >&2
-                blocked=1
-                continue
-            fi
-            if [ -n "$tracked_paths" ]; then
-                tracked=true
-                if [ "$tracked_paths" != "$git_relative_path" ]; then
-                    echo "  ✗ $relative_path has a case-insensitive tracked alias; automatic migration refused." >&2
-                    blocked=1
-                    continue
-                fi
-            fi
-            if ! status_output=$(agent_fault_git "$governance_dir" \
-                status --porcelain=v1 --untracked-files=all -- "$git_pathspec"); then
-                echo "  ✗ cannot inspect Git state for $relative_path; automatic migration refused." >&2
-                blocked=1
-                continue
-            fi
-        fi
-        AGENT_FAULT_SHIM_PREFLIGHT_PATHS+=("$relative_path")
-        AGENT_FAULT_SHIM_TARGET_SNAPSHOTS+=("$target_snapshot")
-        if $git_ready; then
-            AGENT_FAULT_SHIM_GIT_READY+=("1")
-        else
-            AGENT_FAULT_SHIM_GIT_READY+=("0")
-        fi
-        AGENT_FAULT_SHIM_GIT_PATHSPECS+=("$git_pathspec")
-        AGENT_FAULT_SHIM_TRACKED_SNAPSHOTS+=("$tracked_paths")
-        AGENT_FAULT_SHIM_STATUS_SNAPSHOTS+=("$status_output")
-        if [ -f "$target_path" ] && cmp -s "$source_path" "$target_path"; then
-            if [ ! -x "$target_path" ]; then
-                AGENT_FAULT_SHIMS_TO_APPLY+=("$relative_path")
-            fi
-            continue
-        fi
-        if ! $git_ready; then
-            echo "  ✗ $relative_path needs migration but governance is non-Git; provenance cannot be proven." >&2
-            blocked=1
-            continue
-        fi
-        if [ ! -e "$target_path" ]; then
-            if $tracked; then
-                echo "  ✗ $relative_path is a tracked deletion; automatic resurrection refused." >&2
-                blocked=1
-                continue
-            fi
-            if [ -n "$status_output" ]; then
-                echo "  ✗ $relative_path has a case-insensitive untracked or staged alias; automatic migration refused." >&2
-                blocked=1
-            else
-                AGENT_FAULT_SHIMS_TO_APPLY+=("$relative_path")
-            fi
-            continue
-        fi
-        digest=$(hash_file "$target_path") || {
-            echo "  ✗ cannot hash $relative_path; automatic migration refused." >&2
-            blocked=1
-            continue
-        }
-        if agent_fault_legacy_hash_is_blessed "$relative_path" "$digest" && \
-           $tracked && [ -z "$status_output" ]; then
-            AGENT_FAULT_SHIMS_TO_APPLY+=("$relative_path")
-            continue
-        fi
-        if [ -n "$status_output" ]; then
-            echo "  ✗ $relative_path is dirty, staged, or untracked; automatic migration refused." >&2
-        elif $tracked; then
-            echo "  ✗ $relative_path is clean but has unknown bytes; it is not an FMT-owned version." >&2
-        else
-            echo "  ✗ $relative_path is an unknown untracked file; automatic migration refused." >&2
-        fi
-        blocked=1
-    done
-
-    if ! consumer_matches=$(scan_legacy_agent_fault_import_consumers "$governance_dir/scripts" "$WORKSPACE_DIR"); then
-        echo "  ✗ legacy import consumer scan failed; no compatibility shim was changed." >&2
-        blocked=1
-    elif [ -n "$consumer_matches" ]; then
-        echo "  ✗ legacy import consumer(s) still require init_db/DB_PATH-style facade removal:" >&2
-        printf '%s\n' "$consumer_matches" | sed 's/^/    /' >&2
-        echo "  Migrate them to the canonical immutable read_faults(...) API, then rerun update.sh." >&2
-        blocked=1
-    fi
-    if [ "$blocked" -ne 0 ]; then
-        AGENT_FAULT_SHIMS_TO_APPLY=()
-        print_legacy_agent_fault_manual_remediation "$governance_dir"
-        return 1
-    fi
-    if [ "${#AGENT_FAULT_SHIM_PREFLIGHT_PATHS[@]}" -ne \
-         "${#AGENT_FAULT_LEGACY_SHIMS[@]}" ]; then
-        echo "  ✗ incomplete legacy shim snapshot; automatic migration refused." >&2
-        AGENT_FAULT_SHIMS_TO_APPLY=()
-        return 1
-    fi
-}
-
-agent_fault_revalidate_shim_snapshot() {
-    if [ "$#" -ne 2 ]; then
-        return 1
-    fi
-    local governance_dir="$1" relative_path="$2" target_path
-    local expected_index=-1 index=0 snapshot_path
-    local current_snapshot current_tracked current_status
-    for snapshot_path in "${AGENT_FAULT_SHIM_PREFLIGHT_PATHS[@]}"; do
-        if [ "$snapshot_path" = "$relative_path" ]; then
-            expected_index=$index
-            break
-        fi
-        index=$((index + 1))
-    done
-    if [ "$expected_index" -lt 0 ]; then
-        echo "  ✗ no preflight snapshot for $relative_path; apply refused." >&2
-        return 1
-    fi
-    target_path="$governance_dir/$relative_path"
-    if ! current_snapshot=$(agent_fault_target_snapshot "$target_path") || \
-       [ "$current_snapshot" != \
-         "${AGENT_FAULT_SHIM_TARGET_SNAPSHOTS[$expected_index]}" ]; then
-        echo "  ✗ $relative_path changed after preflight; apply refused." >&2
-        return 1
-    fi
-    if [ "${AGENT_FAULT_SHIM_GIT_READY[$expected_index]}" = "1" ]; then
-        if ! current_tracked=$(agent_fault_git "$governance_dir" ls-files -- \
-                "${AGENT_FAULT_SHIM_GIT_PATHSPECS[$expected_index]}") || \
-           ! current_status=$(agent_fault_git "$governance_dir" \
-                status --porcelain=v1 --untracked-files=all -- \
-                "${AGENT_FAULT_SHIM_GIT_PATHSPECS[$expected_index]}"); then
-            echo "  ✗ Git state for $relative_path cannot be revalidated." >&2
-            return 1
-        fi
-        if [ "$current_tracked" != \
-             "${AGENT_FAULT_SHIM_TRACKED_SNAPSHOTS[$expected_index]}" ] || \
-           [ "$current_status" != \
-             "${AGENT_FAULT_SHIM_STATUS_SNAPSHOTS[$expected_index]}" ]; then
-            echo "  ✗ Git state for $relative_path changed after preflight; apply refused." >&2
-            return 1
-        fi
-    elif agent_fault_git "$governance_dir" \
-        rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-        echo "  ✗ $relative_path entered a Git worktree after preflight; apply refused." >&2
-        return 1
-    fi
-}
-
-apply_legacy_agent_fault_shims() {
-    if [ "$#" -ne 1 ]; then
-        echo "ОШИБКА: apply_legacy_agent_fault_shims требует <governance-dir>" >&2
-        return 1
-    fi
-    local governance_dir="$1" backup_root relative_path source_path target_path
-    local backup_path restore_temp index=0 applied_count=0 rollback_failed=0
-    local transaction_active=false transaction_signal="" transaction_code=1
-    local saved_exit saved_hup saved_int saved_term
-    local -a originals
-
-    if [ "${#AGENT_FAULT_SHIMS_TO_APPLY[@]}" -eq 0 ]; then
-        echo "  ✓ legacy agent-fault shims already match the release payload."
-        return 0
-    fi
-    if ! backup_root=$(mktemp -d "${TMPDIR_UPDATE:-${TMPDIR:-/tmp}}/iwe-agent-fault-shims.XXXXXX"); then
-        echo "  ✗ cannot create rollback storage for legacy shims." >&2
-        return 1
-    fi
-
-    saved_exit=$(trap -p EXIT)
-    saved_hup=$(trap -p HUP)
-    saved_int=$(trap -p INT)
-    saved_term=$(trap -p TERM)
-
-    agent_fault_restore_transaction_traps() {
-        trap - EXIT HUP INT TERM
-        [ -z "$saved_exit" ] || eval "$saved_exit"
-        [ -z "$saved_hup" ] || eval "$saved_hup"
-        [ -z "$saved_int" ] || eval "$saved_int"
-        [ -z "$saved_term" ] || eval "$saved_term"
-    }
-
-    agent_fault_rollback_applied_prefix() {
-        local rollback_index=0 rollback_relative rollback_target
-        local rollback_backup rollback_temp
-        rollback_failed=0
-        while [ "$rollback_index" -lt "$applied_count" ]; do
-            rollback_relative="${AGENT_FAULT_SHIMS_TO_APPLY[$rollback_index]}"
-            rollback_target="$governance_dir/$rollback_relative"
-            rollback_backup="$backup_root/$rollback_index"
-            if [ "${originals[$rollback_index]}" = "file" ]; then
-                rollback_temp="$rollback_target.iwe-rollback.$$.$rollback_index"
-                if ! cp -p "$rollback_backup" "$rollback_temp" || \
-                   ! mv -f "$rollback_temp" "$rollback_target"; then
-                    rm -f "$rollback_temp"
-                    rollback_failed=1
-                fi
-            elif ! rm -f "$rollback_target"; then
-                rollback_failed=1
-            fi
-            rollback_index=$((rollback_index + 1))
-        done
-        rm -rf "$backup_root"
-    }
-
-    agent_fault_transaction_exit() {
-        local exit_code=$?
-        if $transaction_active; then
-            transaction_active=false
-            agent_fault_rollback_applied_prefix
-        fi
-        agent_fault_restore_transaction_traps
-        exit "$exit_code"
-    }
-
-    agent_fault_transaction_signal() {
-        transaction_signal="$1"
-        transaction_code="$2"
-        if $transaction_active; then
-            transaction_active=false
-            agent_fault_rollback_applied_prefix
-        fi
-        agent_fault_restore_transaction_traps
-        kill -s "$transaction_signal" "$$"
-        return "$transaction_code"
-    }
-
-    transaction_active=true
-    trap 'agent_fault_transaction_exit' EXIT
-    trap 'agent_fault_transaction_signal HUP 129' HUP
-    trap 'agent_fault_transaction_signal INT 130' INT
-    trap 'agent_fault_transaction_signal TERM 143' TERM
-
-    originals=()
-    for relative_path in "${AGENT_FAULT_SHIMS_TO_APPLY[@]}"; do
-        target_path="$governance_dir/$relative_path"
-        backup_path="$backup_root/$index"
-        if [ -f "$target_path" ]; then
-            if ! cp -p "$target_path" "$backup_path"; then
-                echo "  ✗ cannot snapshot $relative_path before migration." >&2
-                transaction_active=false
-                rm -rf "$backup_root"
-                agent_fault_restore_transaction_traps
-                unset -f agent_fault_restore_transaction_traps \
-                    agent_fault_rollback_applied_prefix \
-                    agent_fault_transaction_exit agent_fault_transaction_signal
-                return 1
-            fi
-            originals+=("file")
-        else
-            originals+=("missing")
-        fi
-        index=$((index + 1))
-    done
-
-    index=0
-    for relative_path in "${AGENT_FAULT_SHIMS_TO_APPLY[@]}"; do
-        source_path="$SCRIPT_DIR/seed/strategy/$relative_path"
-        target_path="$governance_dir/$relative_path"
-        if ! agent_fault_revalidate_shim_snapshot "$governance_dir" "$relative_path"; then
-            echo "  ✗ apply precondition drift at $relative_path; rolling back applied legacy shims." >&2
-            break
-        fi
-        # Include the in-flight target in rollback: TERM may arrive after its
-        # atomic rename but before this loop regains control.
-        applied_count=$((index + 1))
-        if ! atomic_copy_executable "$source_path" "$target_path"; then
-            echo "  ✗ apply failed at $relative_path; rolling back applied legacy shims." >&2
-            break
-        fi
-        index=$((index + 1))
-    done
-
-    if [ "$index" -ne "${#AGENT_FAULT_SHIMS_TO_APPLY[@]}" ]; then
-        transaction_active=false
-        agent_fault_rollback_applied_prefix
-        agent_fault_restore_transaction_traps
-        if [ "$rollback_failed" -ne 0 ]; then
-            echo "  ✗ legacy shim rollback was incomplete; inspect all four paths manually." >&2
-        else
-            echo "  ✓ legacy shim apply failure rolled back without index changes." >&2
-        fi
-        unset -f agent_fault_restore_transaction_traps \
-            agent_fault_rollback_applied_prefix \
-            agent_fault_transaction_exit agent_fault_transaction_signal
-        return 1
-    fi
-
-    transaction_active=false
-    rm -rf "$backup_root"
-    agent_fault_restore_transaction_traps
-    unset -f agent_fault_restore_transaction_traps \
-        agent_fault_rollback_applied_prefix \
-        agent_fault_transaction_exit agent_fault_transaction_signal
-    echo "  ✓ four legacy agent-fault names now delegate to the canonical CLI."
-}
-
-backfill_legacy_agent_fault_shims() {
-    local governance_repo="${EFFECTIVE_GOVERNANCE_REPO:-}"
-    local governance_dir
-    if [ -z "$governance_repo" ]; then
-        governance_repo=$(effective_governance_repo) || return 1
-    fi
-    governance_dir="$WORKSPACE_DIR/$governance_repo"
-    if [ ! -e "$governance_dir" ] && [ ! -L "$governance_dir" ]; then
-        echo "  ○ $governance_repo: governance repo не найден, legacy agent-fault migration пропущена."
-        return 0
-    fi
-    preflight_legacy_agent_fault_shims "$governance_dir" || return 1
-    # The consumer scan may take long enough for a user/agent to create or
-    # stage one of the targets. Re-run the full read-only preflight so apply
-    # receives a snapshot taken after that scan, not before it.
-    preflight_legacy_agent_fault_shims "$governance_dir" || return 1
-    apply_legacy_agent_fault_shims "$governance_dir"
-}
-
-backfill_platform_hooks() {
-    local governance_repo="${EFFECTIVE_GOVERNANCE_REPO:-$(effective_governance_repo)}"
-    local governance_dir="$WORKSPACE_DIR/$governance_repo"
-    local source_installer="$SCRIPT_DIR/seed/strategy/scripts/install-hooks.sh"
-    local target_installer="$governance_dir/scripts/install-hooks.sh"
-    local backup_dir="$governance_dir/.git/hook-backups"
-    local backup backup_index
-
-    if [ -L "$governance_dir" ] || [ -L "$governance_dir/.git" ] || [ -L "$backup_dir" ]; then
-        echo "  ✗ $governance_repo: governance/.git/hook-backups symlink запрещён; platform hooks не изменены." >&2
-        return 1
-    fi
-    if [ -f "$governance_dir/.git" ]; then
-        echo "  ⚠ $governance_repo: обнаружен Git worktree (.git — файл); platform hooks не установлены. Используйте обычный clone или установите hooks вручную после проверки общего core.hooksPath." >&2
-        return 0
-    fi
-    if [ ! -d "$governance_dir/.git" ]; then
-        echo "  ○ $governance_repo: git-репозиторий не найден, миграция hooks пропущена."
-        return 0
-    fi
-    if [ -L "$governance_dir/scripts" ] || [ -L "$governance_dir/.githooks" ]; then
-        echo "  ✗ Каталоги scripts/.githooks в $governance_repo не должны быть symlink; platform hooks не изменены." >&2
-        return 1
-    fi
-
-    for source_path in \
-        "$source_installer" \
-        "$SCRIPT_DIR/seed/strategy/.githooks/pre-commit" \
-        "$SCRIPT_DIR/seed/strategy/.githooks/pre-push"
-    do
-        if [ -L "$source_path" ] || [ ! -f "$source_path" ]; then
-            echo "  ✗ Канонический platform-hook не доставлен: ${source_path#"$SCRIPT_DIR"/}" >&2
-            return 1
-        fi
-    done
-    if [ -L "$target_installer" ]; then
-        echo "  ✗ scripts/install-hooks.sh является symlink; автоматическая перезапись запрещена." >&2
-        return 1
-    fi
-
-    if ! mkdir -p "$governance_dir/scripts" "$backup_dir"; then
-        echo "  ✗ Не удалось подготовить каталоги platform hooks." >&2
-        return 1
-    fi
-    if [ -f "$target_installer" ] && ! cmp -s "$source_installer" "$target_installer"; then
-        backup="$backup_dir/install-hooks.sh.backup.$(date +%s)"
-        backup_index=0
-        while [ -e "$backup" ]; do
-            backup_index=$((backup_index + 1))
-            backup="$backup_dir/install-hooks.sh.backup.$(date +%s).$backup_index"
-        done
-        if ! cp "$target_installer" "$backup"; then
-            echo "  ✗ Не удалось сохранить backup существующего install-hooks.sh." >&2
-            return 1
-        fi
-        echo "  📝 Existing install-hooks.sh backed up to: $backup"
-    fi
-    if [ ! -f "$target_installer" ] || ! cmp -s "$source_installer" "$target_installer"; then
-        atomic_copy_executable "$source_installer" "$target_installer" || return 1
-    elif ! chmod +x "$target_installer"; then
-        echo "  ✗ Не удалось восстановить executable bit у install-hooks.sh." >&2
-        return 1
-    fi
-
-    if ! IWE_TEMPLATE="$SCRIPT_DIR" IWE_ROOT="$WORKSPACE_DIR" \
-        bash "$target_installer" "$governance_dir"; then
-        return 1
-    fi
-}
-
-backfill_executor_catalog() {
-    local governance_repo="${EFFECTIVE_GOVERNANCE_REPO:-$(effective_governance_repo)}"
-    local governance_dir="$WORKSPACE_DIR/$governance_repo"
-    local skills_dir="$WORKSPACE_DIR/.claude/skills"
-    local output_path="$governance_dir/scripts/executor-catalog.yaml"
-    local resolved_python catalog_output
-
-    if [ -L "$governance_dir" ]; then
-        echo "  ✗ executor-catalog.yaml не обновлён: governance repo является symlink." >&2
-        return 1
-    fi
-    if [ ! -d "$governance_dir" ] || [ ! -d "$skills_dir" ]; then
-        echo "  ○ executor-catalog.yaml: governance repo или skills не найдены, backfill пропущен."
-        return 0
-    fi
-    if [ -L "$governance_dir/scripts" ] || [ -L "$output_path" ]; then
-        echo "  ✗ executor-catalog.yaml не обновлён: scripts или сам target является symlink." >&2
-        return 1
-    fi
-    if ! resolved_python=$("$SCRIPT_DIR/scripts/lib/find-python3.sh" 2>/dev/null); then
-        echo "  ⚠ executor-catalog.yaml не сгенерирован: нет python3 с PyYAML." >&2
-        return 1
-    fi
-
-    if catalog_output=$(IWE_ROOT="$WORKSPACE_DIR" IWE_GOVERNANCE_REPO="$governance_repo" \
-        "$resolved_python" "$SCRIPT_DIR/scripts/generate-executor-catalog.py" \
-        --skills-dir "$skills_dir" --output "$output_path" 2>&1); then
-        [ -n "$catalog_output" ] && printf '%s\n' "$catalog_output" | sed 's/^/  /'
-        return 0
-    fi
-
-    [ -n "$catalog_output" ] && printf '%s\n' "$catalog_output" | sed 's/^/  /' >&2
-    echo "  ⚠ executor-catalog.yaml не сгенерирован: повторите после исправления ошибки выше." >&2
-    return 1
-}
-
-backfill_governance_seed_script() {
-    if [ "$#" -ne 1 ]; then
-        echo "ОШИБКА: backfill_governance_seed_script требует <relative-path>" >&2
-        return 1
-    fi
-    local governance_repo="${EFFECTIVE_GOVERNANCE_REPO:-$(effective_governance_repo)}"
-    local governance_dir="$WORKSPACE_DIR/$governance_repo"
-    local relative_path="$1"
-    local source_path="$SCRIPT_DIR/seed/strategy/$relative_path"
-    local target_path="$governance_dir/$relative_path"
-    local git_prefix git_relative_path git_pathspec tracked_paths status_output tracked_status
-
-    if [ -L "$governance_dir" ]; then
-        echo "  ✗ $relative_path не обновлён: governance repo является symlink." >&2
-        return 1
-    fi
-    if [ ! -d "$governance_dir" ]; then
-        echo "  ○ $governance_repo: governance repo не найден, backfill $relative_path пропущен."
-        return 0
-    fi
-    if [ -L "$source_path" ] || [ ! -f "$source_path" ]; then
-        echo "  ✗ $relative_path не доставлен в целевом release payload." >&2
-        return 1
-    fi
-    if [ -L "$governance_dir/scripts" ]; then
-        echo "  ✗ $relative_path не обновлён: governance scripts является symlink." >&2
-        return 1
-    fi
-    if [ -L "$target_path" ]; then
-        echo "  ✗ $relative_path является symlink; автоматическая перезапись запрещена." >&2
-        return 1
-    fi
-
-    # Fresh installs receive the seed copy, including its provenance header.
-    # Existing installations may be upgraded only when their platform snapshot
-    # is either absent or a clean tracked file. A local deletion is a worktree
-    # change too: never silently resurrect it over the user's Git state.
-    if [ ! -f "$target_path" ] || ! cmp -s "$source_path" "$target_path"; then
-        if agent_fault_git "$governance_dir" \
-            rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-            if ! git_prefix=$(agent_fault_git "$governance_dir" rev-parse --show-prefix); then
-                echo "  ✗ $relative_path: не удалось определить Git prefix; backfill запрещён." >&2
-                return 1
-            fi
-            git_relative_path="${git_prefix}${relative_path}"
-            git_pathspec=":(top,icase,literal)${git_relative_path}"
-            if ! tracked_paths=$(agent_fault_git "$governance_dir" \
-                    ls-files -- "$git_pathspec") || \
-               ! status_output=$(agent_fault_git "$governance_dir" \
-                    status --porcelain=v1 --untracked-files=all -- "$git_pathspec") || \
-               ! tracked_status=$(agent_fault_git "$governance_dir" \
-                    status --porcelain=v1 --untracked-files=no -- "$git_pathspec"); then
-                echo "  ✗ $relative_path: Git state не прочитан; backfill запрещён." >&2
-                return 1
-            fi
-            if [ -n "$tracked_paths" ] && \
-               [ "$tracked_paths" != "$git_relative_path" ]; then
-                echo "  ✗ $relative_path имеет case-insensitive tracked alias; backfill запрещён." >&2
-                return 1
-            fi
-            # status_output mixes the tracked file's own state with any
-            # untracked case-variant sibling matched by the icase pathspec;
-            # tracked_status (--untracked-files=no) isolates the former so
-            # each branch below names the actual cause, not a catch-all.
-            if [ -n "$tracked_status" ]; then
-                echo "  ✗ $relative_path содержит локальные изменения/удаление; сначала разберите Git state." >&2
-                return 1
-            fi
-            if [ -n "$status_output" ]; then
-                if [ -n "$tracked_paths" ]; then
-                    echo "  ✗ $relative_path: рядом обнаружен untracked-файл с другим регистром имени (case alias); backfill запрещён." >&2
-                elif [ -e "$target_path" ]; then
-                    echo "  ✗ $relative_path существует как пользовательский untracked-файл; автоматическая перезапись запрещена. Если это платформенный файл, который забыли закоммитить — выполните git add/git commit и повторите обновление." >&2
-                else
-                    echo "  ✗ $relative_path: рядом обнаружен файл с другим регистром имени (untracked case alias); backfill запрещён." >&2
-                fi
-                return 1
-            fi
-        elif [ -e "$target_path" ]; then
-            echo "  ✗ $relative_path отличается, а governance directory не является git-репозиторием; автоматическая перезапись запрещена." >&2
-            return 1
-        fi
-    fi
-
-    if [ ! -f "$target_path" ] || ! cmp -s "$source_path" "$target_path"; then
-        atomic_copy_executable "$source_path" "$target_path" || return 1
-        echo "  ⟳ $relative_path обновлён в $governance_repo."
+# run_build_runtime_or_die (upstream WP-529 F6, issue найден на реальном обновлении
+# пилота): раньше сбой build-runtime.sh проглатывался целиком — статус проверялся у
+# `sed` из конвейера `... | sed ... || echo warning`, не у самого build-runtime.sh, так
+# что предупреждение практически никогда не срабатывало. Маркер незавершённого
+# обновления при этом снимался как обычно — сборка окружения могла остаться битой, а
+# прогон отчитывался как успешный. Теперь: сбой = маркер остаётся, обновление
+# считается незавершённым, повторный запуск после починки причины сходится сам.
+run_build_runtime_or_die() {
+    [ -f "$SCRIPT_DIR/setup/build-runtime.sh" ] || return 0
+    echo ""
+    echo "Generated runtime (.iwe-runtime/)..."
+    local brt_out brt_status
+    if brt_out=$(bash "$SCRIPT_DIR/setup/build-runtime.sh" \
+        --workspace "$WORKSPACE_DIR" --env-file "$ENV_FILE" --quiet 2>&1); then
+        brt_status=0
     else
-        echo "  ✓ $relative_path уже совпадает с release payload."
+        brt_status=$?
     fi
-}
-
-# ds_publish_version FILE — print the "# ds-publish version: N" stamp of FILE as a
-# plain decimal (leading zeros dropped) and return 0; return 1 when FILE has no
-# well-formed stamp. Only the FIRST line starting with "# ds-publish version:" is
-# considered and it must match ^# ds-publish version: ([0-9]+)$ exactly: a
-# malformed first stamp ("1a", trailing text, CRLF) means "no stamp", it is never
-# rescued by a later well-formed line. More than 9 digits is also "no stamp": the
-# value is compared with shell arithmetic and must not overflow.
-ds_publish_version() {
-    local line digits
-    line=$(grep -m1 '^# ds-publish version:' "$1" 2>/dev/null) || return 1
-    case "$line" in
-        "# ds-publish version: "*) digits=${line#"# ds-publish version: "} ;;
-        *) return 1 ;;
-    esac
-    case "$digits" in
-        ""|*[!0-9]*) return 1 ;;
-    esac
-    [ "${#digits}" -le 9 ] || return 1
-    printf '%s\n' "$((10#$digits))"
-}
-
-# replace_ds_publish_with_backup TARGET SOURCE GOVERNANCE_REPO REASON — keep a copy
-# of TARGET under .backups/ds-publish-pre-update/ (the file is usually untracked, so
-# git has no copy of it), then replace it with SOURCE. Returns 1 and leaves TARGET
-# as it was when the backup cannot be made.
-replace_ds_publish_with_backup() {
-    local target_path="$1" source_path="$2" governance_repo="$3" reason="$4"
-    local backup_dir
-    backup_dir="$WORKSPACE_DIR/.backups/ds-publish-pre-update/$(date -u +%Y%m%dT%H%M%SZ)-$$"
-    if [ -L "$WORKSPACE_DIR/.backups" ] || ! mkdir -p "$backup_dir" \
-       || ! cp -p "$target_path" "$backup_dir/ds-publish.sh"; then
-        echo "  ✗ scripts/ds-publish.sh: не удалось сделать резервную копию, прежняя копия остаётся." >&2
-        return 1
-    fi
-    echo "  ↳ backup: $target_path → $backup_dir/ds-publish.sh"
-    atomic_copy_executable "$source_path" "$target_path" || return 1
-    echo "  ⟳ scripts/ds-publish.sh: $reason — заменена на текущую в $governance_repo."
-}
-
-# ds-publish.sh (issue #941): strategist.sh publishes its commits through
-# $governance/scripts/ds-publish.sh, which the template never shipped. Missing copy →
-# delivered. Existing copy → decided by its version stamp (issue #1280):
-#   installed stamp <  shipped stamp → an older template copy: replaced, backup kept;
-#   installed stamp >= shipped stamp → never touched, even if the content differs
-#                                      (that is a deliberate local edit);
-#   no (well-formed) stamp           → migration from the pre-stamp era: a copy whose
-#                                      sha256 is on known_old_publishers was shipped
-#                                      by this template and is replaced; any other
-#                                      unstamped file is the user's own publisher —
-#                                      kept, with a loud warning.
-backfill_ds_publish() {
-    local governance_repo="${EFFECTIVE_GOVERNANCE_REPO:-$(effective_governance_repo)}"
-    local target_path="$WORKSPACE_DIR/$governance_repo/scripts/ds-publish.sh"
-    # FROZEN (issue #1280): no new entries. Every version of
-    # seed/strategy/scripts/ds-publish.sh shipped BEFORE the version stamp existed,
-    # i.e. the whole pre-stamp git history of that file (issue #1003, #1288; the
-    # last one, 19649ea8..., is the copy shipped 15.10-26.10). A hash list was a
-    # trap by construction -- every seed edit minted a hash that was not on it yet
-    # and stranded installs on a stale copy. The "# ds-publish version:" stamp
-    # replaces it; this list only recognises the unstamped legacy copies.
-    local known_old_publishers="dd9a0e7a3116281763b26a351904f5e21de8d730559a1a77dd2a248f2a986730 a86c3f628c06e8b7fe8d7a338c01ff0d7a0794751b4ce1a27affbb11295b2a36 13af55c37bfbf2c74fc4c6d9ac446758a28fc8e727b8f169c96920babc90115e 19649ea85169a92d20890fe68cb97182c53f5616675010edbf428b3eea75ce03"
-    local source_path="$SCRIPT_DIR/seed/strategy/scripts/ds-publish.sh"
-    local target_hash shipped_version installed_version
-    if [ -f "$target_path" ] && [ ! -L "$target_path" ] && [ ! -L "$(dirname "$target_path")" ] \
-       && [ -f "$source_path" ] && [ ! -L "$source_path" ]; then
-        if ! shipped_version=$(ds_publish_version "$source_path"); then
-            # A release defect, not a user state: never guess, leave the copy alone.
-            echo "  ⚠ scripts/ds-publish.sh: в поставке нет строки «# ds-publish version: N» — существующая копия в $governance_repo оставлена без изменений." >&2
-            return 0
-        fi
-        if installed_version=$(ds_publish_version "$target_path"); then
-            if [ "$installed_version" -lt "$shipped_version" ]; then
-                replace_ds_publish_with_backup "$target_path" "$source_path" "$governance_repo" \
-                    "версия $installed_version старше поставляемой $shipped_version"
-                return
-            fi
-            if ! cmp -s "$source_path" "$target_path"; then
-                echo "  ○ scripts/ds-publish.sh: версия $installed_version не старше поставляемой $shipped_version, содержимое отличается — считаю это вашей правкой, не заменяю."
-            else
-                echo "  ✓ scripts/ds-publish.sh уже совпадает с поставкой (версия $installed_version)."
-            fi
-            return 0
-        fi
-        target_hash=$(hash_file "$target_path" 2>/dev/null) || target_hash=""
-        if [ -n "$target_hash" ]; then
-            case " $known_old_publishers " in
-                *" $target_hash "*)
-                    replace_ds_publish_with_backup "$target_path" "$source_path" "$governance_repo" \
-                        "прежняя копия шаблона (без номера версии)"
-                    return ;;
-            esac
-        fi
-        {
-            echo "  ⚠ ВНИМАНИЕ: $target_path — без строки «# ds-publish version: N» и не совпадает ни с одной копией, которую поставлял шаблон."
-            echo "    Считаю его вашим собственным публикатором и не заменяю: ночные роли продолжат работать через него."
-            echo "    Принять поставляемую версию вручную: cp \"$target_path\" \"$target_path.mine\" && cp \"$source_path\" \"$target_path\" && chmod +x \"$target_path\""
-        } >&2
-        return 0
-    fi
-    if [ -e "$target_path" ] || [ -L "$target_path" ]; then
-        echo "  ✓ scripts/ds-publish.sh уже есть в $governance_repo, не заменяю."
-        return 0
-    fi
-    backfill_governance_seed_script "scripts/ds-publish.sh"
-}
-
-# #533: update is the one reliable point at which an existing private fault
-# profile can be brought onto the current schema and permission contract.  The
-# canonical CLI's no-create observational `stats` command is used here: it
-# deliberately migrates and hardens an existing untracked DB, but create=False
-# means a user who never enabled the profile gets no profile/.gitignore/DB as
-# update debris.
-# A tracked private DB remains fail-closed.  Surface that refusal as a warning
-# without ever running `git rm --cached` or otherwise mutating the user's index.
-harden_agent_fault_profile_after_update() {
-    local governance_repo="${EFFECTIVE_GOVERNANCE_REPO:-}"
-    local cli="$SCRIPT_DIR/scripts/agent-fault/iwe_checklist_memory.py"
-    local harden_output harden_status
-
-    if [ -z "$governance_repo" ] && \
-       ! governance_repo=$(effective_governance_repo); then
-        echo "  ⚠ agent-fault profile не проверен: governance repo не определён." >&2
-        return 0
-    fi
-    if [ ! -f "$cli" ]; then
-        echo "  ⚠ agent-fault profile не проверен: canonical CLI не доставлен." >&2
-        return 0
-    fi
-    if ! py_available; then
-        echo "  ⚠ agent-fault profile не проверен: Python 3 недоступен." >&2
-        return 0
-    fi
-
-    if harden_output=$(IWE_WORKSPACE="$WORKSPACE_DIR" \
-        IWE_GOVERNANCE_REPO="$governance_repo" \
-        "$PY_BIN" "$cli" stats 2>&1 >/dev/null); then
-        return 0
-    else
-        harden_status=$?
-    fi
-    printf '  ⚠ agent-fault profile оставлен без изменений (код %s): %s\n' \
-        "$harden_status" "$harden_output" >&2
-    return 0
-}
-
-run_post_apply_backfills_or_die() {
-    $CHECK_ONLY && return 0
-    if ! EFFECTIVE_GOVERNANCE_REPO=$(effective_governance_repo); then
-        return 1
-    fi
-
-    local install_paths_args=(
-        --workspace "$WORKSPACE_DIR"
-        --governance "$EFFECTIVE_GOVERNANCE_REPO"
-        --quiet
-    )
-    # issue #768: a foreign/unowned host-global state must not have its real
-    # ~/.zshenv rewritten to point at this WORKSPACE_DIR.
-    $HOST_GLOBAL_OWNER_CONFLICT && install_paths_args+=(--skip-zshenv)
-    bash "$SCRIPT_DIR/setup/install-iwe-paths.sh" \
-        "${install_paths_args[@]}" 2>&1 | sed 's/^/  /'
-    local install_paths_status="${PIPESTATUS[0]}"
-    if [ "$install_paths_status" -ne 0 ]; then
-        echo "  ⚠ install-iwe-paths.sh завершился с ошибкой (exit $install_paths_status). Запустите вручную: bash $SCRIPT_DIR/setup/install-iwe-paths.sh --workspace $WORKSPACE_DIR --governance $EFFECTIVE_GOVERNANCE_REPO"
-    fi
-
-    # scripts/day-open-llm-fill.py is no longer backfilled here (WP-485 Phase 17,
-    # 2026-10-05): the Day Open pipeline runs it from $IWE_SCRIPTS (the template's
-    # own copy, confirmed on a live installation -- ~/.iwe-paths resolves
-    # IWE_SCRIPTS to "$IWE_TEMPLATE/scripts" whenever workspace/scripts has no
-    # regular non-wrapper session-guard.sh, per install-iwe-paths.sh #957
-    # recurrence rule), so a governance-repo copy is never executed. Delivering
-    # it there only risked silently replacing a pilot's own committed,
-    # more-advanced version with an older seed -- the mechanism behind the
-    # reported user incident.
-
-    echo ""
-    echo "Agent fault profile (safe update hardening)..."
-    harden_agent_fault_profile_after_update
-
-    echo ""
-    echo "Agent fault legacy entrypoints (all-or-none upgrade)..."
-    if ! backfill_legacy_agent_fault_shims; then
-        echo "  ОШИБКА: legacy agent-fault entrypoints не мигрированы; canonical profile hardening уже выполнен независимо." >&2
-        return 1
-    fi
-
-    echo ""
-    echo "Platform hooks (upgrade backfill)..."
-    if ! backfill_platform_hooks; then
-        echo "  ОШИБКА: platform hooks не мигрированы; обновление оставлено незавершённым." >&2
-        return 1
-    fi
-
-    # WP-485 Phase 17 (2026-10-05): content-based policy (same classifier as memory/*),
-    # never aborts the run -- a file it cannot safely replace is reported, not a
-    # reason to leave the rest of update.sh undelivered.
-    echo ""
-    echo "Governance-скрипты (upgrade backfill)..."
-    apply_governance_script_policy "scripts/update-derived-snapshot.py" || true
-    apply_governance_script_policy "scripts/generate-executor-catalog.py" || true
-    report_governance_script_policy_summary
-
-    echo ""
-    echo "Публикатор коммитов ds-publish.sh (upgrade backfill)..."
-    backfill_ds_publish || echo "  ⚠ scripts/ds-publish.sh не доставлен: ночные роли оставят коммиты локальными, пока его нет (issue #941)." >&2
-
-    echo ""
-    echo "Гейт публикации publish-gate.sh (upgrade backfill)..."
-    backfill_governance_seed_script "scripts/lib/publish-gate.sh" \
-        || echo "  ⚠ scripts/lib/publish-gate.sh не доставлен: Экстрактор останется на сыром git push без повтора при устаревшем origin/main (issue #1102)." >&2
-
-    echo ""
-    echo "Executor catalog (upgrade backfill)..."
-    backfill_executor_catalog || true
-
-    echo ""
-    echo "Knowledge Extractor feeders (upgrade backfill)..."
-    backfill_extractor_feeders || true
-
-    echo ""
-    echo "FPF base copy (upgrade refresh)..."
-    refresh_fpf_base_clone || true
-}
-
-# WP-5 F55 (High finding of F54, 03.09): setup.sh got the extractor feeders
-# step, update.sh did not -- so every already-configured machine (the ones
-# where the gap actually showed up) kept getting updates with the capture
-# pipeline still not scheduled, forever. Runs from the post-apply chain, which
-# also fires in the TOTAL_CHANGES=0 recovery branches, so an install that is
-# otherwise up to date still gets its feeders. Re-running is safe: the feeders
-# script skips an unchanged, already-loaded launchd job instead of unload/load
-# (which would kill a run in flight at exactly 09:00/21:00).
-backfill_extractor_feeders() {
-    local feeders="$SCRIPT_DIR/scripts/setup-extractor-feeders.sh"
-    local governance_repo="${EFFECTIVE_GOVERNANCE_REPO:-}"
-    local feeders_output
-
-    # Two steps, not one: `local x="$(f)"` would swallow a failing f, and an
-    # empty repo name silently becomes the wrong default one level down.
-    if [ -z "$governance_repo" ] && ! governance_repo=$(effective_governance_repo); then
-        echo "  ○ Экстрактор: governance-репозиторий не определён, backfill пропущен."
-        return 0
-    fi
-
-    if [ "${IWE_SKIP_EXTRACTOR_FEEDERS:-0}" = "1" ]; then
-        echo "  ○ Экстрактор: пропущен (IWE_SKIP_EXTRACTOR_FEEDERS=1)."
-        return 0
-    fi
-    # setup.sh --core leaves automation out and records it; an update must not add it behind the
-    # user's back (WP-529 Ф270, RT5-2 of the rc.5 red team).
-    if [ "$(head -n 1 "$WORKSPACE_DIR/.iwe-install-mode" 2>/dev/null)" = "core" ]; then
-        echo "  ○ Экстрактор: установка в урезанном режиме (--core) — расписание не заводим."
-        echo "    Включить: bash $feeders"
-        return 0
-    fi
-    # An install made before the mode was recorded has no file, and a 0.41.11 --core install looks
-    # exactly like a full one. So without the file an update only refreshes a schedule that already
-    # exists and never adds one (WP-529 Ф270, RT8-1 of the rc.8 red team).
-    local schedule_file="$HOME/.config/systemd/user/extractor-git-diff-feed.timer"
-    if [ "$(uname -s)" = "Darwin" ]; then
-        schedule_file="$HOME/Library/LaunchAgents/com.extractor.git-diff-feed.plist"
-    fi
-    if [ ! -f "$WORKSPACE_DIR/.iwe-install-mode" ] && [ ! -f "$schedule_file" ]; then
-        echo "  ○ Экстрактор: расписания на этой установке нет, а режим установки не записан — расписание не заводим."
-        echo "    Включить: bash $feeders"
-        return 0
-    fi
-    # issue #768: the feeders script schedules a real launchd job under the
-    # current user's real $HOME — a foreign/unowned host-global state must
-    # not have that job's workspace pointer rewritten onto this copy.
-    if $HOST_GLOBAL_OWNER_CONFLICT; then
-        echo "  ○ Экстрактор: host-global расписание не изменено — $HOST_GLOBAL_OWNER_CONFLICT_REASON"
-        return 0
-    fi
-    if [ ! -f "$feeders" ]; then
-        echo "  ○ Экстрактор: scripts/setup-extractor-feeders.sh не найден, backfill пропущен."
-        return 0
-    fi
-    # The feeders script exits 1 without the CLI; on update that is a normal
-    # state (CLI not installed yet), not an update failure -- say what to run
-    # later instead of printing its error.
-    if ! command -v claude >/dev/null 2>&1; then
-        echo "  ○ Экстрактор: claude CLI не установлен — расписание не заводим."
-        echo "    После установки CLI: bash $feeders"
-        return 0
-    fi
-
-    # --schedule-only, not install: an update may add the periodic job, but must
-    # not redo the install-time decisions (the global git hook template, the
-    # init.templateDir pointer, seeding fleeting-notes) on every single run.
-    # IWE_WORKSPACE now passed (issue #768 fix) — the feeders script used to
-    # hardcode $HOME/IWE regardless, which is exactly what let it silently
-    # retarget a real host-global launchd job onto a disposable copy.
-    if feeders_output=$(
-        IWE_WORKSPACE="$WORKSPACE_DIR" \
-        IWE_GOVERNANCE_REPO="$governance_repo" \
-        IWE_RUNTIME="$WORKSPACE_DIR/.iwe-runtime" \
-        bash "$feeders" --schedule-only 2>&1); then
-        printf '%s\n' "$feeders_output" | sed 's/^/  /'
-        return 0
-    fi
-
-    printf '%s\n' "$feeders_output" | sed 's/^/  /' >&2
-    echo "  ⚠ Экстрактор не запустится автоматически — повторите вручную: bash $feeders" >&2
-    return 1
-}
-
-# WP-5 F57: setup.sh clones ailev/FPF once and nothing refreshed it afterwards,
-# so already-installed machines never received USING-FPF.md (the author's usage
-# instruction) or the newer DPF Suites. Fast-forward only, tracked-clean copies
-# only, never fatal: a modified, ahead or diverged copy is reported and left
-# exactly as it was.
-refresh_fpf_base_clone() {
-    local fpf_dir="$WORKSPACE_DIR/FPF"
-    local before after upstream head_oid fetch_status
-    local fetch_limit="${IWE_FPF_FETCH_TIMEOUT:-90}"
-
-    if [ "${IWE_SKIP_FPF_REFRESH:-0}" = "1" ]; then
-        echo "  ○ FPF: пропущен (IWE_SKIP_FPF_REFRESH=1)."
-        return 0
-    fi
-    # .git is a file, not a directory, in a linked worktree or a submodule.
-    if [ ! -e "$fpf_dir/.git" ]; then
-        echo "  ○ FPF: копия не найдена ($fpf_dir), обновление пропущено."
-        return 0
-    fi
-    if [ -n "$(git -C "$fpf_dir" status --porcelain --untracked-files=no 2>/dev/null)" ]; then
-        echo "  ⚠ FPF: в копии есть локальные изменения — не обновляю, копия может быть устаревшей."
-        return 0
-    fi
-    if ! before=$(git -C "$fpf_dir" rev-parse --short HEAD 2>/dev/null); then
-        echo "  ⚠ FPF: не удалось прочитать состояние копии, обновление пропущено."
-        return 0
-    fi
-
-    # The Sync Gate timeout wrapper launches git under one process-tree
-    # supervisor and gives Windows a native PID. Git Bash's $! /proc winpid
-    # can refer to a Bash shim whose native children are no longer in its
-    # Windows ancestry; taskkill /T then reports success while fetch survives.
-    case "$fetch_limit" in
-        0|*[!0-9]*)
-            echo "  ⚠ FPF: некорректный лимит IWE_FPF_FETCH_TIMEOUT — обновление копии пропущено."
-            return 0
-            ;;
-    esac
-    if [ ! -r "$SCRIPT_DIR/scripts/lib/git-sync-status.sh" ]; then
-        echo "  ⚠ FPF: контроллер таймаута недоступен — обновление копии пропущено."
-        return 0
-    fi
-    # shellcheck source=scripts/lib/git-sync-status.sh
-    . "$SCRIPT_DIR/scripts/lib/git-sync-status.sh"
-    fetch_status=0
-    if GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=true \
-        GIT_SSH_COMMAND='ssh -o BatchMode=yes -o ConnectTimeout=10' \
-        _git_sync_run_with_timeout "$fetch_limit" \
-        git -C "$fpf_dir" -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=30 \
-        fetch --quiet >/dev/null 2>&1; then
-        :
-    else
-        fetch_status=$?
-    fi
-    case "$fetch_status" in
-        0) ;;
-        124)
-            echo "  ⚠ FPF: сервер не ответил за ${fetch_limit} с — копия остаётся как была и может быть устаревшей."
-            return 0
-            ;;
-        125)
-            echo "  ⚠ FPF: остановка дерева git не подтверждена; проверьте дочерние процессы. Копия может быть устаревшей."
-            return 0
-            ;;
-        *)
-            echo "  ⚠ FPF: не удалось получить обновления (ошибка Git или контроллера таймаута) — копия остаётся как была и может быть устаревшей."
-            return 0
-            ;;
-    esac
-
-    # Classify HEAD against the tracked upstream instead of trusting the exit
-    # code of a merge: "already up to date" is also what a copy that is AHEAD
-    # of the server reports, and an untracked-file collision fails the merge
-    # for a reason that has nothing to do with history.
-    if ! upstream=$(git -C "$fpf_dir" rev-parse --verify --quiet '@{u}' 2>/dev/null); then
-        echo "  ⚠ FPF: у копии нет ветки слежения (отсоединённый HEAD или другая настройка) — не обновляю, копия может быть устаревшей."
-        return 0
-    fi
-    if ! head_oid=$(git -C "$fpf_dir" rev-parse HEAD 2>/dev/null); then
-        echo "  ⚠ FPF: не удалось прочитать состояние копии, обновление пропущено."
-        return 0
-    fi
-    if [ "$head_oid" = "$upstream" ]; then
-        echo "  ✓ FPF: копия уже актуальна ($before)."
-        return 0
-    fi
-    if git -C "$fpf_dir" merge-base --is-ancestor "$upstream" "$head_oid" 2>/dev/null; then
-        echo "  ⚠ FPF: в копии есть свои коммиты, которых нет на сервере — не трогаю."
-        return 0
-    fi
-    if ! git -C "$fpf_dir" merge-base --is-ancestor "$head_oid" "$upstream" 2>/dev/null; then
-        echo "  ⚠ FPF: история копии разошлась с сервером — не трогаю, копия может быть устаревшей."
-        return 0
-    fi
-    if ! git -C "$fpf_dir" merge --ff-only --quiet "$upstream" 2>/dev/null; then
-        echo "  ⚠ FPF: обновить не удалось (возможно, мешают неотслеживаемые файлы в копии) — копия остаётся как была."
-        return 0
-    fi
-    if ! after=$(git -C "$fpf_dir" rev-parse --short HEAD 2>/dev/null); then
-        echo "  ⚠ FPF: копия обновлена, но новое состояние прочитать не удалось."
-        return 0
-    fi
-    echo "  ✓ FPF: копия обновлена $before → $after."
-    return 0
-}
-
-# Rules and hooks (WP-529 Phase 246): a workspace copy equal to the previous template is
-# safe to replace silently; any other copy carries the user's own edit.
-record_rule_workspace_state() {
-    local fpath="$1" src dst
-    case "$fpath" in .claude/rules/*|.claude/hooks/*) ;; *) return 0 ;; esac
-    src="$SCRIPT_DIR/$fpath"
-    dst="$WORKSPACE_DIR/$fpath"
-    if [ ! -f "$dst" ] || { [ -f "$src" ] && [ "$(hash_file "$src")" = "$(hash_file "$dst")" ]; }; then
-        RULES_SAFE_TO_UPDATE="${RULES_SAFE_TO_UPDATE}${fpath}|"
-    fi
-}
-
-rule_was_safe_to_update() {
-    case "$RULES_SAFE_TO_UPDATE" in *"|$1|"*) return 0 ;; *) return 1 ;; esac
-}
-
-backup_rule_before_overwrite() {
-    local fpath="$1" dst="$2" backup
-    case "$fpath" in .claude/rules/*) ;; *) return 0 ;; esac
-    [ -f "$dst" ] || return 0
-    if [ -z "$RULES_BACKUP_RUN" ]; then
-        RULES_BACKUP_RUN="$WORKSPACE_DIR/.backups/rules-pre-update/$(date -u +%Y%m%dT%H%M%SZ)-$$"
-    fi
-    backup="$RULES_BACKUP_RUN/${fpath#.claude/rules/}"
-    mkdir -p "$(dirname "$backup")"
-    cp "$dst" "$backup"
-    echo "  ↳ backup: $dst → $backup"
-}
-
-# issue #847: memory/* stale-repair (see repair_pass() below) used to overwrite
-# a workspace-local memory file with the template's version whenever hashes
-# differed, with no backup — unlike .claude/rules/* above, which already has
-# this via backup_rule_before_overwrite(). apply_memory_policy() now replaces only
-# a copy it proved untouched, and saves it here first under its own backup dir.
-# MEMORY_BACKUP_FILE names the saved copy; it is set before the attempt, so a
-# warning can name it too. Returns non-zero when the copy could not be saved
-# (mkdir and cp say why on stderr): the caller must then leave DST alone. The
-# function used to end with an echo, so a failed cp read as success (#967 review).
-backup_memory_file_before_overwrite() {
-    local fpath="$1" dst="$2"
-    MEMORY_BACKUP_FILE=""
-    case "$fpath" in memory/*.md|memory/*.yaml|memory/*.yml) ;; *) return 0 ;; esac
-    [ -f "$dst" ] || return 0
-    if [ -z "$MEMORY_BACKUP_RUN" ]; then
-        MEMORY_BACKUP_RUN="$WORKSPACE_DIR/.backups/memory-pre-update/$(date -u +%Y%m%dT%H%M%SZ)-$$"
-    fi
-    MEMORY_BACKUP_FILE="$MEMORY_BACKUP_RUN/${fpath#memory/}"
-    mkdir -p "$(dirname "$MEMORY_BACKUP_FILE")" && cp "$dst" "$MEMORY_BACKUP_FILE"
-}
-
-# WP-529 Phase 246: a user-edited protective hook is still replaced by the template
-# version (otherwise the install silently stays unprotected), but the edit is kept
-# here first. HOOK_BACKUP_FILE names the copy; non-zero when it could not be saved,
-# and the caller must then leave DST alone.
-backup_hook_before_overwrite() {
-    local fpath="$1" dst="$2"
-    HOOK_BACKUP_FILE=""
-    if [ -z "$HOOKS_BACKUP_RUN" ]; then
-        HOOKS_BACKUP_RUN="$WORKSPACE_DIR/.backups/hooks-pre-update/$(date -u +%Y%m%dT%H%M%SZ)-$$"
-    fi
-    HOOK_BACKUP_FILE="$HOOKS_BACKUP_RUN/${fpath#.claude/hooks/}"
-    [ ! -L "$WORKSPACE_DIR/.backups" ] && mkdir -p "$(dirname "$HOOK_BACKUP_FILE")" && cp -p "$dst" "$HOOK_BACKUP_FILE"
-}
-
-report_replaced_hooks_summary() {
-    [ "${#HOOKS_REPLACED[@]}" -gt 0 ] || return 0
-    echo ""
-    echo "  ⚠ Защитные хуки с вашими правками заменены версией шаблона (${#HOOKS_REPLACED[@]}); ваши версии — в $HOOKS_BACKUP_RUN"
-    printf '    %s\n' "${HOOKS_REPLACED[@]}"
-    echo "    Свои изменения переносите в extensions/ — туда обновление не пишет."
-}
-
-copy_platform_file_preserving_user_space() {
-    local src="$1" dst="$2" fpath="$3" user_section=""
-    if [ -f "$dst" ]; then
-        case "$fpath" in
-            .claude/rules/*)
-                user_section=$(sed -n '/^<!-- USER-SPACE -->/,/^<!-- \/USER-SPACE -->/p' "$dst" 2>/dev/null || true)
-                if [ "$(hash_file "$src")" != "$(hash_file "$dst")" ] && ! rule_was_safe_to_update "$fpath"; then
-                    backup_rule_before_overwrite "$fpath" "$dst"
-                    echo "  ⚠ $fpath — рабочая копия отличается от прежнего шаблона; пользовательская правка сохранена."
-                    echo "    Сверьте: diff \"$src\" \"$dst\""
-                    return 1
-                fi
-                ;;
-            .claude/hooks/*)
-                if [ "$(hash_file "$src")" != "$(hash_file "$dst")" ] && ! rule_was_safe_to_update "$fpath"; then
-                    if ! backup_hook_before_overwrite "$fpath" "$dst"; then
-                        echo "  ⚠ $fpath — ваша версия хука не заменена: не удалось сохранить её копию. Сверьте: diff \"$src\" \"$dst\""
-                        return 1
-                    fi
-                    echo "  ⚠ $fpath — ваша версия хука заменена версией шаблона; копия: $HOOK_BACKUP_FILE"
-                    HOOKS_REPLACED+=("$fpath")
-                fi
-                ;;
-            .claude/skills/*/SKILL.md)
-                # #1010 F3: the regular update path keeps the USER-SPACE block of a skill spec
-                # (Step 5, SKILL.md branch); the repair/stale-repair path did not and dropped it.
-                user_section=$(sed -n '/^<!-- USER-SPACE -->/,/^<!-- \/USER-SPACE -->/p' "$dst" 2>/dev/null || true)
-                ;;
-        esac
-        backup_rule_before_overwrite "$fpath" "$dst"
-    fi
-    cp "$src" "$dst"
-    [ -z "$user_section" ] || reinject_user_section "$dst" "$user_section"
-}
-
-# iwe_claude_project_slug PATH — the directory name Claude Code uses under
-# ~/.claude/projects for PATH: every character that is not an ASCII letter or
-# digit becomes "-" (so "/", ".", "_" and " " all do): /Users/alice/IWE → -Users-alice-IWE.
-# issue #869: three scripts used three different rules ("tr /", "tr /_.",
-# "tr /_ "), and none converted a Git Bash path ("/f/notes") to the native form
-# Claude Code actually sees ("F:\notes"). On Windows the native path comes from
-# cygpath; the drive-letter case does not matter there, the file system is
-# case-insensitive. A non-ASCII character becomes one dash (python3 counts characters
-# whatever the locale - launchd and cron run with none; the sed fallback does the same
-# only under a UTF-8 locale). Not verified against Claude Code for non-ASCII paths.
-# KEEP IN SYNC with setup.sh and scripts/day-close.sh — the same function body;
-# scripts/tests/test_issue_869_claude_slug.sh fails when the copies diverge.
-iwe_claude_project_slug() {
-    local path="$1" native=""
-    if command -v cygpath >/dev/null 2>&1; then
-        native=$(cygpath -w "$path" 2>/dev/null) || native=""
-        [ -n "$native" ] && path="$native"
-    fi
-    if command -v python3 >/dev/null 2>&1 \
-       && python3 -c 'import os, re, sys; sys.stdout.write(re.sub("[^A-Za-z0-9]", "-", os.fsencode(sys.argv[1]).decode("utf-8", "replace")))' "$path" 2>/dev/null; then
-        return 0
-    fi
-    printf '%s' "$path" | sed 's/[^A-Za-z0-9]/-/g'
-}
-
-# memory_paths_equal A B — true when two directory paths name the same place.
-# issue #1099 (item 2): on Windows (Git Bash) the file system ignores case, and a
-# path built from `cygpath -w` may write the drive letter in the other case
-# ("C:" vs "c:"), so a plain string comparison stopped the updater at start for
-# one and the same directory. Elsewhere the comparison stays exact.
-memory_paths_equal() {
-    [ "$1" = "$2" ] && return 0
-    case "${OSTYPE:-}" in
-        msys*|cygwin*)
-            [ "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')" = \
-              "$(printf '%s' "$2" | tr '[:upper:]' '[:lower:]')" ] && return 0
-            ;;
-    esac
-    return 1
-}
-
-resolve_workspace_memory_dir() {
-    local workspace="$1" physical="" computed slug legacy_slug legacy_dir
-    slug=$(iwe_claude_project_slug "$workspace")
-    computed="$HOME/.claude/projects/$slug/memory"
-    if [ -d "$workspace/memory" ]; then
-        physical=$(cd -P "$workspace/memory" 2>/dev/null && pwd -P) || return 1
-    fi
-    if [ -n "$physical" ] && [ -d "$computed" ]; then
-        computed=$(cd -P "$computed" 2>/dev/null && pwd -P) || return 1
-        if ! memory_paths_equal "$physical" "$computed"; then
-            # issue #869: installs made before the single slug rule pointed workspace/memory at
-            # a directory named by an older rule ("tr /", "tr /_.", "tr /_ "). For a path with a
-            # space or other punctuation that is not the directory Claude Code uses. The physical
-            # link stays authoritative: accept it with a note instead of stopping the updater.
-            for legacy_slug in "$(printf '%s' "$workspace" | tr '/' '-')" \
-                               "$(printf '%s' "$workspace" | tr '/_.' '-')" \
-                               "$(printf '%s' "$workspace" | tr '/_ ' '-')"; do
-                legacy_dir="$HOME/.claude/projects/$legacy_slug/memory"
-                if [ -d "$legacy_dir" ] && [ "$(cd -P "$legacy_dir" 2>/dev/null && pwd -P)" = "$physical" ]; then
-                    echo "ВНИМАНИЕ: workspace/memory ведёт в $physical (каталог назван по прежнему правилу), а Claude Code читает $computed. Обновление продолжается с физической memory/." >&2
-                    printf '%s\n' "$physical"
-                    return 0
-                fi
-            done
-            echo "ОШИБКА: memory target неоднозначен: workspace/memory → $physical, slug target → $computed" >&2
-            return 1
-        fi
-    fi
-    printf '%s\n' "${physical:-$computed}"
-}
-
-# Physical workspace/memory is authoritative; computed Claude slug is only a
-# fallback for a first install without the link (#368).
-CLAUDE_MEMORY_DIR=$(resolve_workspace_memory_dir "$WORKSPACE_DIR") || exit 1
-
-# issue #350: the file lists printed further down cover only the template's own files.
-# A normal run writes to several more places that never appeared in any preview, and
-# users found out by losing an edit. Called from every branch that shows a preview,
-# including the "no changes" one — there a repair-pass still writes to all of these.
-print_extra_write_targets() {
-    local governance_repo governance_dir
-    if governance_repo=$(effective_governance_repo 2>/dev/null); then
-        governance_dir="$WORKSPACE_DIR/$governance_repo"
-    else
-        governance_dir="$WORKSPACE_DIR/<invalid-GOVERNANCE_REPO>"
-    fi
-    echo "Кроме перечисленного, обычный запуск (без --check) также пишет — это зоны возможной перезаписи, пофайлового прогноза для них превью не строит (issue #350):"
-    echo "  • $WORKSPACE_DIR/.claude/ — рабочие копии скиллов, хуков, правил"
-    echo "  • $CLAUDE_MEMORY_DIR — рабочие копии memory-файлов"
-    echo "  • $WORKSPACE_DIR/.iwe-runtime/ — пересобирается целиком из шаблона"
-    echo "  • $WORKSPACE_DIR/.exocortex.env, $SCRIPT_DIR/.claude.md.base, $SCRIPT_DIR/update-manifest.json"
-    echo "  • $WORKSPACE_DIR/.claude.md.base и $WORKSPACE_DIR/.claude.md.delivered — база слияния CLAUDE.md и запись хешей доставленной копии"
-    echo "  • $WORKSPACE_DIR/.memory-deployed.tsv — запись версий памяти, которые установлены и не менялись (по ней update.sh отличает нетронутую копию от изменённой)"
-    echo "  • $WORKSPACE_DIR/.iwe-paths и $HOME/.zshenv — пересоздаваемое окружение путей"
-    echo "  • local core.hooksPath в git-репозиториях с .githooks под $WORKSPACE_DIR"
-    echo "  • $governance_dir/scripts/install-hooks.sh — установщик platform hooks"
-    echo "  • $governance_dir/.githooks/pre-commit и pre-push — platform hooks"
-    echo "  • $governance_dir/scripts/update-derived-snapshot.py — обновлятор derived snapshot"
-    echo "  • $governance_dir/scripts/generate-executor-catalog.py — генератор каталога исполнителей"
-    echo "  • $governance_dir/scripts/executor-catalog.yaml — каталог исполнителей"
-    echo "  • $governance_dir/scripts/ds-publish.sh — публикатор коммитов ночных ролей (кладётся только если файла нет, существующий не трогается)"
-    echo "  • $governance_dir/exocortex/agent-fault-profile/ — только миграция/права существующей приватной БД; отсутствующий профиль не создаётся"
-    echo "    scripts/day-open-llm-fill.py больше не доставляется сюда (WP-485 Ф17) — Day Open исполняет копию шаблона через \$IWE_SCRIPTS."
-    echo "    Symlink-пути блокируют backfill. Отличающиеся installer/hooks сохраняются в .git/hook-backups/ и заменяются."
-    echo "    Snapshot updater/executor-catalog generator: решение по содержимому (как memory/*), не по git-статусу — локальная правка не блокирует остальное обновление, только эти файлы; executor-catalog.yaml — генерируемый файл и заменяется при смысловом расхождении."
-    echo "  Расхождение рабочей копии с шаблоном чинится независимо от списков выше."
-    echo ""
-}
-
-# fix #205: --check must not mutate update.sh itself. Shared by every --check exit so
-# an added early return cannot quietly skip the guard.
-assert_self_unmutated() {
-    local self_hash_after
-    self_hash_after=$(hash_file "$SCRIPT_DIR/update.sh")
-    if [ "$SELF_HASH_BEFORE" != "$self_hash_after" ]; then
-        echo "ОШИБКА: update.sh мутировал в режиме --check — это баг!" >&2
+    [ -n "$brt_out" ] && printf '%s\n' "$brt_out" | sed 's/^/  /'
+    if [ "$brt_status" -ne 0 ]; then
+        echo "✗ build-runtime.sh завершился с ошибкой (код $brt_status). Обновление НЕ завершено: маркер незавершённого обновления сохранён." >&2
+        echo "  Проверьте .exocortex.env (значения placeholders) и повторите: bash $SCRIPT_DIR/update.sh" >&2
         exit 1
     fi
 }
 
-# run_sync_canary — issue #718: a mechanism that fails open (delivers a
-# plausible-looking result instead of a loud error) can silently lose a fix
-# for weeks before anyone notices, e.g. #717. wp-sync-bundle.sh --self-test
-# already exercises the exact code path every WP Gate sync relies on
-# (registry lookup + status-cell resolution); running it here catches a
-# broken/unreadable registry the same day an update runs, not weeks later.
-# No governance repo configured, or wp-sync-bundle.sh missing — SKIP, not
-# FAIL: those are separate, already-diagnosed conditions elsewhere in
-# update.sh, not a canary regression.
-run_sync_canary() {
-    local governance_repo
-    governance_repo=$(effective_governance_repo) || { echo "  ℹ Canary (реестр РП): SKIP (governance repo не определён)"; return 0; }
-
-    # effective_governance_repo() always returns a name (default DS-strategy)
-    # even when that directory doesn't exist yet — a fresh install before the
-    # pilot's first governance repo is set up. wp-sync-bundle.sh hard-exits 1
-    # in that case ("Governance repo с WP-REGISTRY.md не найден"), which
-    # run_sync_canary would otherwise report as a canary FAILURE rather than
-    # the "not configured yet" SKIP it actually is.
-    if [ ! -f "$WORKSPACE_DIR/$governance_repo/docs/WP-REGISTRY.md" ]; then
-        echo "  ℹ Canary (реестр РП): SKIP ($governance_repo/docs/WP-REGISTRY.md ещё не существует)"
-        return 0
-    fi
-
-    local sync_bundle="$WORKSPACE_DIR/$governance_repo/.claude/scripts/wp-sync-bundle.sh"
-    if [ ! -x "$sync_bundle" ]; then
-        sync_bundle="$SCRIPT_DIR/.claude/scripts/wp-sync-bundle.sh"
-    fi
-    if [ ! -x "$sync_bundle" ]; then
-        echo "  ℹ Canary (реестр РП): SKIP (wp-sync-bundle.sh не найден)"
-        return 0
-    fi
-
-    # IWE_TEMPLATE: a copy of the bundle kept in the governance repo has no scripts/lib next
-    # to it, and the shared WP-number library (wp-num.sh, issue #954) lives in the template
-    # clone -- tell the bundle where it is instead of failing the canary on a missing file.
-    local canary_output canary_status
-    canary_output=$(IWE_WORKSPACE="$WORKSPACE_DIR" IWE_GOVERNANCE_REPO="$governance_repo" \
-        IWE_TEMPLATE="$SCRIPT_DIR" bash "$sync_bundle" --self-test 2>&1)
-    canary_status=$?
-    if [ "$canary_status" -eq 0 ]; then
-        echo "  ✓ Canary (реестр РП): OK"
-        return 0
-    fi
-    echo "  ✗ Canary (реестр РП) FAILED — реестр WP-Registry нечитаем или статус не резолвится:" >&2
-    echo "$canary_output" | sed 's/^/    /' >&2
-    return "$EXIT_CANARY_FAILED"
-}
-
-# WP-529 F244: --check ends with one verdict line. An update is allowed only on
-# exit 0 together with the exact line "ВЕРДИКТ: можно ставить"; caveats are
-# printed on separate lines so consumers never parse suffixes.
-print_check_verdict() {
+echo "=========================================="
+echo "  Exocortex Update — offline v$VERSION"
+echo "=========================================="
+echo "  FMT (источник):  $SCRIPT_DIR"
+echo "  Workspace:       $WORKSPACE_DIR"
+echo "  Каталог памяти:  $QWEN_MEMORY_DIR"
+echo ""
+if [ -f "$UPDATE_INCOMPLETE_MARKER" ]; then
+    echo "⚠ Найден маркер незавершённого обновления: $UPDATE_INCOMPLETE_MARKER"
+    echo "  Предыдущий запуск мог применить только часть файлов; успешный повторный запуск снимет маркер."
     echo ""
-    echo "ВЕРДИКТ: $1"
-}
+fi
 
-# Runs the same read-only predicates the apply gates use (env, .backups) and
-# stops --check with EXIT_RUNTIME when the real run would refuse. Both
-# predicates are independent, so every reason found is reported. The .backups
-# check runs even when nothing is to update (the real run then skips that
-# gate): a broken backup root fails the next update anyway, so this errs safe.
-check_install_preflight() {
-    local reason reasons=()
-    reason=$(env_preflight_reason) || reasons+=("$reason")
-    reason=$(backup_root_preflight_reason) || reasons+=("$reason")
-    [ "${#reasons[@]}" -eq 0 ] && return 0
-    echo "🔴 Установка не готова к обновлению:"
-    for reason in "${reasons[@]}"; do
-        echo "  - $reason"
-    done
-    print_check_verdict "нельзя ставить"
-    echo "Причина: настоящий запуск update.sh остановится на этих проверках до изменения файлов."
-    echo "Дальнейшие проверки (сеть, состав обновления) не выполнялись."
-    exit "$EXIT_RUNTIME"
-}
+# === Temp ===
+TMPDIR_UPDATE="$(mktemp -d 2>/dev/null || { mkdir -p "/tmp/exo-update-$$"; echo "/tmp/exo-update-$$"; })"
 
-# The verdict of a --check that finished without an operational error, shared
-# by the "up to date" and the "updates available" branches so both run the
-# registry canary before any positive line. Mirrors exit_clean(): tainted means
-# file content was never compared, so the update cannot be confirmed.
-check_verdict_exit_clean() {
-    if ! run_sync_canary; then
-        print_check_verdict "нельзя ставить"
-        echo "Причина: проверка синхронизации реестра РП (canary) не прошла (подробности выше)."
-        exit "$EXIT_CANARY_FAILED"
-    fi
-    if $INTEGRITY_TAINTED; then
-        print_check_verdict "нельзя подтвердить"
-        echo "Причина: Python недоступен, содержимое файлов не сверялось по контрольной сумме."
-    elif $AUTO_YES && { [ "${ROLLBACK_DETECTED:-false}" = true ] || [ "${ROLLBACK_UNCERTAIN:-false}" = true ]; }; then
-        # Step 4 refuses exactly this combination with EXIT_USAGE.
-        print_check_verdict "нельзя ставить"
-        echo "Причина: обнаружен откат или история релиза не проверена, а --yes запрещает ручное подтверждение."
-        exit "$EXIT_USAGE"
-    else
-        print_check_verdict "можно ставить"
-        if [ -f "$UPDATE_INCOMPLETE_MARKER" ]; then
-            echo "Оговорка: найден маркер незавершённого обновления; успешный повторный запуск снимет маркер."
-        fi
-        if [ "${ROLLBACK_DETECTED:-false}" = true ] || [ "${ROLLBACK_UNCERTAIN:-false}" = true ]; then
-            echo "Оговорка: вердикт относится к ручному запуску; запуск с --yes будет остановлен (откат или непроверенная история релиза)."
-        fi
-        if [ "${CHECK_UPDATER_OUTDATED:-false}" = true ]; then
-            echo "Оговорка: вердикт вынесен текущей версией update.sh; настоящий запуск сначала обновит update.sh и проверит установку новой версией."
-        fi
-    fi
-    echo "Граница проверки: конфликты слияния CLAUDE.md не прогнозируются, существующие маркеры конфликтов в нём не проверяются."
-    exit_clean
-}
-
-# exit_clean — the shared exit for every "this run completed with no
-# operational error" path (peer-session 2026-08-21-09, Codex review
-# consensus). Overrides EXIT_OK with EXIT_TAINTED when INTEGRITY_TAINTED is
-# set — i.e. the grep-fallback ran (no Python), so file content was never
-# verified by sha256, only file names were compared. It does not intercept
-# any operational-error exit (EXIT_NETWORK/EXIT_RUNTIME/EXIT_CONFLICT) —
-# those return directly and never reach this function, so a real failure
-# is never masked by a tainted-but-otherwise-clean verdict.
-exit_clean() {
-    if $INTEGRITY_TAINTED; then
-        echo "⚠ Завершено с непроверенной целостностью: Python недоступен, содержимое файлов не сверялось по контрольной сумме." >&2
-        exit "$EXIT_TAINTED"
-    fi
-    exit "$EXIT_OK"
-}
-
-# Resolve main once before fetching the manifest.  Every subsequent download uses
-# that immutable commit, so a push between manifest and file requests cannot mix
-# hashes from one revision with content from another (issue #398).
-github_api_get() {
-    if [ "$#" -ne 1 ]; then
-        echo "ОШИБКА: github_api_get требует один GitHub API URL" >&2
-        return 1
-    fi
-    local trace_was_enabled=false
-    case "$-" in
-        *x*) trace_was_enabled=true; set +x ;;
-    esac
-    local api_url="$1" token="" auth_source="anonymous" endpoint result=0
-    local curl_option numeric_value expecting_numeric="" unsafe_curl_options=false
-    local glob_was_disabled=false
-    local -a authenticated_curl_options=()
-    case "$api_url" in
-        https://api.github.com/*) ;;
-        *)
-            echo "ОШИБКА: github_api_get отклонил URL вне api.github.com" >&2
-            $trace_was_enabled && set -x
-            return 1
-            ;;
-    esac
-
-    if [ -n "${GH_TOKEN:-}" ]; then
-        token="$GH_TOKEN"
-        auth_source="GH_TOKEN"
-    elif [ -n "${GITHUB_TOKEN:-}" ]; then
-        token="$GITHUB_TOKEN"
-        auth_source="GITHUB_TOKEN"
-    fi
-    if [ -n "$token" ]; then
-        if [ "${#token}" -gt 512 ]; then
-            echo "ОШИБКА: $auth_source содержит недопустимый GitHub token." >&2
-            $trace_was_enabled && set -x
-            return "$GITHUB_API_INVALID_TOKEN"
-        fi
-        case "$token" in
-            *[!A-Za-z0-9_]*)
-                echo "ОШИБКА: $auth_source содержит недопустимый GitHub token." >&2
-                $trace_was_enabled && set -x
-                return "$GITHUB_API_INVALID_TOKEN"
-                ;;
-        esac
-        # CURL_OPTS is intentionally flexible for anonymous downloads, but an
-        # authenticated request must never inherit tracing, config, headers or
-        # output flags that could persist the Authorization header. Parse a
-        # small transport-only allowlist without eval (Bash 3.2 compatible).
-        case "$-" in *f*) glob_was_disabled=true ;; *) set -f ;; esac
-        for curl_option in ${CURL_BASE_OPTS:-}; do
-            if [ -n "$expecting_numeric" ]; then
-                numeric_value="$curl_option"
-                case "$numeric_value" in
-                    *[!0-9.]*|*.*.*|"") unsafe_curl_options=true ;;
-                    *[0-9]*) authenticated_curl_options+=("$numeric_value") ;;
-                    *) unsafe_curl_options=true ;;
-                esac
-                expecting_numeric=""
-                $unsafe_curl_options && break
-                continue
-            fi
-            case "$curl_option" in
-                --insecure)
-                    authenticated_curl_options+=("$curl_option")
-                    ;;
-                --max-time|--connect-timeout|--retry|--retry-delay|--retry-max-time)
-                    authenticated_curl_options+=("$curl_option")
-                    expecting_numeric="$curl_option"
-                    ;;
-                --max-time=*|--connect-timeout=*|--retry=*|--retry-delay=*|--retry-max-time=*)
-                    numeric_value="${curl_option#*=}"
-                    case "$numeric_value" in
-                        *[!0-9.]*|*.*.*|"") unsafe_curl_options=true ;;
-                        *[0-9]*) authenticated_curl_options+=("$curl_option") ;;
-                        *) unsafe_curl_options=true ;;
-                    esac
-                    ;;
-                *)
-                    unsafe_curl_options=true
-                    ;;
-            esac
-            $unsafe_curl_options && break
-        done
-        [ -z "$expecting_numeric" ] || unsafe_curl_options=true
-        $glob_was_disabled || set +f
-        if $unsafe_curl_options; then
-            echo "ОШИБКА: authenticated GitHub API отклонил небезопасные CURL_OPTS; разрешены только transport timeout/retry и --insecure." >&2
-            token=""
-            $trace_was_enabled && set -x
-            return "$GITHUB_API_UNSAFE_CURL_OPTIONS"
-        fi
-        if [ -n "${_CURL_SSL_OPT:-}" ]; then
-            authenticated_curl_options+=("$_CURL_SSL_OPT")
-        fi
-        # Never put a credential in argv or xtrace. curl reads the one header
-        # from stdin as configuration; -q must be argv[1] so curl cannot load
-        # a user curlrc that enables tracing before it reads that header.
-        if [ -n "${authenticated_curl_options[*]-}" ]; then
-            printf 'header = "Authorization: Bearer %s"\n' "$token" | \
-                curl -q "${authenticated_curl_options[@]}" -sSfL -K - "$api_url"
-        else
-            # Bash 3.2 with `set -u` treats an explicitly declared empty array
-            # as unbound when expanded with "${array[@]}". Keep the zero-option
-            # path expansion-free while preserving curl -q as argv[1].
-            printf 'header = "Authorization: Bearer %s"\n' "$token" | \
-                curl -q -sSfL -K - "$api_url"
-        fi
-        result=${PIPESTATUS[1]}
-        if [ "$result" -ne 0 ]; then
-            echo "ОШИБКА: authenticated GitHub API request via $auth_source failed; fallback disabled." >&2
-            result="$GITHUB_API_AUTH_FAILURE"
-        fi
-        token=""
-        $trace_was_enabled && set -x
-        return "$result"
-    fi
-
-    if command -v gh >/dev/null 2>&1 && \
-       GH_DEBUG='' DEBUG='' GH_PROMPT_DISABLED=1 \
-           gh auth status --hostname github.com >/dev/null 2>&1; then
-        # No leading slash (issue #980): Git Bash (MSYS) rewrites an argument that starts
-        # with "/" into a Windows path ("C:/Program Files/Git/repos/...") before gh sees
-        # it, and gh rejects that endpoint. gh accepts "repos/..." everywhere.
-        endpoint="${api_url#https://api.github.com/}"
-        if ! GH_DEBUG='' DEBUG='' GH_PROMPT_DISABLED=1 \
-             gh api --hostname github.com --method GET "$endpoint"; then
-            echo "ОШИБКА: authenticated GitHub API request via gh failed; fallback disabled." >&2
-            result="$GITHUB_API_AUTH_FAILURE"
-        fi
-        $trace_was_enabled && set -x
-        return "$result"
-    fi
-
-    # No explicit credential and no authenticated gh session: preserve the
-    # public anonymous request path and its native curl status.
-    # shellcheck disable=SC2086
-    curl ${CURL_BASE_OPTS:-} ${_CURL_SSL_OPT:-} -sSfL "$api_url"
-    result=$?
-    $trace_was_enabled && set -x
-    return "$result"
-}
-
-resolve_delivery_ref() {
-    local resolved_ref release_tag release_json commit_json api_status
-    local rc_tag refs_json latest_tag
-    if [ "$UPDATE_CHANNEL" = "rc" ]; then
-        # WP-529 Phase 239: release-candidate channel. release-candidate.yml (Phase 251)
-        # puts an immutable tag vX.Y.Z-rc.N on the release branch (bump commit or its later tip). A tag without a
-        # GitHub Release is invisible to /releases — resolve via the git refs API,
-        # pick the maximum by (X,Y,Z,N). Fail-closed like #501: no candidate,
-        # API failure or an unpinned SHA — refuse, never silently fall back to
-        # main/release.
-        if ! py_available; then
-            echo "ОШИБКА: канал rc требует python3 — без него нельзя выбрать свежий кандидат среди rc-тегов." >&2
-            echo "  Повторите на машине с python3 или выберите другой канал (release/main)." >&2
-            exit "$EXIT_NETWORK"
-        fi
-        # The API returns at most 100 refs per page; the template passed 48 tags at 0.42, so read
-        # page by page until a short page (WP-529 Ф270, RT5-5 of the rc.5 red team). A page that
-        # fails, or 20 full pages, is fail-closed: a partial list could hide the newest candidate.
-        refs_json=""
-        local page=1 page_json page_count
-        while :; do
-            if page_json=$(github_api_get "$API_BASE/git/matching-refs/tags/v?per_page=100&page=$page"); then
-                api_status=0
-            else
-                api_status=$?
-            fi
-            if [ "$api_status" -ne 0 ]; then
-                echo "ОШИБКА: не удалось получить список rc-тегов (API недоступен, страница $page)." >&2
-                echo "  Канал rc fail-closed: без списка кандидатов обновление не выполняется." >&2
-                exit "$EXIT_NETWORK"
-            fi
-            # One compact line per page: the API pretty-prints, the parser below reads line by line.
-            page_json=$(printf '%s\n' "$page_json" | "$PY_BIN" -c 'import json, sys; print(json.dumps(json.load(sys.stdin)))' 2>/dev/null) || page_json=""
-            page_count=$(printf '%s\n' "$page_json" | "$PY_BIN" -c 'import json, sys; print(len(json.load(sys.stdin)))' 2>/dev/null) || page_count=""
-            if [ -z "$page_count" ]; then
-                echo "ОШИБКА: список rc-тегов не распознан (страница $page)." >&2
-                exit "$EXIT_NETWORK"
-            fi
-            refs_json="$refs_json$page_json"$'\n'
-            [ "$page_count" -lt 100 ] && break
-            page=$((page + 1))
-            if [ "$page" -gt 20 ]; then
-                echo "ОШИБКА: rc-тегов больше 2000 — список не дочитан, канал rc fail-closed." >&2
-                exit "$EXIT_NETWORK"
-            fi
-        done
-        rc_tag=$(printf '%s' "$refs_json" | "$PY_BIN" -c '
-import json, re, sys
-best = None
-items = []
-try:
-    for line in sys.stdin.read().splitlines():
-        if line.strip():
-            items.extend(json.loads(line))
-except ValueError:
-    raise SystemExit(1)
-for item in items:
-    m = re.fullmatch(r"refs/tags/v(\d+)\.(\d+)\.(\d+)-rc\.(\d+)", item.get("ref", ""))
-    if m:
-        key = tuple(int(g) for g in m.groups())
-        if best is None or key > best[0]:
-            best = (key, item["ref"][len("refs/tags/"):])
-if best is None:
-    raise SystemExit(1)
-print(best[1])') || rc_tag=""
-        if [ -z "$rc_tag" ]; then
-            echo "ОШИБКА: кандидатов в выпуск (теги v*-rc.N) нет." >&2
-            echo "  Канал rc работает только от опубликованного кандидата (fail-closed)." >&2
-            echo "  Дождитесь кандидата (Release Candidate) или выберите другой канал (release/main)." >&2
-            exit "$EXIT_NETWORK"
-        fi
-        commit_json=""
-        if commit_json=$(github_api_get "$API_BASE/commits/$rc_tag"); then
-            api_status=0
-        else
-            api_status=$?
-        fi
-        if [ "$api_status" -eq "$GITHUB_API_AUTH_FAILURE" ] || \
-           [ "$api_status" -eq "$GITHUB_API_INVALID_TOKEN" ] || \
-           [ "$api_status" -eq "$GITHUB_API_UNSAFE_CURL_OPTIONS" ]; then
-            echo "ОШИБКА: authenticated rc commit lookup failed; refusing fallback to tag." >&2
-            exit "$EXIT_NETWORK"
-        fi
-        if [ -n "$commit_json" ] && \
-           resolved_ref=$(printf '%s\n' "$commit_json" | "$PY_BIN" -c '
-import json, re, sys
-sha = json.load(sys.stdin).get("sha", "")
-if not re.fullmatch(r"[0-9a-f]{40}", sha):
-    raise SystemExit(1)
-print(sha)'); then
-            RAW_BASE="https://raw.githubusercontent.com/$REPO/$resolved_ref"
-            echo "  Канал поставки: кандидат $rc_tag (снимок ${resolved_ref:0:12})"
-            RELEASE_SHA="$resolved_ref"
-        else
-            # Unlike the release channel (a tag is a valid pin), rc is fail-closed
-            # here too: an unpinned SHA = an unverifiable snapshot (cold review).
-            echo "ОШИБКА: не удалось закрепить кандидат $rc_tag по SHA коммита." >&2
-            echo "  Канал rc fail-closed: обновление по подвижному имени тега не выполняется." >&2
-            exit "$EXIT_NETWORK"
-        fi
-        # Stale candidate: a release of the same or newer version has already shipped —
-        # the tester must see this, not silently install an old snapshot.
-        latest_tag=""
-        if release_json=$(github_api_get "$API_BASE/releases/latest"); then
-            latest_tag=$(printf '%s\n' "$release_json" | \
-                sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
-        fi
-        if [ -z "$latest_tag" ]; then
-            echo "  ⚠ Актуальность кандидата проверить не удалось (releases/latest недоступен или не распознан)." >&2
-        fi
-        if [ -n "$latest_tag" ]; then
-            local _cmp
-            _cmp=$(printf '%s\n%s\n' "$latest_tag" "$rc_tag" | "$PY_BIN" -c '
-import re, sys
-def ver(tag):
-    m = re.match(r"v(\d+)\.(\d+)\.(\d+)", tag)
-    return tuple(int(g) for g in m.groups()) if m else None
-lines = [l.strip() for l in sys.stdin if l.strip()]
-rel, rc = (ver(t) for t in lines[:2])
-print("stale" if rel and rc and rel >= rc else "fresh")')
-            if [ "$_cmp" = "stale" ]; then
-                echo "  ⚠ ВНИМАНИЕ: кандидат $rc_tag устарел — релиз $latest_tag уже опубликован." >&2
-                echo "    Переключитесь на release-канал: IWE_UPDATE_CHANNEL=release bash update.sh" >&2
-            fi
-        fi
-        return 0
-    fi
-    if [ "$UPDATE_CHANNEL" = "release" ]; then
-        # sed, not python: the tag must be resolvable even on installs where
-        # py_available fails — a release tag is already an immutable-enough
-        # pin, unlike the moving branch the no-python path degrades to below.
-        release_json=""
-        if release_json=$(github_api_get "$API_BASE/releases/latest"); then
-            release_tag=$(printf '%s\n' "$release_json" | \
-                sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
-        else
-            api_status=$?
-            release_tag=""
-        fi
-        if [ -n "$release_tag" ]; then
-            if py_available; then
-                commit_json=""
-                if commit_json=$(github_api_get "$API_BASE/commits/$release_tag"); then
-                    api_status=0
-                else
-                    api_status=$?
-                fi
-            else
-                api_status=0
-                commit_json=""
-            fi
-            if [ "$api_status" -eq "$GITHUB_API_AUTH_FAILURE" ] || \
-               [ "$api_status" -eq "$GITHUB_API_INVALID_TOKEN" ] || \
-               [ "$api_status" -eq "$GITHUB_API_UNSAFE_CURL_OPTIONS" ]; then
-                echo "ОШИБКА: authenticated release commit lookup failed; refusing fallback to tag." >&2
-                exit "$EXIT_NETWORK"
-            fi
-            if py_available && [ -n "$commit_json" ] && \
-               resolved_ref=$(printf '%s\n' "$commit_json" | "$PY_BIN" -c '
-import json, re, sys
-sha = json.load(sys.stdin).get("sha", "")
-if not re.fullmatch(r"[0-9a-f]{40}", sha):
-    raise SystemExit(1)
-print(sha)'); then
-                RAW_BASE="https://raw.githubusercontent.com/$REPO/$resolved_ref"
-                echo "  Канал поставки: релиз $release_tag (снимок ${resolved_ref:0:12})"
-                # issue #863: remember the release commit SHA for rollback detection.
-                RELEASE_SHA="$resolved_ref"
-            else
-                RAW_BASE="https://raw.githubusercontent.com/$REPO/$release_tag"
-                echo "  Канал поставки: релиз $release_tag (закреплён по тегу)"
-                # Fallback: tag itself is the best SHA proxy we have.
-                RELEASE_SHA="$release_tag"
-            fi
-            return 0
-        fi
-        # #501 (fail-closed, external-user matrix for v0.38.7): a silent
-        # fallback to a moving branch turned a release resolve failure into a quiet delivery
-        # of unverified main — exactly what the release channel protects against. The explicit
-        # main channel remains the only road to a moving branch.
-        echo "ОШИБКА: не удалось определить последний релиз (нет релизов или API недоступен)." >&2
-        echo "  Release-канал работает только от опубликованного релиза (fail-closed, #501)." >&2
-        echo "  Повторите позже, либо осознанно выберите подвижную ветку:" >&2
-        echo "    IWE_UPDATE_CHANNEL=main bash update.sh" >&2
-        exit "$EXIT_NETWORK"
-    fi
-    if ! py_available; then
-        echo "  ⚠ Нет python3: поставка проверяется по подвижной ветке $BRANCH."
-        return 0
-    fi
-    # shellcheck disable=SC2086  # CURL_BASE_OPTS intentionally contains multiple flags.
-    commit_json=""
-    if commit_json=$(github_api_get "$API_BASE/commits/$BRANCH"); then
-        api_status=0
-    else
-        api_status=$?
-    fi
-    if [ "$api_status" -eq "$GITHUB_API_AUTH_FAILURE" ] || \
-       [ "$api_status" -eq "$GITHUB_API_INVALID_TOKEN" ] || \
-       [ "$api_status" -eq "$GITHUB_API_UNSAFE_CURL_OPTIONS" ]; then
-        echo "ОШИБКА: authenticated branch lookup failed; refusing anonymous or moving-branch fallback." >&2
-        exit "$EXIT_NETWORK"
-    fi
-    if [ -n "$commit_json" ] && \
-       resolved_ref=$(printf '%s\n' "$commit_json" | "$PY_BIN" -c '
-import json, re, sys
-sha = json.load(sys.stdin).get("sha", "")
-if not re.fullmatch(r"[0-9a-f]{40}", sha):
-    raise SystemExit(1)
-print(sha)'); then
-        RAW_BASE="https://raw.githubusercontent.com/$REPO/$resolved_ref"
-        echo "  Снимок поставки: ${resolved_ref:0:12}"
-    else
-        echo "  ⚠ Не удалось закрепить $BRANCH по commit SHA; используется подвижная ветка."
-    fi
-}
-
-# === Temp directory ===
-TMPDIR_UPDATE=$(mktemp -d 2>/dev/null || { mkdir -p "/tmp/exocortex-update-$$"; echo "/tmp/exocortex-update-$$"; })
-# issues #965/#967: Step 2 records here the version of each changed memory file that this run
-# is about to replace (record_memory_old_hash); Step 6 reads it (apply_memory_policy, proof 1).
-MEMORY_OLD_HASHES="$TMPDIR_UPDATE/memory-old-hashes.tsv"
-cleanup_update() {  # $1 = the exit status, captured by the trap action before it clears ERR
-    local status="${1:-$?}"
+# cleanup_update — заменяет голый `trap rm -rf ... EXIT`. Если прогон транзакции
+# начался (begin_update_transaction), но скрипт вышел с ошибкой — маркер остаётся
+# нарочно (upstream 30efdb5): следующий запуск должен его увидеть.
+cleanup_update() {
+    local status=$?
     rm -rf "$TMPDIR_UPDATE"
     if [ "$UPDATE_TRANSACTION_STARTED" = true ] && [ "$status" -ne 0 ] && [ -f "$UPDATE_INCOMPLETE_MARKER" ]; then
         echo "⚠ Обновление завершилось не полностью; маркер сохранён: $UPDATE_INCOMPLETE_MARKER" >&2
@@ -4020,3898 +321,691 @@ cleanup_update() {  # $1 = the exit status, captured by the trap action before i
     fi
     return "$status"
 }
-# The ERR trap is cleared in the trap action itself: cleanup_update returns the exit status, and a
-# non-zero action fired ERR, printing "прервался на строке …: exit …" after every deliberate
-# refusal (RT8-3 of the 0.42 rc.8 red team). Clearing it inside the function does not help, and
-# the status is taken before `trap - ERR`, which would otherwise reset $? to 0.
-trap 'update_exit_status=$?; trap - ERR; cleanup_update "$update_exit_status"' EXIT
+trap cleanup_update EXIT
 
-echo "=========================================="
-echo "  Exocortex Update v$VERSION"
-echo "=========================================="
-echo "  Репо: $SCRIPT_DIR"
-echo ""
-if [ -f "$UPDATE_INCOMPLETE_MARKER" ]; then
-    echo "⚠ Найден маркер незавершённого обновления: $UPDATE_INCOMPLETE_MARKER"
-    echo "  Предыдущий запуск мог применить только часть файлов; успешный повторный запуск снимет маркер."
-    echo ""
-fi
-
-# Step 0 can replace this running updater and exec an older release before any
-# later preflight runs. Missing configuration must stop every applying run here,
-# before even the self-update; --check remains read-only and reports the same
-# conditions through the shared predicates (WP-529 F244). --fast checks the
-# version only and gives no readiness verdict.
-if ! $CHECK_ONLY; then
-    require_env_before_update
-elif ! $FAST_CHECK; then
-    check_install_preflight
-fi
-
-# step0_integrity_check FILE — 0 when the downloaded update.sh FILE may replace the running one.
-# No manifest, no network, no version parsing (#1004): the file says about itself whether it must
-# end with the marker. An update.sh of this generation carries UPDATE_SH_INTEGRITY_TAG on its own
-# line in the first 40 lines; such a file must END with UPDATE_SH_END_MARKER (last non-empty
-# line), so a copy that kept its header but lost its tail, or has the marker in the middle, is
-# refused. A file without the tag belongs to an older release (rollback, pin): the checks done
-# before this function (non-empty, "#!", bash -n) plus a minimum length of UPDATE_SH_MIN_LINES. Sets STEP0_REJECT_REASON.
-UPDATE_SH_INTEGRITY_TAG="# update-sh-integrity: end-marker-required"
-UPDATE_SH_END_MARKER="# --- end of update.sh ---"
-UPDATE_SH_MIN_LINES=100
-step0_integrity_check() {
-    local file="$1" last_line
-    STEP0_REJECT_REASON=""
-    # Trailing blanks and CR (a CRLF copy) do not change what a line says.
-    if ! head -n 40 "$file" | sed 's/[[:space:]]*$//' | grep -qxF "$UPDATE_SH_INTEGRITY_TAG"; then
-        # An older release has no tag; a real one is thousands of lines, so a few comment lines
-        # after a shebang are a truncated answer, not an old updater.
-        if [ "$(wc -l < "$file" | tr -d ' ')" -lt "$UPDATE_SH_MIN_LINES" ]; then
-            STEP0_REJECT_REASON="ответ неполон (слишком короткий файл)"
-            return 1
-        fi
-        return 0
-    fi
-    last_line=$(awk '{ sub(/[[:space:]]+$/, "") } NF { l = $0 } END { print l }' "$file")
-    if [ "$last_line" != "$UPDATE_SH_END_MARKER" ]; then
-        STEP0_REJECT_REASON="ответ неполон (последняя строка не конечный маркер)"
-        return 1
-    fi
-    return 0
+# === Подстановка плейсхолдеров (как setup-offline.sh) ===
+substitute_placeholders() {
+    sed_inplace \
+        -e "s|{{HOME_DIR}}|$HOME_DIR|g" \
+        -e "s|{{WORKSPACE_DIR}}|$WORKSPACE_DIR|g" \
+        -e "s|{{GOVERNANCE_REPO}}|$GOVERNANCE_REPO|g" \
+        -e "s|{{STRATEGY_REPO}}|$GOVERNANCE_REPO|g" \
+        -e "s|{{GITHUB_USER}}|$GITHUB_USER|g" \
+        -e "s|{{CLAUDE_PROJECT_SLUG}}|$CLAUDE_PROJECT_SLUG|g" \
+        -e "s|{{IWE_TEMPLATE}}|$SCRIPT_DIR|g" \
+        -e "s|{{IWE_RUNTIME}}|$IWE_RUNTIME_PATH|g" \
+        "$1"
 }
 
-# step0_release_is_older — 0 when the release this run delivers is strictly older than the
-# installed copy (WP-529 Ф270, RT-1 of the v0.42.0-rc.1 red team): replacing the updater
-# here would exec the older update.sh, which predates the rollback guard of Step 1, and the
-# files were rolled back without ROLLBACK. 1 when newer, equal or not known (no installed
-# manifest, no answer, unreadable versions): the self-update then runs as before.
-step0_release_is_older() {
-    local remote="$TMPDIR_UPDATE/step0-manifest.json" installed upstream order
-    [ -f "$SCRIPT_DIR/update-manifest.json" ] || return 1
-    # shellcheck disable=SC2086  # CURL_BASE_OPTS/_CURL_SSL_OPT intentionally unquoted (multi-token flags)
-    curl $CURL_BASE_OPTS $_CURL_SSL_OPT -sSfL "$RAW_BASE/update-manifest.json" -o "$remote" 2>/dev/null || return 1
-    installed=$(manifest_version "$SCRIPT_DIR/update-manifest.json")
-    upstream=$(manifest_version "$remote")
-    order=$(version_compare "$upstream" "$installed") || return 1
-    [ "$order" = "-1" ]
+# target в установленной среде для файла из манифеста (пусто = вне scope обновления)
+target_path() {
+    case "$1" in
+        QWEN.md) echo "$WORKSPACE_DIR/QWEN.md" ;;
+        # Путь относительно memory/, не basename (upstream #287/#294): basename ронял
+        # memory/reference/agent-core.md в плоский memory/agent-core.md, и ссылки на него
+        # из QWEN.md указывали в никуда.
+        memory/*.md|memory/*.yaml|memory/*.yml) echo "$QWEN_MEMORY_DIR/${1#memory/}" ;;
+        # rules-lazy/styles/templates добавлены вслед за шаблоном (upstream 489db97, 3c3365e,
+        # 8c94681): без них 10 файлов манифеста получали пустой адрес и молча выпадали
+        # из обновления — ни в одном списке отчёта они не появлялись.
+        .qwen/skills/*|.qwen/hooks/*|.qwen/rules/*|.qwen/rules-lazy/*|.qwen/lib/*|.qwen/config/*|.qwen/detectors/*|.qwen/scripts/*|.qwen/agents/*|.qwen/styles/*|.qwen/templates/*|.qwen/settings.json|.qwen/settings.local.json)
+            echo "$WORKSPACE_DIR/$1" ;;
+        *) echo "" ;;
+    esac
 }
 
-# === Step 0: Self-update (bootstrap) ===
-# issue #505 root, part 1: the channel must be resolved BEFORE self-update.
-# Step 0 used to fetch update.sh from the DEFAULT moving main while Step 1
-# then pinned the delivery to the release snapshot — so the local update.sh
-# ping-ponged between the main and release versions on every run, and Step 5
-# always saw update.sh as "updated" (see part 2 at the apply loop).
-resolve_delivery_ref
-echo "[0] Проверка update.sh..."
-# Capture hash before any network activity — used for --check integrity guard below (fix #205)
-SELF_HASH_BEFORE=$(hash_file "$SCRIPT_DIR/update.sh")
-REMOTE_UPDATE="$TMPDIR_UPDATE/update.sh.new"
-STEP0_ERR="$TMPDIR_UPDATE/update.sh.err"
-STEP0_RC=0
-# shellcheck disable=SC2086  # CURL_BASE_OPTS/_CURL_SSL_OPT intentionally unquoted (multi-token flags)
-curl $CURL_BASE_OPTS $_CURL_SSL_OPT -sSfL "$RAW_BASE/update.sh" -o "$REMOTE_UPDATE" 2>"$STEP0_ERR" || STEP0_RC=$?
-if [ "$STEP0_RC" -ne 0 ]; then
-    # issues #955/#980: "could not check" is not "checked, up to date". The failure used
-    # to fall through to the "актуален" line below, with curl's cause thrown away.
-    echo "  ⚠ не удалось проверить update.sh: $(curl_failure_note "$STEP0_RC" "$STEP0_ERR")"
-elif [ ! -s "$REMOTE_UPDATE" ]; then
-    # curl exit 0 with an empty body (a proxy or a login page that returns nothing) is a
-    # failed check as well: the empty file differs from the local one, so it used to pass
-    # for a newer update.sh and a normal run replaced the updater with a 0-byte file.
-    echo "  ⚠ не удалось проверить update.sh: пустой ответ"
-elif [ "$(head -c 2 "$REMOTE_UPDATE")" != "#!" ]; then
-    # Same for an answer that is no script: HTTP 200 with the HTML of a Wi-Fi login page or a
-    # proxy. update.sh starts with a "#!" line (any interpreter path, /bin/bash or
-    # /usr/bin/env bash alike); anything else must not replace the running updater.
-    echo "  ⚠ не удалось проверить update.sh: ответ не похож на скрипт"
-elif ! bash -n "$REMOTE_UPDATE" 2>/dev/null; then
-    # "#!" alone proves nothing about integrity: a script cut off in the middle (an incomplete
-    # body served as a finished HTTP 200) starts with it too. A syntax check is the one test
-    # that needs no reference hash, which Step 0 does not have yet (the manifest comes later),
-    # and it runs with the same `bash` that the replacement is re-executed with.
-    echo "  ⚠ не удалось проверить update.sh: ответ не похож на рабочий скрипт"
-elif ! step0_integrity_check "$REMOTE_UPDATE"; then
-    # Issue #1004: a syntactically whole stub (a shebang and comments) passes `bash -n` and
-    # used to replace the updater, which then "succeeded" doing nothing. An update.sh that carries
-    # UPDATE_SH_INTEGRITY_TAG must END with the marker; one without the tag is an older release
-    # (rollback, pin) and keeps the checks above.
-    echo "  ⚠ не удалось проверить update.sh: $STEP0_REJECT_REASON"
-else
-    LOCAL_HASH=$(hash_file "$SCRIPT_DIR/update.sh")
-    REMOTE_HASH=$(hash_file "$REMOTE_UPDATE")
-    if [ "$LOCAL_HASH" = "$REMOTE_HASH" ]; then
-        echo "  update.sh актуален."
-    elif $CHECK_ONLY && step0_release_is_older; then
-        # The real run keeps this updater (see below), so the verdict is not "made by an older updater".
-        echo "  ⚠ update.sh выпуска старше установленного — настоящий запуск его не заменит до решения об откате."
-    elif $CHECK_ONLY; then
-        # In --check mode: report available update without touching the file
-        echo "  ⚠ Новая версия update.sh доступна. Запустите без --check для обновления."
-        CHECK_UPDATER_OUTDATED=true
-    elif step0_release_is_older; then
-        # The older updater must not replace this one before Step 1 asks for ROLLBACK; a confirmed
-        # rollback installs it at the end of this run (replace_updater_after_rollback).
-        echo "  ⚠ update.sh выпуска старше установленного — не заменяю его: сначала решение об откате."
-        STEP0_OLDER_UPDATER="$REMOTE_UPDATE"
-    elif [ -n "${IWE_UPDATE_STEP0_REEXECED:-}" ]; then
-        # This process is already the re-executed new updater, and the server serves yet another
-        # update.sh: the channel answers inconsistently (a tag moving right now, a flapping API).
-        # Replacing again looped forever — 401 re-execs in 240 s on the rc.5 red team (WP-529 Ф270,
-        # RT5-1). Stop before touching anything; a later run sees a settled channel.
-        echo "ОШИБКА: update.sh на сервере снова изменился сразу после перезапуска — версия меняется прямо сейчас." >&2
-        echo "  Обновление остановлено, файлы не тронуты. Повторите через несколько минут." >&2
-        exit "$EXIT_NETWORK"
-    else
-        echo "  Найдена новая версия update.sh — обновляю..."
-        # issue #505 class (residual, found in the same sweep): replace
-        # the RUNNING script via sibling tmp + mv — rename swaps the
-        # directory entry and this process keeps its old inode; a plain cp
-        # truncates the very file bash is executing. Historically survived
-        # only because the few remaining commands sat in bash's read
-        # buffer.
-        _boot_staged="$SCRIPT_DIR/.update.sh.staged.$$"
-        cp "$REMOTE_UPDATE" "$_boot_staged"
-        chmod +x "$_boot_staged"
-        mv -f "$_boot_staged" "$SCRIPT_DIR/update.sh"
-        echo "  Перезапуск..."
-        # #1010 F17: exec replaces the process, so the EXIT trap never runs and the temp
-        # directory (update.sh.new, update.sh.err) would stay behind: remove it first.
-        rm -rf "$TMPDIR_UPDATE"
-        export IWE_UPDATE_STEP0_REEXECED=1
-        exec bash "$SCRIPT_DIR/update.sh" "$@"
-    fi
-fi
-echo ""
-
-# === Step 1: Fetch manifest ===
-echo "[1] Загрузка манифеста..."
-MANIFEST_URL="$RAW_BASE/update-manifest.json"
-MANIFEST="$TMPDIR_UPDATE/manifest.json"
-
-if ! fetch_update_manifest "$MANIFEST_URL" "$MANIFEST"; then
-    echo "ОШИБКА: Не удалось загрузить манифест обновлений."
-    echo "  URL: $MANIFEST_URL"
-    echo "  Последний отказ: $FETCH_MANIFEST_DIAG"
-    echo "  Проверьте подключение к интернету. Значение кода curl объясняет раздел EXIT CODES в man curl."
-    echo "  Если такая же команда curl вручную работает, а здесь нет, приложите этот вывод к обращению (issue #943)."
-    exit 1
-fi
-
-# schema v2 binds every delivered path to its content.  This makes --check --fast
-# notice content-only releases and prevents a proxy/CDN mismatch from installing a
-# file that does not belong to the downloaded manifest.
-if py_available; then
-    if ! $PY_BIN - "$MANIFEST" <<'PY'
-import json
-import re
-import sys
-
-with open(sys.argv[1], encoding="utf-8") as handle:
-    manifest = json.load(handle)
-schema = manifest.get("schema_version", 1)
-if schema >= 2:
-    invalid = [
-        entry.get("path", "<missing path>")
-        for entry in manifest.get("files", [])
-        if not re.fullmatch(r"[0-9a-f]{64}", entry.get("sha256", ""))
-    ]
-    if invalid:
-        raise SystemExit("schema v2: missing/invalid sha256: " + ", ".join(invalid[:5]))
-PY
-    then
-        echo "ОШИБКА: Манифест обновлений повреждён: schema v2 требует sha256 для каждого файла."
-        exit 1
-    fi
-fi
-
-# Parse version from manifest
-UPSTREAM_VERSION=$(manifest_version "$MANIFEST")
-# Shown next to upstream so a pilot running the same install on two machines
-# sees at a glance whether they are about to converge or diverge.
-INSTALLED_VERSION=$(manifest_version "$SCRIPT_DIR/update-manifest.json" 2>/dev/null)
-if [ -n "$INSTALLED_VERSION" ]; then
-    echo "  Установленная версия: $INSTALLED_VERSION"
-fi
-echo "  Версия upstream: $UPSTREAM_VERSION"
-echo ""
-
-# === Fast check (issue #230): manifest-content comparison, skips the ~330-file download loop ===
-# Enough for the Day Open traffic light (step 5) — the full change list is still
-# available via `--check` without `--fast`.
+# === Чтение списка файлов манифеста ===
+# Вывод буферизуется, а не льётся сразу в потребителя: прежняя форма
+# `python3 -c "..." || grep-запасной` при обрыве интерпретатора на середине отдавала
+# частичный список И следом запасной — потребитель читал дубли. Заглушка Microsoft
+# Store вдобавок печатает свой отказ в stdout (не в stderr), то есть её текст попадал
+# в тот же поток. Сначала собираем, потом решаем, чей результат отдать.
 #
-# issue #288: the version-only comparison stayed silent when files[] changed (files
-# added/removed/renamed) without a version bump — "✓ обновлений нет",
-# even though new files were available. The manifest is already downloaded above (Step 1), so
-# comparing the files[] hash costs the same as the version, but catches the composition, not
-# just the number. python3 unavailable → fall back to version-only with an explicit note
-# (not a silent downgrade of the guarantee).
-if $CHECK_ONLY && $FAST_CHECK; then
-    # issue #1185: the fast path used to skip straight to the version/files
-    # comparison below, which only reports "differs" either way -- a local
-    # install ahead of the release read as "update available" instead of
-    # "applying this would roll you back". Same check and wording as the
-    # full --check path (#863), just run before the fast-path exit instead
-    # of after the full file-diff walk.
-    _fast_rollback_code=1
-    if detect_release_rollback; then
-        _fast_rollback_code=0
-    else
-        _fast_last_rc=$?
-        [ "$_fast_last_rc" -eq 2 ] && _fast_rollback_code=2
-    fi
-    if [ "$_fast_rollback_code" -eq 0 ]; then
-        echo "🔴 ВНИМАНИЕ: локальная установка новее того, что доставит этот канал."
-        echo "   Применение этого обновления ОТКАТИТ установку на более старый снимок."
-        rollback_channel_hint
-        echo ""
-    elif [ "$_fast_rollback_code" -eq 2 ]; then
-        echo "⚠️ ВНИМАНИЕ: не удалось проверить историю релиза; автоматическое применение с --yes заблокировано."
-        rollback_channel_hint
-        echo ""
-    fi
-
-    # WP-529 Phase 220: the "what changes for me" summary needs the release's CHANGELOG.md,
-    # which --fast never downloads; say so instead of staying silent.
-    echo "ℹ Сводка «Главное в этом обновлении» в режиме --fast недоступна: файлы релиза не скачиваются. Полная проверка со сводкой: bash update.sh --check"
-    echo ""
-
-    LOCAL_MANIFEST="$SCRIPT_DIR/update-manifest.json"
-    LOCAL_VERSION=""
-    [ -f "$LOCAL_MANIFEST" ] && LOCAL_VERSION=$(manifest_version "$LOCAL_MANIFEST")
-
-    if py_available && [ -f "$LOCAL_MANIFEST" ]; then
-        # issue #402: paths passed via argv, not interpolated into the -c string —
-        # MSYS only rewrites path-shaped argv values to Windows form, not text
-        # baked into the script source, so an interpolated path silently fails
-        # to open on native Windows Python.
-        FILES_MATCH=$($PY_BIN -c "
-import json, sys
-def files_key(path):
-    try:
-        with open(path, encoding='utf-8') as f:
-            data = json.load(f)
-    except Exception:
-        return None
-    return sorted(json.dumps(f, sort_keys=True) for f in data.get('files', []))
-local_files = files_key(sys.argv[1])
-upstream_files = files_key(sys.argv[2])
-if local_files is None or upstream_files is None:
-    print('unknown')
-else:
-    print('match' if local_files == upstream_files else 'differ')
-" "$LOCAL_MANIFEST" "$MANIFEST" 2>/dev/null)
-        VERSIONS_MATCH=false
-        [ -n "$LOCAL_VERSION" ] && [ "$LOCAL_VERSION" = "$UPSTREAM_VERSION" ] && VERSIONS_MATCH=true
-        # issue #288 review fix: FILES_MATCH="unknown" (manifest JSON unparseable
-        # on either side) used to fall into the generic "версия отличается" branch
-        # even when the two version STRINGS were in fact identical — printed the
-        # same version number twice while claiming a mismatch. Four distinct cases
-        # now, not three collapsed into one catch-all.
-        if [ "$FILES_MATCH" = "match" ] && $VERSIONS_MATCH; then
-            echo "✓ Версия и состав манифеста совпадают с upstream (v$UPSTREAM_VERSION). Обновлений нет."
-        elif [ "$FILES_MATCH" = "differ" ]; then
-            echo "⚠ Состав манифеста изменился (файлы добавлены/удалены/обновлены)."
-            echo "  Для полного списка изменений: bash update.sh --check (без --fast)."
-        elif $VERSIONS_MATCH; then
-            echo "⚠ Версия совпадает (v$UPSTREAM_VERSION), но не удалось сверить состав манифеста (не распарсился JSON)."
-            echo "  Для полного списка изменений: bash update.sh --check (без --fast)."
-        else
-            echo "⚠ Версия отличается: локально v${LOCAL_VERSION:-неизвестно}, upstream v$UPSTREAM_VERSION."
-            echo "  Для полного списка изменений: bash update.sh --check (без --fast)."
-        fi
-    elif [ -n "$LOCAL_VERSION" ] && [ "$LOCAL_VERSION" = "$UPSTREAM_VERSION" ]; then
-        echo "✓ Версия совпадает с upstream (v$UPSTREAM_VERSION). python3 не найден — состав манифеста не сверен."
-    else
-        echo "⚠ Версия отличается: локально v${LOCAL_VERSION:-неизвестно}, upstream v$UPSTREAM_VERSION."
-        echo "  Для полного списка изменений: bash update.sh --check (без --fast)."
-    fi
-    echo ""
-    echo "Вердикт о готовности не выдаётся: --fast сверяет только версию. Для вердикта: bash update.sh --check"
-    exit 0
-fi
-
-# === Repair-pass for critical runtime files (issue #226) ===
-# Closes two gaps:
-#   (1) "UNCHANGED ⇒ file is missing" — manual deletion / failure of a previous update.
-#   (2) "UNCHANGED ⇒ file is stale" — the file exists but its hash diverges from the FMT source
-#       (happens with a partially applied update, a dirty workspace, or if the workspace
-#       did not overwrite the existing file during the previous update).
-# A function (not inline) because it is needed BEFORE the early "TOTAL_CHANGES=0 ⇒ exit 0"
-# (otherwise repair is unreachable exactly when it is needed most — SCRIPT_DIR is already
-# at the current version from a previous run, while the workspace stayed stale) AND
-# after the normal propagation (Step 6) — so as not to duplicate the work of NEW/UPDATED_FILES.
-# REPAIRED — a global counter, read by the calling code after return.
-sync_workspace_agents() {
-    [ -f "$SCRIPT_DIR/AGENTS.md" ] || return 0
-    local ws_agents_new="$TMPDIR_UPDATE/ws-agents-new-substituted.md"
-    local destination="$WORKSPACE_DIR/AGENTS.md"
-    local destination_temp=""
-    if [ -L "$destination" ]; then
-        echo "  ✗ $destination — symbolic link is forbidden" >&2
-        return 1
-    fi
-    if [ -e "$destination" ] && [ ! -f "$destination" ]; then
-        echo "  ✗ $destination — existing target is not a regular file" >&2
-        return 1
-    fi
-    substitute_claude_placeholders "$SCRIPT_DIR/AGENTS.md" "$ws_agents_new" || return 1
-    if [ ! -f "$destination" ] || ! cmp -s "$destination" "$ws_agents_new"; then
-        destination_temp=$(mktemp "$WORKSPACE_DIR/.AGENTS.md.update.XXXXXX") || {
-            echo "  ✗ $destination — не удалось создать временный файл" >&2
-            return 1
-        }
-        if ! cp "$ws_agents_new" "$destination_temp" || \
-           ! mv -f "$destination_temp" "$destination"; then
-            rm -f "$destination_temp"
-            echo "  ✗ $destination не синхронизирован" >&2
-            return 1
-        fi
-        echo "  ✓ $destination обновлён (generated, substituted)"
-    fi
-    return 0
-}
-
-repair_pass() {
-    REPAIRED=0
-    # Generated workspace instructions are part of repair, not only delivery:
-    # both TOTAL_CHANGES=0 recovery branches must restore a missing/stale copy.
-    sync_workspace_agents || return 1
-    # Bash 3.2 (macOS) parses the apostrophe in the comment below before it
-    # recognizes the closing `)` of a process substitution.  Keep the manifest
-    # reader in ordinary temporary files: its diagnostics stay visible and the
-    # repair pass remains available on the oldest supported shell.
-    local repair_paths repair_errors
-    # Every return below closes the memory pass with its summary: Step 6, before this pass,
-    # may already have replaced or kept memory files in this run.
-    repair_paths=$(mktemp "${TMPDIR:-/tmp}/iwe-repair-paths.XXXXXX") || {
-        echo "  ⚠ repair_pass: не удалось создать временный список" >&2
-        report_memory_policy_summary
-        return 0
-    }
-    repair_errors=$(mktemp "${TMPDIR:-/tmp}/iwe-repair-errors.XXXXXX") || {
-        rm -f "$repair_paths"
-        echo "  ⚠ repair_pass: не удалось создать файл диагностики" >&2
-        report_memory_policy_summary
-        return 0
-    }
-
+# Код возврата берётся из самого интерпретатора, БЕЗ конвейера: `$(cmd | tr -d '\r')`
+# отдал бы статус `tr` (всегда 0), и сбой Python стал бы неотличим от пустого списка —
+# ровно тот тихий отказ, который здесь и чинится. Возврат каретки снимаем подстановкой
+# самого bash, на случай если пользователь держит файл в CRLF (Windows-совместимый
+# редактор): `\r` уезжает в ПОСЛЕДНЕЕ поле строки, а это описание файла — ущерб
+# косметический, но снятие бесплатно и защищает от новых полей.
+manifest_paths() {
+    local out="" rc=0
     if py_available; then
-        if ! $PY_BIN -c "
+        # shellcheck disable=SC2086  # PY_BIN может быть "py -3" — см. комментарий у объявления.
+        # Путь манифеста — аргументом, а не подстановкой в текст программы: апостроф в
+        # пути (C:/Users/O'Brien) рвал строковый литерал Python, и список читался grep'ом
+        # (как в апстриме, sys.argv; найдено циклом 13).
+        out=$($PY_BIN -c "
 import json, sys
 with open(sys.argv[1], encoding='utf-8') as f:
     data = json.load(f)
-for entry in data.get('files', []):
-    print(entry['path'] + '|')
-" "$MANIFEST" > "$repair_paths" 2> "$repair_errors"; then
-            sed 's/^/  ⚠ repair_pass: /' "$repair_errors" >&2
-            rm -f "$repair_paths" "$repair_errors"
-            report_memory_policy_summary
+for e in data.get('files', []):
+    print(e['path'] + '|' + e.get('desc',''))
+" "$MANIFEST_PY" 2>/dev/null) || rc=$?
+        if [ "$rc" -eq 0 ]; then
+            out="${out//$'\r'/}"
+            [ -n "$out" ] && printf '%s\n' "$out"
             return 0
         fi
-    else
-        echo "  ⚠ repair_pass: python недоступен — сверка runtime-файлов пропущена" >&2
     fi
-
-    [ -s "$repair_errors" ] && sed 's/^/  ⚠ repair_pass: /' "$repair_errors" >&2
-
-    while IFS='|' read -r fpath _; do
-        [ -z "$fpath" ] && continue
-        [ ! -f "$SCRIPT_DIR/$fpath" ] && continue
-
-        case "$fpath" in
-            memory/*.md|memory/*.yaml|memory/*.yml)
-                fname=$(basename "$fpath")
-                [ "$fname" = "MEMORY.md" ] && continue
-                if [ -d "$CLAUDE_MEMORY_DIR" ]; then
-                    # The relative path from memory/ preserves nesting (issue #287/#294) —
-                    # basename dropped memory/reference/agent-core.md onto a flat memory/agent-core.md,
-                    # and 9 links to it in CLAUDE.md pointed nowhere.
-                    rel="${fpath#memory/}"
-                    mem_dst="$CLAUDE_MEMORY_DIR/$rel"
-                    mkdir -p "$(dirname "$mem_dst")"
-                    if [ -f "$mem_dst" ] && is_personal_config "$fname"; then
-                        : # a personal L4 config without frontmatter (day-rhythm-config.yaml) — NOT stale-repair
-                    elif [ -f "$mem_dst" ] && is_author_mode; then
-                        # issue #238: the same hole already closed for the .claude/* branches below —
-                        # the author could have reworked the live copy of a memory file directly, stale-repair
-                        # would silently clobber it with the version from SCRIPT_DIR. An owner: user copy keeps
-                        # its quiet report (report_author_user_memory), as before #965/#967.
-                        if is_user_owned_memory "$mem_dst"; then
-                            report_author_user_memory "$fpath" "$mem_dst"
-                        else
-                            echo "  ⚠ $fpath — author_mode: memory/ рабочая копия не тронута. Сверь: diff \"$SCRIPT_DIR/$fpath\" \"$mem_dst\""
-                        fi
-                    elif apply_memory_policy "$fpath" "$mem_dst"; then
-                        # issues #965/#967: a missing copy is restored, an untouched stale one
-                        # refreshed after a backup, an edited one kept (apply_memory_policy).
-                        # No OLD_HASH here: the repair pass replaced nothing in its own run.
-                        REPAIRED=$((REPAIRED + 1))
-                    fi
-                fi
-                ;;
-            # issue #891: the .claude/*.yaml|.claude/*.yml|.claude/*.example arm
-            # covers loose top-level .claude/ files (rules-registry.yaml among
-            # them). repair_pass() iterates the WHOLE manifest (every declared
-            # path, not just subdirectories), so a missing/stale loose file needs
-            # the same repair arm as the subdir ones, or it is silently skipped.
-            .claude/skills/*|.claude/hooks/*|.claude/rules/*|.claude/rules-lazy/*|.claude/lib/*|.claude/bin/*|.claude/config/*|.claude/detectors/*|.claude/scripts/*|.claude/agents/*|.claude/styles/*|.claude/templates/*|.claude/*.yaml|.claude/*.yml|.claude/*.example)
-                dst="$WORKSPACE_DIR/$fpath"
-                if [ ! -f "$dst" ]; then
-                    skip_author_readonly_target "$fpath" "$dst" && continue
-                    mkdir -p "$(dirname "$dst")"
-                    if copy_platform_file_preserving_user_space "$SCRIPT_DIR/$fpath" "$dst" "$fpath"; then
-                        case "$fpath" in *.sh|.claude/bin/*) chmod +x "$dst" ;; esac
-                        echo "  ⟲ $fpath → workspace (repair)"
-                        REPAIRED=$((REPAIRED + 1))
-                    fi
-                elif [ -r "$dst" ] && is_author_mode && [ "$(hash_file "$SCRIPT_DIR/$fpath")" != "$(hash_file "$dst")" ]; then
-                    report_author_skip "$fpath" "$dst"
-                elif [ -r "$dst" ] && [ "$(hash_file "$SCRIPT_DIR/$fpath")" != "$(hash_file "$dst")" ]; then
-                    if copy_platform_file_preserving_user_space "$SCRIPT_DIR/$fpath" "$dst" "$fpath"; then
-                        case "$fpath" in *.sh|.claude/bin/*) chmod +x "$dst" ;; esac
-                        echo "  ⟲ $fpath → workspace (stale repair)"
-                        REPAIRED=$((REPAIRED + 1))
-                    fi
-                fi
-                ;;
-            .claude/settings.json)
-                # bug-2026-07-11: settings.json mixes L1 platform defaults with L4 user
-                # hooks/permissions (custom security hooks, additionalDirectories, allow-list).
-                # Treating it like a pure-L1 path (skills/hooks/rules/...) made every "hash
-                # differs from template" stale-repair silently clobber the user's own hooks
-                # back to the generic template — a live regression found and fixed live in
-                # this file (see inbox/bugs/bug-2026-07-11-update-sh-settings-json-clobber.md).
-                # Only seed on first install; never overwrite an existing file here.
-                dst="$WORKSPACE_DIR/$fpath"
-                if [ ! -f "$dst" ]; then
-                    mkdir -p "$(dirname "$dst")"
-                    cp "$SCRIPT_DIR/$fpath" "$dst"
-                    echo "  ⟲ $fpath → workspace (repair, new install)"
-                    REPAIRED=$((REPAIRED + 1))
-                fi
-                ;;
-        esac
-    done < "$repair_paths"
-    rm -f "$repair_paths" "$repair_errors"
-    if [ "$REPAIRED" -gt 0 ]; then
-        echo "  ✓ $REPAIRED runtime-файлов восстановлено"
+    warn_py_degraded
+    grep '"path"' "$MANIFEST" | sed 's/.*"path"[[:space:]]*:[[:space:]]*"//;s/".*/|/'
+}
+manifest_deprecated() {
+    local out="" rc=0
+    # Запасного пути нет: список снятых с поставки файлов не вытащить grep'ом (нужна
+    # пара путь+причина из вложенной структуры). Поэтому при отказе Python чистка
+    # устаревших файлов не выполняется — об этом и предупреждает warn_py_degraded.
+    py_available || { warn_py_degraded; return 0; }
+    # shellcheck disable=SC2086  # PY_BIN может быть "py -3" — см. комментарий у объявления.
+    out=$($PY_BIN -c "
+import json, sys
+with open(sys.argv[1], encoding='utf-8') as f:
+    data = json.load(f)
+# upstream (внешний репорт 2026-08-22): путь одновременно в поставке и в
+# deprecated_files — рассинхронизация генератора манифеста, а не сигнал к удалению.
+# Поставка побеждает; конфликт сообщается, но не исполняется.
+delivered = {e.get('path') for e in data.get('files', [])}
+for e in data.get('deprecated_files', []):
+    path = e.get('path', '')
+    if path in delivered:
+        print('  ⚠ %s: и в поставке, и в списке устаревших — удаление пропущено (несогласованный манифест)' % path, file=sys.stderr)
+        continue
+    print(path + '|' + e.get('reason',''))
+" "$MANIFEST_PY") || rc=$?
+    if [ "$rc" -ne 0 ]; then
+        warn_py_degraded
+        return 0
     fi
-    report_memory_policy_summary
-    # An explicit success: as a function (unlike the old inline block), this is
-    # a plain top-level command at the call site, and its own exit status
-    # (not exempted by the && short-circuit rule that saved the old inline code)
-    # is what set -e sees.
+    out="${out//$'\r'/}"
+    [ -n "$out" ] && printf '%s\n' "$out"
     return 0
 }
 
-# issue #541 hvost 2 (Evgenii Red Team v0.38.11, #540): this used to be plain
-# inline Step 6 code, reachable ONLY from the main apply-path below. Both
-# TOTAL_CHANGES=0 early-exit branches (Step 2) call `repair_pass()` and then
-# print success/no-op WITHOUT ever reaching Step 6 — so a workspace whose
-# CLAUDE.md/.claude.md.base had drifted (while the FMT template copy itself
-# was already fully up to date, hence TOTAL_CHANGES=0) had this exact
-# reconciliation silently skipped and got told "Всё актуально" anyway.
-# Wrapped in a function so both the early-exit paths and Step 6 can call it.
-sync_workspace_claude_md() {
-    CLAUDE_UPDATED=false
-    # issue #289: this used to be a gate on membership of "CLAUDE.md" in NEW_FILES/
-    # UPDATED_FILES of this run — if Step 5 failed on a conflict, the pilot resolved the
-    # markers by hand and re-ran update.sh, the FMT copy in the second run was already ==
-    # upstream → nothing lands in UPDATED_FILES → Step 6 was silently skipped,
-    # the workspace copy and its .claude.md.base froze forever without a warning.
-    # Now the trigger is a real base/FMT-copy divergence, not the fact of an edit in
-    # THIS run: this closes both the abort-and-restart and any other skip of Step 5.
-    NEEDS_WS_CLAUDE_SYNC=false
-    if [ -f "$SCRIPT_DIR/CLAUDE.md" ]; then
-        WS_NEW="$TMPDIR_UPDATE/ws-claude-new-substituted.md"
-        substitute_claude_placeholders "$SCRIPT_DIR/CLAUDE.md" "$WS_NEW"
-        if [ ! -f "$WORKSPACE_DIR/.claude.md.base" ] || ! diff -q "$WORKSPACE_DIR/.claude.md.base" "$WS_NEW" >/dev/null 2>&1; then
-            NEEDS_WS_CLAUDE_SYNC=true
-        fi
-    fi
-    if [ "$NEEDS_WS_CLAUDE_SYNC" = "true" ]; then
-        # 3-way merge for workspace CLAUDE.md (same logic as repo copy)
-        WS_BASE="$WORKSPACE_DIR/.claude.md.base"
-        WS_CURRENT="$WORKSPACE_DIR/CLAUDE.md"
-        # issue #846: records the WS_NEW content at the moment a conflict was
-        # last written to $WS_CURRENT. $WS_BASE is deliberately never advanced
-        # on conflict (issue #711), so once the pilot removes the markers by
-        # hand, the branches below used to re-run the exact same 3-way merge
-        # against the still-stale base and reproduce the exact same conflict
-        # on every run. This sidecar lets that specific case be recognized
-        # and the pilot's resolution accepted, instead of merged again.
-        WS_CONFLICT_PENDING="$WORKSPACE_DIR/.claude.md.conflict-pending"
+# === Эталон для memory/* (порт по существу upstream #965/#967, main 27d79bdb, цикл 12) ===
+# Апстрим больше не решает по owner: «нетронутую» копию обновляет, правленую оставляет.
+# Его доказательства (b) и (c) опираются на старую копию шаблона и её git-историю — в офлайне
+# их нет (папка FMT заменяется из ZIP целиком, без .git). Остаётся доказательство (a): своя
+# запись «что мы положили в прошлый раз». Используем тот же приём, что для .qwen/rules/ выше:
+# скрытая копия каждого применённого файла памяти. MEMORY.md, личные конфиги и owner: user
+# сюда не доходят — их отсекает Step 1.
+#   копия = эталон      → с прошлого обновления не правилась → заменяем, эталон двигаем;
+#   копия ≠ эталон      → правка пилота → не трогаем, печатаем diff и готовую команду;
+#   эталона ещё нет     → первый прогон после этой правки: заменяем, как раньше, но сперва
+#                         кладём отдельную копию файла и называем её (а не молча).
+MEMORY_BASELINE_DIR="$WORKSPACE_DIR/.qwen-memory.baseline"
+MEMORY_BACKUP_DIR=""      # каталог копий памяти этого прогона, создаётся при первой замене
+MEMORY_KEPT=()            # файлы памяти, оставленные как есть
 
-        # issue #711: a previous run left unresolved <<<<<<< markers in
-        # $WS_CURRENT (pilot hasn't touched the file yet). Running
-        # `git merge-file` again would 3-way-merge a file that already
-        # contains literal marker lines as if they were real content —
-        # confusing nested markers at best. Re-surface the same warning
-        # without attempting a new merge; base stays untouched either way.
-        if [ -f "$WS_CURRENT" ] && grep -q '^<<<<<<<' "$WS_CURRENT" 2>/dev/null; then
-            echo "  ~ $WS_CURRENT (неразрешённый конфликт с прошлого запуска — сначала разрешите маркеры вручную)"
-            CLAUDE_CONFLICT_DETECTED=true
-            CLAUDE_CONFLICT_FILES+=("$WS_CURRENT")
-        elif [ -f "$WS_CONFLICT_PENDING" ] && [ -f "$WS_BASE" ] && diff -q "$WS_CONFLICT_PENDING" "$WS_NEW" >/dev/null 2>&1; then
-            # Markers are gone and the upstream CLAUDE.md hasn't moved since
-            # the conflict that produced them — the pilot resolved it by hand.
-            # Accept their file as the new ground truth instead of re-merging
-            # it against the stale base (which is exactly what reproduced the
-            # same conflict every run).
-            cp "$WS_BASE" "$WS_BASE.bak-$(date -u +%Y%m%dT%H%M%SZ)"
-            cp "$WS_NEW" "$WS_BASE"
-            rm -f "$WS_CONFLICT_PENDING"
-            echo "  ✓ $WS_CURRENT принят как разрешённый вручную (база обновлена, прежняя сохранена рядом)"
-        elif [ -f "$WS_BASE" ] && [ -f "$WS_CURRENT" ] && command -v git >/dev/null 2>&1; then
-            # Either the upstream template moved on since any earlier conflict
-            # (a stale pending record no longer applies), or this is the very
-            # first merge attempt — either way, a fresh merge decides next.
-            rm -f "$WS_CONFLICT_PENDING"
-            WS_MERGE_TMP="$TMPDIR_UPDATE/ws-claude-merge.md"
-            cp "$WS_CURRENT" "$WS_MERGE_TMP"
-            if git merge-file -p "$WS_MERGE_TMP" "$WS_BASE" "$WS_NEW" > "$TMPDIR_UPDATE/ws-claude-merged.md" 2>/dev/null; then
-                WS_SILENT_LOSS=$(detect_claude_silent_loss "$WS_BASE" "$WS_CURRENT" "$TMPDIR_UPDATE/ws-claude-merged.md")
-                if [ "$WS_SILENT_LOSS" -gt 0 ]; then
-                    CLAUDE_SILENT_LOSS_FILES+=("$WS_CURRENT")
-                    echo "  ⚠ $WS_CURRENT НЕ тронут — слияние потеряло бы $WS_SILENT_LOSS строк(и) без маркеров конфликта."
-                    echo "    Сверьте вручную: diff \"$WS_CURRENT\" \"$WS_NEW\""
-                else
-                    cp "$TMPDIR_UPDATE/ws-claude-merged.md" "$WS_CURRENT"
-                    cp "$WS_NEW" "$WS_BASE"
-                    echo "  ✓ $WS_CURRENT обновлён (3-way merge)"
-                fi
-            else
-                WS_CONFLICTS=$(grep -c '^<<<<<<<' "$TMPDIR_UPDATE/ws-claude-merged.md" 2>/dev/null || true); WS_CONFLICTS=${WS_CONFLICTS:-0}
-                if [ "$WS_CONFLICTS" -eq 0 ]; then
-                    # Non-zero without a single marker is not a conflict: git did not merge.
-                    # Its (empty) output must not replace the pilot's file.
-                    claude_merge_failed "$WS_CURRENT" "$WS_NEW"
-                else
-                    cp "$TMPDIR_UPDATE/ws-claude-merged.md" "$WS_CURRENT"
-                    CLAUDE_CONFLICTS=$((CLAUDE_CONFLICTS + WS_CONFLICTS))
-                    # issue #226: don't abort here — a CLAUDE.md conflict is an isolated
-                    # artifact, not a reason to skip the rest of the delivery (memory/hooks/
-                    # skills propagation, repair-pass, commit). Warn now, fail at the end.
-                    # issue #711: do NOT advance $WS_BASE here (unlike the clean-merge
-                    # branch above) — advancing it made the next run's `diff -q
-                    # "$WORKSPACE_DIR/.claude.md.base" "$WS_NEW"` gate at the top of this
-                    # function succeed even though $WS_CURRENT still had unresolved
-                    # <<<<<<< markers, so update.sh reported "Всё актуально" on a corrupt
-                    # file. Base now advances only once the markers are gone (see the
-                    # pre-check above, which takes over on the next run).
-                    # issue #846: record $WS_NEW so a future run whose markers are gone
-                    # but whose $WS_NEW is unchanged can recognize a hand-resolved file
-                    # (see $WS_CONFLICT_PENDING branch above) instead of re-merging it.
-                    cp "$WS_NEW" "$WS_CONFLICT_PENDING"
-                    echo "  ~ $WS_CURRENT ($WS_CONFLICTS конфликтов — разрешите вручную)"
-                    echo "    Конфликты обозначены <<<<<<< / ======= / >>>>>>>"
-                    CLAUDE_CONFLICT_DETECTED=true
-                    CLAUDE_CONFLICT_FILES+=("$WS_CURRENT")
-                fi
-            fi
-        elif [ ! -f "$WS_CURRENT" ]; then
-            # No workspace CLAUDE.md yet — first install, nothing of the pilot's to lose.
-            cp "$WS_NEW" "$WS_CURRENT"
-            cp "$WS_NEW" "$WS_BASE"
-            echo "  ✓ $WS_CURRENT создан"
-        else
-            # issue #336: WS_CURRENT already exists but .claude.md.base is missing/lost
-            # (e.g. re-clone, migration gap) — a blind `cp $WS_NEW $WS_CURRENT` silently
-            # discarded any pilot edit to §8/§9 that wasn't wrapped in explicit
-            # <!-- USER-SPACE --> markers (those markers don't exist in the real §8/§9
-            # format). Without a real base there is no safe 3-way merge — leave the
-            # pilot's file untouched and surface it the same way an unresolved merge
-            # conflict is surfaced, instead of guessing.
-            WS_USER_SECTION=$(sed -n '/^<!-- USER-SPACE/,/^<!-- \/USER-SPACE/p' "$WS_CURRENT")
-            if [ -n "$WS_USER_SECTION" ] && ! WS_BACKUP_DIR=$(claude_backup_before_replace "$WS_CURRENT"); then
-                # #1004: no backup, no replacement.
-                CLAUDE_BASE_MISSING_FILES+=("$WS_CURRENT")
-                echo "  ⚠ $WS_CURRENT НЕ тронут — не удалось сделать резервную копию перед заменой."
-                echo "    Сверьте свои правки вручную с шаблонной версией: diff \"$WS_CURRENT\" \"$WS_NEW\""
-            elif [ -n "$WS_USER_SECTION" ]; then
-                echo "  ⚠ $WS_CURRENT: правки вне блока USER-SPACE будут заменены версией шаблона; резервная копия: $WS_BACKUP_DIR"
-                cp "$WS_NEW" "$WS_CURRENT"
-                sed_inplace '/^<!-- USER-SPACE/,/^<!-- \/USER-SPACE/d' "$WS_CURRENT"
-                echo "" >> "$WS_CURRENT"
-                printf '%s\n' "$WS_USER_SECTION" >> "$WS_CURRENT"
-                cp "$WS_NEW" "$WS_BASE"
-                echo "  ✓ $WS_CURRENT обновлён (USER-SPACE сохранён, базовый файл создан)"
-            else
-                # issue #541 hvost 2 (Evgenii Red Team v0.38.11): same false-ancestry
-                # bug as the FMT-copy branch above — writing WS_BASE = WS_NEW here
-                # while leaving WS_CURRENT untouched would let the next run's 3-way
-                # merge treat the still-stale WS_CURRENT as an intentional pilot
-                # edit and clear .update-incomplete without ever really syncing it.
-                # Leave the base absent so the drift keeps surfacing until resolved.
-                if is_author_mode; then
-                    # WP-568 F11: in author_mode the workspace CLAUDE.md is the author's own
-                    # source (the template copy is derived from it), so a missing base is the
-                    # normal state, not a lost one. Same treatment as every other authored L1
-                    # file: untouched, one line, no blocking of .update-incomplete.
-                    echo "  ⚠ $WS_CURRENT — author_mode: базового файла для слияния нет, авторская копия не тронута. Сверь: diff \"$WS_CURRENT\" \"$WS_NEW\""
-                else
-                    CLAUDE_BASE_MISSING_FILES+=("$WS_CURRENT")
-                    echo "  ⚠ $WS_CURRENT НЕ тронут — базовый файл для слияния отсутствовал."
-                    echo "    Сверьте свои правки §8/§9 вручную с шаблонной версией: diff \"$WS_CURRENT\" \"$WS_NEW\""
-                fi
-            fi
-        fi
-        CLAUDE_UPDATED=true
+memory_baseline_path() {
+    printf '%s/%s' "$MEMORY_BASELINE_DIR" "${1#memory/}"
+}
+
+# save_memory_baseline FPATH DST — эталон FPATH := содержимое DST. Сбой не роняет обновление:
+# теряется только доказательство для следующего прогона, о чём и говорим.
+save_memory_baseline() {
+    local baseline; baseline="$(memory_baseline_path "$1")"
+    if ! { mkdir -p "$(dirname "$baseline")" && cp "$2" "$baseline"; }; then
+        echo "  ⚠ эталон $1 не записан: следующий прогон не отличит вашу правку от старой версии" >&2
     fi
 }
 
-# claude_backup_before_replace FILE — issue #1004: the no-base USER-SPACE branch replaces FILE with
-# the template version and keeps only the marked block; everything the pilot wrote outside it
-# (§8/§9 have no markers in the real format) is gone. Copy FILE into
-# $WORKSPACE_DIR/.backups/claude-md-pre-update/<run>/ first and print where it went; non-zero
-# (and nothing printed) when the copy failed: the caller must then leave FILE untouched.
-claude_backup_before_replace() {
-    local src="$1" dir
-    dir="${WORKSPACE_DIR:-$SCRIPT_DIR}/.backups/claude-md-pre-update/$(date -u +%Y%m%dT%H%M%SZ)-$$"
-    [ -L "${WORKSPACE_DIR:-$SCRIPT_DIR}/.backups" ] && return 1
-    mkdir -p "$dir" || return 1
-    cp -p "$src" "$dir/$(basename "$(dirname "$src")")-$(basename "$src")" || return 1
-    printf '%s\n' "$dir"
+# sync_memory_baseline_if_template FPATH DST — копия, совпадающая с шаблоном, получает эталон:
+# и та, что пришла такой, и та, где пилот принял версию шаблона командой из строки «НЕ обновлён».
+# Без этого старый эталон держал бы файл «правленым» на всех следующих прогонах. Зовётся из
+# Step 1, а не после применения: прогон без изменений выходит («Всё актуально») раньше.
+sync_memory_baseline_if_template() {
+    local baseline; baseline="$(memory_baseline_path "$1")"
+    [ -f "$baseline" ] && [ "$(hash_file "$baseline")" = "$(hash_file "$2")" ] && return 0
+    save_memory_baseline "$1" "$2"
 }
 
-# claude_template_copy_is_replaceable FILE — B1 (WP-7 F193): setup.sh (since v0.38.10) keeps the
-# CLAUDE.md merge base only in the workspace root, never in the template repo, so Step 5 found no
-# $SCRIPT_DIR/.claude.md.base on such installs and kept the #541 refusal on every run (exit 49,
-# CLAUDE.md never updated, .update-incomplete forever). FILE is the delivered copy in the template
-# repo: when a workspace base exists (the modern layout) and FILE was never edited
-# (claude_template_copy_is_pristine), there is nothing to merge in it and upstream goes in as is;
-# the pilot's own edits live in the workspace copy, merged against the workspace base in Step 6.
-# Equality of FILE with the workspace base is NOT required: an unresolved workspace conflict keeps
-# the base on the old release while the copy has already moved on (audit of v0.41.0, finding 1).
-claude_template_copy_is_replaceable() {
-    [ -n "${WORKSPACE_DIR:-}" ] && [ -f "$WORKSPACE_DIR/.claude.md.base" ] || return 1
-    # An empty copy is a broken file, not an unedited one.
-    [ -s "$1" ] || return 1
-    claude_template_copy_is_pristine "$1"
+# backup_memory_before_overwrite FPATH DST — печатает путь сохранённой копии; не 0 = не сохранено,
+# и тогда DST трогать нельзя. Зовётся через $(...): MEMORY_BACKUP_DIR задаёт вызывающий,
+# присваивание здесь осталось бы в подоболочке и до итога прогона не дошло бы.
+backup_memory_before_overwrite() {
+    local backup
+    backup="$MEMORY_BACKUP_DIR/${1#memory/}"
+    mkdir -p "$(dirname "$backup")" && cp "$2" "$backup" || return 1
+    printf '%s' "$backup"
 }
 
-# claude_record_usable FILE — the delivered record is trusted only when it looks exactly like what
-# claude_record_delivered writes: a small regular file (not a symlink, FIFO or directory) made of lowercase hex
-# digits and newlines. Anything else would hang the read (an endless source), flood it, vouch with text nobody
-# here wrote or be bent by the shell on the way in (NUL bytes are dropped, a CR sticks to the line), so it counts
-# as absent: the other two tests still apply and the next replacement writes a fresh record in its place (red
-# team round 32: a FIFO in its place hung update.sh). A well-formed file can not be told apart from one this
-# script wrote: whoever can write the workspace can edit the copy too.
-claude_record_usable() {
-    local size stray
-    [ -f "$1" ] && [ ! -L "$1" ] || return 1
-    size=$(wc -c < "$1" 2>/dev/null) || return 1
-    size=${size//[[:space:]]/}
-    case "$size" in '' | *[!0-9]*) return 1 ;; esac
-    [ "$size" -le 1024 ] || return 1
-    # pipefail inside the substitution: a failing tr must not be hidden by the wc after it (update.sh runs without pipefail)
-    stray=$(set -o pipefail; LC_ALL=C tr -d '0-9a-f\n' < "$1" 2>/dev/null | wc -c) || return 1
-    [ "${stray//[[:space:]]/}" = 0 ]
-}
-
-# claude_template_copy_is_pristine FILE — proof that FILE was never edited. Equality with the
-# workspace base is no proof: the #541 refusal leaves an edited copy in place,
-# sync_workspace_claude_md() then advances the base to that edited copy, and on the next run
-# "copy == base" holds for it too (found by the round-16 peer review). So FILE must be, byte for byte,
-#   - the file the installed update-manifest.json lists: the release this
-#     install last updated to (Step 6e replaces the manifest only after Step 5,
-#     so it is still the old one here), or
-#   - the file committed at the clone's HEAD: an install that never took a
-#     CLAUDE.md update, the stuck state this fix heals (update.sh commits
-#     nothing, so on its own this holds only until the first update), or
-#   - the file update.sh itself wrote into the template repo last time (claude_record_delivered):
-#     a run that replaced the copy and then stopped before Step 6e replaced the manifest (a later
-#     step failed, an interrupt) leaves the manifest on the OLD release, and update.sh commits nothing,
-#     so HEAD stays old too; the next release would find the copy vouched for by neither (the record
-#     is read only when claude_record_usable accepts it).
-# A copy edited and then committed by hand passes the second test; its text stays in the history.
-claude_template_copy_is_pristine() {
-    local copy="$1" committed
-    claude_template_copy_is_delivered "$copy" && return 0
-    [ -n "$CLAUDE_PROVEN_COPY_HASH_CANDIDATE" ] || return 1
-    command -v git >/dev/null 2>&1 || return 1
-    committed=$(git -C "$SCRIPT_DIR" rev-parse --verify -q "HEAD:CLAUDE.md" 2>/dev/null) || return 1
-    [ "$(git -C "$SCRIPT_DIR" hash-object -- "$copy" 2>/dev/null)" = "$committed" ] || return 1
-    CLAUDE_PROVEN_COPY_HASH="$CLAUDE_PROVEN_COPY_HASH_CANDIDATE"
-}
-
-# claude_template_copy_matches_legacy_base COPY BASE — proof for an install made by setup.sh up to 0.36, whose
-# manifest lists paths without sha256 (rc.10 CI: the delivered-proof never held there). That setup wrote BASE as
-# COPY with the install's .exocortex.env values put in place of its {{KEYS}}, so COPY substituted the same way
-# equals BASE byte for byte only while COPY is unedited since BASE was written. Sets CLAUDE_PROVEN_COPY_HASH.
-claude_template_copy_matches_legacy_base() {
-    local copy="$1" base="$2" env_file=""
-    py_available || return 1
-    [ -f "${WORKSPACE_DIR:-}/.exocortex.env" ] && env_file="$WORKSPACE_DIR/.exocortex.env"
-    [ -z "$env_file" ] && [ -f "$SCRIPT_DIR/.exocortex.env" ] && env_file="$SCRIPT_DIR/.exocortex.env"
-    [ -n "$env_file" ] || return 1
-    # shellcheck disable=SC2086 # PY_BIN may be "py -3"
-    $PY_BIN - "$copy" "$base" "$env_file" <<'PY' || return 1
-import re
-import sys
-
-copy, base, env = (open(path, encoding="utf-8").read() for path in sys.argv[1:4])
-values = {}
-for line in env.splitlines():
-    match = re.match(r"^([A-Z_][A-Z0-9_]*)=(.*)$", line)
-    if match:
-        value = match.group(2).strip()
-        if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
-            value = value[1:-1]
-        values[match.group(1)] = value
-substituted = re.sub(r"\{\{([A-Z_][A-Z0-9_]*)\}\}", lambda m: values.get(m.group(1), m.group(0)), copy)
-sys.exit(0 if substituted == base else 1)
-PY
-    CLAUDE_PROVEN_COPY_HASH=$(hash_file "$copy" 2>/dev/null) || CLAUDE_PROVEN_COPY_HASH=""
-}
-
-# claude_template_copy_is_delivered FILE — the first two proofs above only: FILE is what the installed
-# manifest lists or what update.sh itself wrote last time. The HEAD proof is left out on purpose: update.sh
-# up to 0.36 committed the whole template clone after every run, so a pilot's edit made before that is in
-# HEAD too (cold review of the 0.42 rc.10 fix). Sets CLAUDE_PROVEN_COPY_HASH on success and leaves the
-# copy's hash in CLAUDE_PROVEN_COPY_HASH_CANDIDATE for the HEAD proof.
-claude_template_copy_is_delivered() {
-    local copy="$1" delivered copy_hash record
-    CLAUDE_PROVEN_COPY_HASH=""
-    CLAUDE_PROVEN_COPY_HASH_CANDIDATE=""
-    # One read: the hash the proof is about is the one the record keeps (the copy must not be edited while
-    # update.sh runs; an editor saving between two reads is outside what this can promise).
-    copy_hash=$(hash_file "$copy" 2>/dev/null) || copy_hash=""
-    [ -n "$copy_hash" ] || return 1
-    CLAUDE_PROVEN_COPY_HASH_CANDIDATE="$copy_hash"
-    delivered=$(manifest_sha256_of "$SCRIPT_DIR/update-manifest.json" "CLAUDE.md" 2>/dev/null) || delivered=""
-    if [ -n "$delivered" ] && [ "$copy_hash" = "$delivered" ]; then
-        CLAUDE_PROVEN_COPY_HASH="$copy_hash"
+# apply_memory_file FPATH SRC DST — правило выше для одного файла. 0 = записан, 1 = оставлен.
+apply_memory_file() {
+    local fpath="$1" src="$2" dst="$3" baseline backup stamp
+    baseline="$(memory_baseline_path "$fpath")"
+    mkdir -p "$(dirname "$dst")"
+    if [ ! -f "$dst" ]; then
+        cp "$src" "$dst"; save_memory_baseline "$fpath" "$dst"
+        echo "  + $fpath"
         return 0
     fi
-    record="${WORKSPACE_DIR:-/nonexistent}/.claude.md.delivered"
-    if claude_record_usable "$record" && grep -qxF -- "$copy_hash" <<< "$(head -c 1024 -- "$record" 2>/dev/null)"; then
-        CLAUDE_PROVEN_COPY_HASH="$copy_hash"
+    if [ -f "$baseline" ] && [ "$(hash_file "$dst")" = "$(hash_file "$baseline")" ]; then
+        cp "$src" "$dst"; save_memory_baseline "$fpath" "$dst"
+        echo "  ~ $fpath"
         return 0
     fi
-    return 1
-}
-
-# claude_record_delivered NEWFILE — remember two sha256 values: the template copy about to be replaced, as
-# claude_template_copy_is_pristine just proved it (CLAUDE_PROVEN_COPY_HASH: the very hash that was proved,
-# not a second read of a file an editor could have saved in between), and the upstream CLAUDE.md update.sh is
-# about to write into the template repo (hashed from the SOURCE, so an edit saved in the meantime cannot
-# become "delivered"). The record lives next to the workspace merge base: the template repo never receives
-# either. The hashes are ADDED before the copy and the file keeps the last four lines: if the copy then
-# fails or the run is interrupted before it changes, the copy still in place is vouched for by its own
-# line, which every attempt writes again (a line that only the first attempt wrote would be pushed out by
-# four failed ones), and a copy that was written is vouched for by the new line (round-25, 26 and 27 peer
-# reviews). Only the shortcut calls this, so an edited copy never matches. Atomic (temp file, mv) and best
-# effort: no failure here stops the update, and without the record the other two tests still apply. Not
-# promised: two update.sh at once (the script has no lock anywhere), an editor saving the template copy
-# while update.sh runs, a kill in the middle of cp itself (a half-written copy matches nothing and is refused).
-# The earlier lines are carried over only from a record claude_record_usable accepts; whatever else stands there
-# (a symlink, a FIFO, junk, CRLF text) is replaced, a directory is left alone.
-claude_record_delivered() {
-    [ -n "${WORKSPACE_DIR:-}" ] && [ -d "$WORKSPACE_DIR" ] || return 0
-    local record="$WORKSPACE_DIR/.claude.md.delivered" tmp hash hashes="" kept="" line
-    # mv would move the temp file INTO a directory standing at that path: leave such a path alone
-    [ ! -d "$record" ] || return 0
-    [ -z "${CLAUDE_PROVEN_COPY_HASH:-}" ] || hashes="$CLAUDE_PROVEN_COPY_HASH"$'\n'
-    hash=$(hash_file "$1" 2>/dev/null) || hash=""
-    [ -z "$hash" ] || hashes="$hashes$hash"$'\n'
-    [ -n "$hashes" ] || return 0
-    if claude_record_usable "$record"; then
-        # earlier lines (a sha256 each, and not one this run writes again); a hex line of another length is dropped
-        while IFS= read -r line || [ -n "$line" ]; do
-            [ "${#line}" -eq 64 ] || continue
-            case $'\n'"$hashes" in *$'\n'"$line"$'\n'*) continue ;; esac
-            kept="$kept$line"$'\n'
-        done < <(head -c 1024 -- "$record" 2>/dev/null)
+    if [ -f "$baseline" ]; then
+        MEMORY_KEPT+=("$fpath")
+        stamp="$(date +%Y%m%d-%H%M%S)"
+        # printf %q: строку выполнит оболочка пилота, а в домашнем пути macOS бывает пробел.
+        echo "  ⚠ $fpath НЕ обновлён: вы правили его после прошлого обновления."
+        echo "    Сравнить: diff $(printf %q "$dst") $(printf %q "$src")"
+        echo "    Если ваших правок там не осталось: cp $(printf %q "$dst") $(printf %q "$dst.before-update-$stamp") && cp $(printf %q "$src") $(printf %q "$dst")"
+        return 1
     fi
-    tmp=$(mktemp "$record.tmp.XXXXXX" 2>/dev/null) || return 0
-    if printf '%s%s' "$kept" "$hashes" | tail -n 4 > "$tmp" 2>/dev/null; then
-        mv -f "$tmp" "$record" 2>/dev/null || rm -f "$tmp" 2>/dev/null || true
-    else
-        rm -f "$tmp" 2>/dev/null || true
+    [ -z "$MEMORY_BACKUP_DIR" ] && MEMORY_BACKUP_DIR="$WORKSPACE_DIR/.backups/memory-pre-update/$(date +%Y%m%d-%H%M%S)-$$"
+    if ! backup="$(backup_memory_before_overwrite "$fpath" "$dst")"; then
+        MEMORY_KEPT+=("$fpath")
+        echo "  ⚠ $fpath НЕ обновлён: не удалось сохранить прежнюю версию перед заменой."
+        return 1
     fi
+    cp "$src" "$dst"; save_memory_baseline "$fpath" "$dst"
+    echo "  ~ $fpath (прежняя версия: $backup)"
     return 0
 }
 
-# claude_merge_failed FILE NEW — `git merge-file` failed without a conflict to show (no
-# markers in its output): there is no merge result, so FILE is left exactly as it is, the
-# merge base is not advanced and the run ends in EXIT_CONFLICT with a pointer to git.
-claude_merge_failed() {
-    CLAUDE_MERGE_FAILED_FILES+=("$1")
-    echo "  ⚠ $1 НЕ тронут — git merge-file не выдал слияния (git не работает или файл нечитаем?)."
-    echo "    Проверьте: git --version. Сверить вручную: diff \"$1\" \"$2\""
-}
-
-# issue #541 cold-review (P2, DP.SC.172): the CLAUDE.md conflict/missing-base
-# check-then-exit-49 idiom now has 3 call sites (the two new early-exit gates
-# below, plus the pre-existing final gate at the end of the script) — third
-# repetition, extract instead of copy-pasting a fourth time.
-claude_conflict_gate() {
-    if $CLAUDE_CONFLICT_DETECTED || [ "${#CLAUDE_BASE_MISSING_FILES[@]}" -gt 0 ] || [ "${#CLAUDE_SILENT_LOSS_FILES[@]}" -gt 0 ] \
-        || [ "${#CLAUDE_MERGE_FAILED_FILES[@]}" -gt 0 ]; then
-        echo "  ⚠ Workspace-копия CLAUDE.md требует ручной сверки (см. предупреждения выше)."
-        exit "$EXIT_CONFLICT"
-    fi
-}
-
-# claude_nested_markers_gate — exit EXIT_CONFLICT while either CLAUDE.md still carries <<<<<<< markers.
-# Both the apply path and the "nothing to update" path call it: a run interrupted on a conflict leaves the
-# conflicted copy delivered, so the retry finds nothing to download and used to report "Всё актуально".
-claude_nested_markers_gate() {
-    local cf conflict_marker_files=()
-    for cf in "$SCRIPT_DIR/CLAUDE.md" "$WORKSPACE_DIR/CLAUDE.md"; do
-        [ -f "$cf" ] && grep -q '^<<<<<<<' "$cf" && conflict_marker_files+=("$cf")
-    done
-    [ "${#conflict_marker_files[@]}" -gt 0 ] || return 0
-    echo ""
-    echo "ОШИБКА: обнаружены неразрешённые конфликты слияния (вложенные маркеры):"
-    for cf in "${conflict_marker_files[@]}"; do echo "  - $cf"; done
-    echo "  Разрешите их вручную и перезапустите update.sh."
-    exit "$EXIT_CONFLICT"
-}
-
-# === Step 2: Download and compare files ===
-echo "[2] Сравнение файлов..."
-
+# === Step 1: детект изменений ===
+echo "[1] Сравнение файлов..."
 NEW_FILES=()
-NEW_DESCS=()
 UPDATED_FILES=()
-UPDATED_LINES=()
-SKIPPED_DOWNLOAD=()   # issue #350: manifest files whose fetch failed — status unknown, not "unchanged"
 UNCHANGED=0
-CLAUDE_CONFLICTS=0  # unresolved CLAUDE.md merge conflict counter (WP-7)
-# issue #226: a CLAUDE.md conflict must not abort delivery of the rest of the
-# update (memory/hooks/skills, repair-pass, commit) — it's an isolated artifact.
-# Collect it here and fail at the very end instead of exiting mid-script.
-CLAUDE_CONFLICT_DETECTED=false
-CLAUDE_CONFLICT_FILES=()
-# issue #336: a missing .claude.md.base (no real 3-way merge possible) is a
-# different failure than an actual merge conflict — no <<<<<<< markers, the
-# file was simply left untouched. Tracked separately so the final summary
-# doesn't tell the pilot to look for markers that were never written.
-CLAUDE_BASE_MISSING_FILES=()
-# issue #555: a THIRD failure class, distinct from both of the above — a real
-# base existed, `git merge-file` reported success, no markers, but a pilot's
-# customized line still vanished from the result. Also left untouched and
-# reported separately (detect_claude_silent_loss above), so the summary
-# points at the right cause instead of "no base file" or "look for markers".
-CLAUDE_SILENT_LOSS_FILES=()
-# WP-7 F193 (round-16 cold review): a FOURTH class — git itself failed. `git merge-file`
-# exited non-zero without a single conflict marker and without a merge result (a macOS
-# whose Command Line Tools went missing prints an xcrun error and exits 1 for every git
-# command). The empty output used to be copied over CLAUDE.md as a "clean" merge.
-CLAUDE_MERGE_FAILED_FILES=()
+OWNER_USER_DRIFT=()   # owner: user — не обновляем, но о расхождении сообщаем (upstream #375)
 
-# WP-546 (peer-session 2026-08-20-11, WP-546 Phase 2 consensus with Codex): the
-# manifest loop used to run one `curl` per file, sequentially — 632 files at
-# ~0.65s/file (measured) means ~7min on an ordinary network, and users on
-# slower/higher-latency connections reported 40+ minutes. Split into two
-# phases: (1) a network-free pass builds a download worklist (three parallel
-# indexed arrays, not `declare -A` — that needs bash 4.0+, but this script's
-# #!/bin/bash shebang resolves to the system bash on macOS, which is 3.2;
-# same reasoning as download_batch's positional-args choice below), skipping
-# protected files and files whose local sha256 already matches the manifest
-# (no network call for either); (2) a single `curl --parallel` call downloads
-# the worklist, followed by one retry pass (network failures AND integrity
-# failures — GitHub's raw CDN edges can briefly disagree after a fresh push,
-# so a retry can succeed where the first attempt didn't). Per-file
-# classification (NEW/UPDATED/UNCHANGED, the issue #254 merge-base detector)
-# runs unchanged after download, just reading from $TMPDIR_UPDATE/files/
-# instead of a variable populated file-by-file.
-DOWNLOAD_QUEUE=()
-DOWNLOAD_DESCS=()
-DOWNLOAD_HASHES=()
-# INTEGRITY_TAINTED (peer-session 2026-08-21-09, WP-546 review follow-up,
-# consensus with Codex): true when the fallback path (grep, no sha256 in
-# the manifest lines it emits) is in use — a real parser failure below
-# aborts the script outright instead (cold-context review, same
-# peer-session: an earlier version of this comment claimed the flag also
-# covered that case, which was never reachable — exit happens before this
-# flag would be set). The old fallback comment claimed integrity was
-# "already documented via SKIPPED_DOWNLOAD, not silently trusted" — false:
-# an empty expected_hash makes verify_batch_integrity() skip the file
-# (`[ -n "$expected_hash" ] || continue`), so a corrupted or substituted
-# download was silently accepted as good. This flag makes that condition
-# visible in the final verdict instead of printing an ordinary success.
-INTEGRITY_TAINTED=false
-
-# Parse the manifest into a plain temp file first, not directly via process
-# substitution into the while-loop below (peer-session 2026-08-21-09: the
-# original code piped the parser straight into `while read`, so a Python
-# crash mid-parse — bad JSON, missing field, encoding error — just produced
-# a short or empty stream that `while read` silently accepted as "few/no
-# files to update," indistinguishable from a real empty manifest). Written
-# under $TMPDIR_UPDATE, which cleanup_update()'s EXIT trap already removes.
-MANIFEST_PARSED="$TMPDIR_UPDATE/manifest-parsed.txt"
-if py_available; then
-    # Path via argv (issue #402, defect 2), not interpolated into the -c
-    # string — see FILES_MATCH above. stderr is NOT redirected here (was
-    # `2>/dev/null`): a parse failure on our own manifest should be rare, and
-    # silencing it left nothing to diagnose why the run below fell back to
-    # "no changes."
-    if ! $PY_BIN -c "
-import json, sys
-with open(sys.argv[1], encoding='utf-8') as f:
-    data = json.load(f)
-for entry in data.get('files', []):
-    print(entry['path'] + '|' + entry.get('desc', '') + '|' + entry.get('sha256', ''))
-" "$MANIFEST" > "$MANIFEST_PARSED"; then
-        echo "✗ Не удалось разобрать манифест обновлений ($MANIFEST) — Python вернул ошибку (см. вывод выше)." >&2
-        echo "  Обновление остановлено: продолжать со сбойным разбором значило бы рискнуть тихо решить, что обновлять нечего." >&2
-        exit "$EXIT_RUNTIME"
-    fi
-else
-    # Fallback: basic grep parsing if no working python interpreter. No
-    # sha256 in this path — integrity verification is skipped entirely, so
-    # every file below counts as unverified (INTEGRITY_TAINTED, not merely
-    # "checked composition only" as the old comment claimed).
-    INTEGRITY_TAINTED=true
-    # WP-529 F26: a single line got lost in the general output stream among dozens
-    # of others — the user learned that work proceeded without an integrity check only from
-    # return code 4, if they looked at it at all. The frame and explicit consequences
-    # make the degradation noticeable at the moment it happens.
-    echo "" >&2
-    echo "┌──────────────────────────────────────────────────────────────────┐" >&2
-    echo "│ ⚠  ОБНОВЛЕНИЕ БЕЗ ПРОВЕРКИ ЦЕЛОСТНОСТИ                           │" >&2
-    echo "└──────────────────────────────────────────────────────────────────┘" >&2
-    echo "  Python недоступен, поэтому контрольные суммы SHA-256 не проверяются." >&2
-    echo "  Сверяется только состав файлов: подменённое или повреждённое" >&2
-    echo "  содержимое в этом режиме обнаружено НЕ будет." >&2
-    echo "  Обновление завершится с кодом $EXIT_TAINTED вместо 0 — это не ошибка," >&2
-    echo "  а отметка, что проверка целостности не выполнялась." >&2
-    echo "  Как вернуть полную проверку: установите python3 и повторите запуск." >&2
-    echo "" >&2
-
-    # High 2 fail-closed guard (peer-session 2026-08-21-12, Codex, revised
-    # after cold-context review found the first version tautological — the
-    # extracted-count and found-count were both built from the same grep, so
-    # they were always equal even when sed extracted garbage). The fallback
-    # assumes one "path" key per line — a compact/minified manifest (several
-    # entries on one line) silently breaks that assumption, and the old code
-    # just extracted the FIRST match per line instead of failing, losing
-    # every other entry with no signal. A line-count heuristic
-    # (`wc -l == 1`) was considered and rejected: a trailing-newline-less
-    # minified file gives 0, and a compact multi-line manifest can still
-    # pack several "path" keys onto one physical line. Check the actual
-    # assumption — how many "path" occurrences share a line — not a proxy
-    # for it.
-    #
-    # Scope decision (same peer-session, second round): this fallback
-    # supports ONLY the line-per-field layout this repo's own manifest
-    # generator produces — "path" preceded solely by whitespace on its
-    # line, per PATH_LINE_RE below. A compact single-file manifest like
-    # {"files":[{"path":"x.md"}]} is valid JSON but NOT supported here and
-    # correctly hits EXIT_RUNTIME (test-update-issue-226.sh Scenario H) —
-    # a looser prefix (^.*"path") was considered and rejected: it would
-    # let arbitrary text ahead of the real key mask corruption or a "path"
-    # match inside an unrelated string value, undermining the whole-line
-    # grammar match's actual guarantee.
-    #
-    # Every grep below has an explicit 0/1/>1 status check (peer-session
-    # 2026-08-21-12, High 2): this script has `set -e` but not `pipefail`,
-    # so a grep failing inside a pipe or process substitution would
-    # otherwise be silently absorbed by the next command in the chain —
-    # exactly the "fail-open under error" this guard exists to prevent.
-    # grep_or_die PATTERN FILE DEST-VAR — runs "grep -c PATTERN FILE",
-    # writes stdout to DEST-VAR (a file path), returns 0. Aborts the script
-    # on any grep exit status other than 0 (matches found) or 1 (no
-    # matches) — status >1 means grep itself failed to read/execute.
-    grep_or_die() {
-        local pattern="$1" file="$2" dest="$3" rc=0
-        grep -c -- "$pattern" "$file" > "$dest" 2>/dev/null || rc=$?
-        if [ "$rc" -gt 1 ]; then
-            echo "✗ Не удалось прочитать манифест обновлений для резервного разбора (grep вернул код ${rc})." >&2
-            exit "$EXIT_RUNTIME"
-        fi
-        return 0
-    }
-
-    # -c counts MATCHING LINES; that's exactly what both guards need — the
-    # multi-path check cares whether ANY line has 2+ occurrences (a line
-    # either qualifies as a violation or doesn't), and once that guard has
-    # passed, "at most one path per line" makes line-count and
-    # occurrence-count the same number for the total.
-    MULTI_PATH_COUNT_FILE=$(mktemp)
-    grep_or_die '"path".*"path"' "$MANIFEST" "$MULTI_PATH_COUNT_FILE"
-    MULTI_PATH_LINES=$(cat "$MULTI_PATH_COUNT_FILE")
-    rm -f "$MULTI_PATH_COUNT_FILE"
-    if [ "$MULTI_PATH_LINES" -gt 0 ]; then
-        echo "✗ Манифест обновлений в компактном/минифицированном формате (несколько записей на одной строке) — резервный разбор без Python это не поддерживает." >&2
-        echo "  Обновление остановлено: обычная извлечённая запись отбросила бы соседние записи на той же строке без предупреждения." >&2
-        exit "$EXIT_RUNTIME"
-    fi
-
-    PATH_KEY_COUNT_FILE=$(mktemp)
-    grep_or_die '"path"' "$MANIFEST" "$PATH_KEY_COUNT_FILE"
-    PATH_KEY_TOTAL=$(cat "$PATH_KEY_COUNT_FILE")
-    rm -f "$PATH_KEY_COUNT_FILE"
-
-    # grep_or_die's -c count above already confirms whether "path" occurs;
-    # the actual matching lines still need a second, non-counting pass
-    # (grep without -c) to feed the per-line grammar check below. Same
-    # explicit-status contract as grep_or_die: status 1 (no matches) can't
-    # happen here (PATH_KEY_TOTAL already proved matches exist above), so
-    # >0 is unconditionally a read error, not "no matches." The `|| grep_rc=$?`
-    # form (not a bare `grep ...; grep_rc=$?`, found by cold-context review)
-    # matters under `set -e`: a plain non-zero exit from an unguarded
-    # command aborts the script on that line — the following `grep_rc=$?`
-    # would never run, so a failing grep would kill the script with a raw
-    # exit 1/2 instead of this guard's own EXIT_RUNTIME.
-    PATH_LINES_FILE=$(mktemp)
-    grep_rc=0
-    grep -- '"path"' "$MANIFEST" > "$PATH_LINES_FILE" 2>/dev/null || grep_rc=$?
-    if [ "$grep_rc" -gt 0 ]; then
-        echo "✗ Не удалось прочитать манифест обновлений для резервного разбора (grep вернул код ${grep_rc})." >&2
-        exit "$EXIT_RUNTIME"
-    fi
-
-    # Whole-line grammar match (peer-session 2026-08-21-12, Codex: validate
-    # the full line belongs to the supported form BEFORE extracting, not
-    # just eyeball what sed happened to return). Supported form only:
-    # optional leading whitespace, "path", optional whitespace, colon,
-    # optional whitespace, a double-quoted value with no embedded '"' or
-    # '\' (this fallback cannot decode JSON escapes), then anything after
-    # the closing quote (comma, more keys) is accepted without further
-    # constraint since it isn't part of the path value itself.
-    PATH_LINE_RE='^[[:space:]]*"path"[[:space:]]*:[[:space:]]*"[^"\\]+".*$'
-    PATH_ENTRIES_FOUND=0
-    : > "$MANIFEST_PARSED"
-    while IFS= read -r line; do
-        [ -z "$line" ] && continue
-        case "$line" in
-            *'"path"'*)
-                if ! printf '%s\n' "$line" | grep -Eq -- "$PATH_LINE_RE"; then
-                    echo "✗ Резервный разбор манифеста: строка с ключом \"path\" не в поддерживаемой форме (строка $((PATH_ENTRIES_FOUND + 1)) среди найденных совпадений)." >&2
-                    echo "  Поддерживается только: \"path\": \"значение_без_кавычек_и_обратных_слэшей\" на одной строке." >&2
-                    exit "$EXIT_RUNTIME"
-                fi
-                fpath=$(printf '%s\n' "$line" | sed -E 's/^[[:space:]]*"path"[[:space:]]*:[[:space:]]*"([^"\\]+)".*$/\1/')
-                if [ -z "$fpath" ]; then
-                    echo "✗ Резервный разбор манифеста: строка совпала с формой, но извлечённое значение пути пустое." >&2
-                    exit "$EXIT_RUNTIME"
-                fi
-                PATH_ENTRIES_FOUND=$((PATH_ENTRIES_FOUND + 1))
-                echo "$fpath|" >> "$MANIFEST_PARSED"
-                ;;
-        esac
-    done < "$PATH_LINES_FILE"
-    rm -f "$PATH_LINES_FILE"
-
-    if [ "$PATH_ENTRIES_FOUND" -ne "$PATH_KEY_TOTAL" ]; then
-        echo "✗ Резервный разбор манифеста нашёл ${PATH_KEY_TOTAL} ключ(ей) \"path\", но подтверждённо извлёк только ${PATH_ENTRIES_FOUND} запись(ей) — формат манифеста не полностью соответствует ожиданиям этого разбора." >&2
-        exit "$EXIT_RUNTIME"
-    fi
-fi
-
-# Duplicate-path check (peer-session 2026-08-21-09, Codex: must run on every
-# parsed manifest path BEFORE the skip/protected-file filtering below, not
-# after — a duplicate can disappear from DOWNLOAD_QUEUE if one copy gets
-# skip-if-hash-matches while the other doesn't, hiding the very condition
-# this check exists to catch). Two manifest entries writing the same
-# destination race inside download_batch()'s parallel transfer and each
-# other's --remove-on-error cleanup; this is corrupt manifest data, not a
-# transient network condition, so the run stops instead of continuing with
-# an unspecified winner.
-DUPLICATE_PATHS=$(cut -d'|' -f1 "$MANIFEST_PARSED" | LC_ALL=C sort | LC_ALL=C uniq -d)
-if [ -n "$DUPLICATE_PATHS" ]; then
-    echo "✗ Манифест обновлений содержит повторяющиеся пути файлов:" >&2
-    echo "$DUPLICATE_PATHS" | sed 's/^/  /' >&2
-    echo "  Обновление остановлено — параллельная докачка гарантированно верна только для уникальных путей." >&2
-    exit "$EXIT_RUNTIME"
-fi
-
-# issue #660: update-manifest.local.json's excluded_paths was previously read
-# ONLY by the orphan detector (Step 6f below) — a fork declaring a path there
-# got no effect on delivery itself, so update.sh kept silently overwriting
-# the very file the fork asked to keep, with no distinct signal in the
-# preview (the line looked like an ordinary update, not a revert). Loading
-# the same list here, before the file classification loop, lets a
-# fork-owned path skip application — reported separately below, not folded
-# into an unremarkable "unchanged".
-FORK_OWNED_PATHS_FILE="$TMPDIR_UPDATE/fork-owned-paths.txt"
-: > "$FORK_OWNED_PATHS_FILE"
-if py_available && [ -f "$SCRIPT_DIR/update-manifest.local.json" ]; then
-    # Cold-context review finding: this ran unguarded under `set -e` — a
-    # malformed local manifest (top-level list instead of object; an
-    # excluded_paths entry missing "path") raised an uncaught Python
-    # exception and killed the ENTIRE update, not just this feature. The
-    # narrow except below only ever covered "file unreadable", not "file
-    # readable but wrong shape". `if ! ... ; then` + a broad except make this
-    # match the orphan detector's already-established fail-soft pattern
-    # (Step 6f below): a malformed local manifest degrades to "no fork-owned
-    # paths declared", it does not abort the run.
-    if ! $PY_BIN -c "
-import json, sys
-
-path = sys.argv[1]
-try:
-    with open(path, encoding='utf-8') as f:
-        data = json.load(f)
-    for entry in data.get('excluded_paths', []):
-        print(entry['path'] if isinstance(entry, dict) else entry)
-except (json.JSONDecodeError, OSError, AttributeError, KeyError, TypeError) as exc:
-    print(f'  [warn] update-manifest.local.json unreadable, ignored: {exc}', file=sys.stderr)
-" "$SCRIPT_DIR/update-manifest.local.json" > "$FORK_OWNED_PATHS_FILE"; then
-        echo "  ⚠ update-manifest.local.json: не удалось разобрать excluded_paths — fork-owned защита для этого запуска пропущена." >&2
-        : > "$FORK_OWNED_PATHS_FILE"
-    fi
-fi
-FORK_OWNED_PATHS=()
-while IFS= read -r fork_owned_entry; do
-    [ -n "$fork_owned_entry" ] && FORK_OWNED_PATHS+=("$fork_owned_entry")
-done < "$FORK_OWNED_PATHS_FILE"
-FORK_PROTECTED_SKIPPED=()
-
-# is_fork_owned_path REL — true when REL equals a declared excluded_paths
-# entry or sits under one as a directory prefix. Same semantics as Step 6f's
-# Python _locally_excluded() below — kept in bash here since this runs inside
-# the per-file classification loop, not the Python orphan scan.
-is_fork_owned_path() {
-    local rel="$1" entry
-    for entry in "${FORK_OWNED_PATHS[@]}"; do
-        entry="${entry%/}"
-        if [ "$rel" = "$entry" ] || [ "${rel#"$entry"/}" != "$rel" ]; then
-            return 0
-        fi
-    done
-    return 1
-}
-
-while IFS='|' read -r fpath fdesc expected_hash; do
+while IFS='|' read -r fpath fdesc; do
     [ -z "$fpath" ] && continue
-    # issue #402 (defect 3): native Windows Python prints \r\n even inside a
-    # pipe read by Git Bash — the trailing \r rides along in the LAST field
-    # (expected_hash) and makes every sha256 comparison below fail forever,
-    # silently skipping all 593 manifest files. Strip unconditionally; a no-op
-    # on real Unix output.
-    expected_hash="${expected_hash%$'\r'}"
-    # Protected user files (issue #154): never overwrite if they already exist locally.
-    # The "Не затрагиваются" list below is cosmetic; is_protected_user_file() is the
-    # actual skip-if-exists guard (shared with the deprecated-file removal loop below).
-    if is_protected_user_file "$fpath" && [ -f "$SCRIPT_DIR/$fpath" ]; then
-        UNCHANGED=$((UNCHANGED + 1))
-        continue
-    fi
-    # Fork-declared ownership (issue #660): only meaningful once the file
-    # actually diverges from upstream — a declared-but-unchanged path is
-    # nothing to report, so it counts as an ordinary unchanged file.
-    if is_fork_owned_path "$fpath" && [ -f "$SCRIPT_DIR/$fpath" ]; then
-        if [ -n "$expected_hash" ] && [ "$(hash_file "$SCRIPT_DIR/$fpath")" != "$expected_hash" ]; then
-            FORK_PROTECTED_SKIPPED+=("$fpath")
-        else
-            UNCHANGED=$((UNCHANGED + 1))
-        fi
-        continue
-    fi
-    # skip-if-hash-matches (WP-546 Phase 2): a manifest sha256 that already matches
-    # the local file needs no network round-trip at all — this is the other
-    # half of the speedup alongside parallel download, since a typical update
-    # leaves most files unchanged.
-    if [ -n "$expected_hash" ] && [ -f "$SCRIPT_DIR/$fpath" ] && [ "$(hash_file "$SCRIPT_DIR/$fpath")" = "$expected_hash" ]; then
-        UNCHANGED=$((UNCHANGED + 1))
-        continue
-    fi
-    DOWNLOAD_QUEUE+=("$fpath")
-    DOWNLOAD_DESCS+=("$fdesc")
-    DOWNLOAD_HASHES+=("$expected_hash")
-done < "$MANIFEST_PARSED"
+    tgt="$(target_path "$fpath")"
+    [ -z "$tgt" ] && continue                    # вне scope обновления (FMT read-only / build-runtime)
+    src="$SCRIPT_DIR/$fpath"
+    [ -f "$src" ] || continue
+    bn="$(basename "$fpath")"
 
-# curl_supports_parallel_batch — one-time capability probe (peer-session
-# 2026-08-21-09, consensus with Codex): --parallel/--parallel-max shipped
-# together in curl 7.66.0, --remove-on-error only in 7.83.0, so a curl with
-# the first two but not the third is a real, not hypothetical, combination.
-# `curl --help all` lists every option this curl build understands regardless
-# of network access — checked once here, not per-batch, since download_batch()
-# below runs multiple times (initial pass + retry).
-curl_supports_parallel_batch() {
-    local help_output
-    help_output=$(curl --help all 2>&1) || return 1
-    echo "$help_output" | grep -q -- '--parallel[^-]' || return 1
-    echo "$help_output" | grep -q -- '--parallel-max' || return 1
-    echo "$help_output" | grep -q -- '--remove-on-error' || return 1
-}
-USE_PARALLEL_DOWNLOAD=true
-if ! curl_supports_parallel_batch; then
-    USE_PARALLEL_DOWNLOAD=false
-    echo "⚠ Установленный curl не поддерживает параллельное скачивание (--parallel/--parallel-max/--remove-on-error) — используется более медленный последовательный режим." >&2
-fi
+    # Protected: пропускаем если уже существуют
+    if [ "$bn" = "MEMORY.md" ] && [ -f "$tgt" ]; then UNCHANGED=$((UNCHANGED+1)); continue; fi
+    if [ "$fpath" = ".qwen/settings.local.json" ] && [ -f "$tgt" ]; then UNCHANGED=$((UNCHANGED+1)); continue; fi
+    if is_personal_config "$bn" && [ -f "$tgt" ]; then UNCHANGED=$((UNCHANGED+1)); continue; fi
 
-# download_batch FPATH... — downloads the given fpaths to
-# $TMPDIR_UPDATE/files/$fpath, either as one curl --parallel call (fast path)
-# or one curl invocation per file (sequential fallback, only when
-# USE_PARALLEL_DOWNLOAD=false). Positional args, not a nameref: `local -n`
-# needs bash 4.3+, but this script's #!/bin/bash shebang resolves to the
-# system bash on macOS, which is 3.2 — a nameref there fails "local: -n:
-# invalid option" and silently no-ops the whole download instead of
-# erroring, since `local`'s exit status doesn't trip `set -e` (found live
-# testing this exact function).
-#
-# -f makes curl treat an HTTP error page (404) as a failure instead of
-# writing it to disk as if it were the real file — without it a missing
-# manifest entry silently "downloads" successfully. Existence of the
-# destination file (not its size — a legitimate zero-length file is a valid
-# transfer, peer-session 2026-08-21-08/09) is the "did this file actually
-# arrive" signal downstream, which is why both paths below guarantee a
-# failed transfer leaves no file behind: the parallel path via
-# --remove-on-error, the sequential path via a .part-then-rename so a
-# curl exit status other than 0 never leaves a destination file at all.
-download_batch() {
-    [ $# -eq 0 ] && return 0
-    local p dst
-    if $USE_PARALLEL_DOWNLOAD; then
-        local cfg batch_err batch_rc=0
-        # Under $TMPDIR_UPDATE, not a bare mktemp (cold-context review,
-        # peer-session 2026-08-21-09): cleanup_update()'s EXIT trap removes
-        # $TMPDIR_UPDATE wholesale, so a signal or crash between this mktemp
-        # and the `rm -f "$cfg"` below no longer leaks a temp file — the old
-        # bare mktemp location was outside that trap's reach.
-        cfg=$(mktemp "$TMPDIR_UPDATE/curl-batch.XXXXXX")
-        batch_err="$cfg.err"
-        local dst_cfg
-        for p in "$@"; do
-            dst="$TMPDIR_UPDATE/files/$p"
-            mkdir -p "$(dirname "$dst")"
-            # issue #1217 (continuation of #980): MSYS only rewrites a POSIX path
-            # inside a curl command-line argument, not inside a -K config file that
-            # curl itself reads — a native curl.exe given "output = /tmp/..." can't
-            # find that path and fails with exit 23. cygpath -m (forward slashes,
-            # drive letter) is what curl -K accepts without escaping; absent on
-            # Linux/macOS, where $dst is used as-is.
-            dst_cfg="$dst"
-            if command -v cygpath >/dev/null 2>&1; then
-                dst_cfg=$(cygpath -m "$dst" 2>/dev/null) || dst_cfg="$dst"
+    # owner: user во frontmatter развёрнутой копии — файл принадлежит пилоту, не трогаем
+    # (upstream #229). Защита не должна делать расхождение с шаблоном невидимым, поэтому
+    # отличие копируем не в файл, а в отчёт (upstream #375). Список исключений — выше (#354/#384):
+    # старые релизы поставляли эти файлы с owner: user, и legacy-маркер иначе заморозил бы их навсегда.
+    if [ -f "$tgt" ] && ! is_migrated_platform_memory_path "$fpath" && owner_is_user "$tgt"; then
+        [ "$(hash_file "$src")" != "$(hash_file "$tgt")" ] && OWNER_USER_DRIFT+=("$fpath")
+        UNCHANGED=$((UNCHANGED+1))
+        continue
+    fi
+
+    # QWEN.md сравниваем с подставленной версией
+    if [ "$fpath" = "QWEN.md" ]; then
+        cmp_src="$TMPDIR_UPDATE/QWEN.md.subst"
+        cp "$src" "$cmp_src"; substitute_placeholders "$cmp_src"
+        src="$cmp_src"
+        # Файл под трёхсторонним слиянием законно расходится с шаблоном правками пилота,
+        # поэтому сравнение исходник↔цель показывало бы «изменён» каждый прогон и вхолостую
+        # гоняло merge. Сравниваем база↔исходник: двигался ли сам шаблон (upstream #254).
+        qwen_base="$WORKSPACE_DIR/.qwen.md.base"
+        if [ -f "$qwen_base" ] && [ -f "$tgt" ]; then
+            if [ "$(hash_file "$src")" = "$(hash_file "$qwen_base")" ]; then
+                UNCHANGED=$((UNCHANGED+1)); continue
             fi
-            printf 'url = "%s/%s"\noutput = "%s"\n' "$RAW_BASE" "$p" "$dst_cfg" >> "$cfg"
-        done
-        # shellcheck disable=SC2086  # CURL_BASE_OPTS/_CURL_SSL_OPT intentionally unquoted (multi-token flags)
-        # `|| batch_rc=$?`: a batch failing outright (e.g. every URL in it
-        # unreachable) must not trip `set -e` and abort the whole update —
-        # the per-file presence check right after this call is what
-        # actually decides success per file, same as the old code's
-        # per-file `if curl ...` (Phase 2 peer-session review; all found live
-        # testing this exact function).
-        # -sS (not the default progress meter): stderr goes to a file whose last
-        # line names the cause, shown below only when the batch failed (#980).
-        curl $CURL_BASE_OPTS $_CURL_SSL_OPT -sS -f --remove-on-error --parallel --parallel-max 8 -K "$cfg" 2>"$batch_err" || batch_rc=$?
-        if [ "$batch_rc" -ne 0 ]; then
-            echo "  ⚠ пакетная загрузка: $(curl_failure_note "$batch_rc" "$batch_err")" >&2
+            UPDATED_FILES+=("$fpath"); continue
         fi
-        rm -f "$cfg" "$batch_err"
-    else
-        # Sequential fallback (peer-session 2026-08-21-09): one curl call
-        # per file, same CURL_BASE_OPTS/-f as the parallel path. No
-        # --remove-on-error here (that's the capability we're missing) —
-        # curl writes to a temp sibling and it's renamed into place only on
-        # exit status 0, so a failed transfer never leaves a destination
-        # file, matching the parallel path's guarantee.
-        #
-        # A predictable "$dst.part" suffix (cold-context review found this,
-        # peer-session 2026-08-21-09) can collide with a manifest entry that
-        # is itself literally that name — e.g. paths "a" and "a.part" both
-        # present: downloading "a" would overwrite "a.part"'s own live temp
-        # file mid-transfer, or clobber it after "a.part" already landed.
-        # mktemp in the same destination directory makes the temp name
-        # unpredictable and immune to any manifest content.
-        #
-        # A failed call names its file and curl's cause (#980); the first 5 per
-        # call are shown, the rest are counted, so a dead network cannot flood
-        # the output with one line per manifest entry.
-        local dst_tmp seq_err="$TMPDIR_UPDATE/curl-single.err" seq_rc failed=0
-        for p in "$@"; do
-            dst="$TMPDIR_UPDATE/files/$p"
-            mkdir -p "$(dirname "$dst")"
-            dst_tmp=$(mktemp "$dst.XXXXXX")
-            # shellcheck disable=SC2086
-            if curl $CURL_BASE_OPTS $_CURL_SSL_OPT -sS -f -o "$dst_tmp" "$RAW_BASE/$p" 2>"$seq_err"; then
-                mv "$dst_tmp" "$dst"
-            else
-                seq_rc=$?
-                rm -f "$dst_tmp"
-                failed=$((failed + 1))
-                if [ "$failed" -le 5 ]; then
-                    echo "  ⚠ $p: $(curl_failure_note "$seq_rc" "$seq_err")" >&2
-                fi
-            fi
-        done
-        if [ "$failed" -gt 5 ]; then
-            echo "  ⚠ ещё $((failed - 5)) сбоев загрузки не показано (первые 5 выше)" >&2
-        fi
-        rm -f "$seq_err"
-    fi
-}
-
-# verify_batch_integrity — removes any downloaded file whose sha256 doesn't
-# match its manifest hash, so it reads as "missing" to whatever retry logic
-# runs next. Index-based (not a linear scan for each fpath against
-# DOWNLOAD_QUEUE — that's O(n²) over a 600+ file manifest and was called
-# twice): DOWNLOAD_QUEUE/DOWNLOAD_DESCS/DOWNLOAD_HASHES are parallel arrays,
-# so the caller's index into DOWNLOAD_QUEUE is also the index into
-# DOWNLOAD_HASHES, no lookup needed.
-verify_batch_integrity() {
-    local i fpath expected_hash remote_file
-    for i in "${!DOWNLOAD_QUEUE[@]}"; do
-        fpath="${DOWNLOAD_QUEUE[$i]}"
-        expected_hash="${DOWNLOAD_HASHES[$i]}"
-        [ -n "$expected_hash" ] || continue
-        remote_file="$TMPDIR_UPDATE/files/$fpath"
-        # -f, not -s (peer-session 2026-08-21-08/09): a legitimate
-        # zero-length file is a valid transfer, not a failed one. Both
-        # download_batch() paths guarantee a failed transfer leaves no
-        # destination file at all (--remove-on-error / .part-then-rename),
-        # so existence alone is now a reliable "did this arrive" signal.
-        [ -f "$remote_file" ] || continue
-        if [ "$(hash_file "$remote_file")" != "$expected_hash" ]; then
-            # A retry can still recover this file from a different CDN edge
-            # (see the retry-pass comment below), so this isn't necessarily
-            # its final fate — but the specific reason (integrity, not a
-            # network failure) matters for diagnosis and was silently lost
-            # when this check moved out of the old per-file loop, which did
-            # print it (setup/test-update-issue-226.sh Scenario C caught the
-            # regression).
-            echo "  ⚠ $fpath: sha256 не совпадает с манифестом" >&2
-            rm -f "$remote_file"
-        fi
-    done
-}
-
-if [ ${#DOWNLOAD_QUEUE[@]} -gt 0 ]; then
-    if $USE_PARALLEL_DOWNLOAD; then
-        printf "  Скачиваю %s файлов (до 8 параллельно)...\n" "${#DOWNLOAD_QUEUE[@]}"
-    else
-        printf "  Скачиваю %s файлов (последовательно)...\n" "${#DOWNLOAD_QUEUE[@]}"
-    fi
-    download_batch "${DOWNLOAD_QUEUE[@]}"
-
-    # Integrity check BEFORE building the retry queue (Phase 2 peer-session
-    # review: the original version checked integrity only in the final loop,
-    # after retry — so a hash mismatch could never actually get retried
-    # despite the comment below promising it).
-    verify_batch_integrity
-
-    # Retry pass: anything not present now — network failure on the first
-    # attempt, or an integrity mismatch just removed above — gets one more
-    # attempt. Integrity failures are retried too (not just network
-    # failures): a stale CDN edge can disagree with the manifest briefly
-    # after a fresh push, and a second attempt can land on a different edge
-    # that already has the current content.
-    RETRY_QUEUE=()
-    for fpath in "${DOWNLOAD_QUEUE[@]}"; do
-        # -f, not -s — see verify_batch_integrity() above for why existence
-        # alone is now the correct "did this arrive" signal.
-        [ -f "$TMPDIR_UPDATE/files/$fpath" ] || RETRY_QUEUE+=("$fpath")
-    done
-    if [ ${#RETRY_QUEUE[@]} -gt 0 ]; then
-        download_batch "${RETRY_QUEUE[@]}"
-        verify_batch_integrity
-    fi
-fi
-
-DOWNLOAD_IDX=0
-for _dq_i in "${!DOWNLOAD_QUEUE[@]}"; do
-    fpath="${DOWNLOAD_QUEUE[$_dq_i]}"
-    fdesc="${DOWNLOAD_DESCS[$_dq_i]}"
-    DOWNLOAD_IDX=$((DOWNLOAD_IDX + 1))
-    printf "  (%s/%s) %s\r" "$DOWNLOAD_IDX" "${#DOWNLOAD_QUEUE[@]}" "$fpath"
-
-    REMOTE_FILE="$TMPDIR_UPDATE/files/$fpath"
-
-    # issue #350: a failed download used to `continue` silently — the file landed in
-    # no list at all, not even the UNCHANGED counter, so the preview said nothing about
-    # it while a later run (network back) applied it. "Could not check" is not "up to
-    # date"; it now gets its own list and taints the verdict below. Integrity
-    # failures already removed the file above (both passes), so a missing
-    # file here covers both causes — the category split (network vs.
-    # integrity) that the old per-file loop reported is no longer knowable
-    # after two retry rounds have run, so both land in the same list.
-    # -f, not -s — see verify_batch_integrity() above for why existence
-    # alone is now the correct "did this arrive" signal.
-    if [ ! -f "$REMOTE_FILE" ]; then
-        SKIPPED_DOWNLOAD+=("$fpath")
-        continue
     fi
 
-    if [ ! -f "$SCRIPT_DIR/$fpath" ]; then
-        # New file
+    if [ ! -f "$tgt" ]; then
         NEW_FILES+=("$fpath")
-        NEW_DESCS+=("$fdesc")
+    elif [ "$(hash_file "$src")" != "$(hash_file "$tgt")" ]; then
+        UPDATED_FILES+=("$fpath")
     else
-        # Existing file — compare hashes
-        LOCAL_HASH=$(hash_file "$SCRIPT_DIR/$fpath")
-        REMOTE_HASH=$(hash_file "$REMOTE_FILE")
-        # issue #254: a merge-managed file (3-way merge, e.g. CLAUDE.md) legitimately
-        # diverges from upstream through local customizations → local≠remote always.
-        # For such files the detector compares base↔remote: upstream has not moved
-        # since the last merge — "no changes". Detection by the presence of a .base file.
-        MERGE_BASE="$(dirname "$fpath")/.$(basename "$fpath" | tr '[:upper:]' '[:lower:]').base"
-        if [ -f "$SCRIPT_DIR/$MERGE_BASE" ]; then
-            BASE_HASH=$(hash_file "$SCRIPT_DIR/$MERGE_BASE")
-            if [ "$BASE_HASH" = "$REMOTE_HASH" ]; then
-                UNCHANGED=$((UNCHANGED + 1))
-                continue
-            fi
-        fi
-        COMPARE_FILE="$REMOTE_FILE"
-        if [ "$LOCAL_HASH" != "$REMOTE_HASH" ] && [[ "$fpath" == .claude/skills/*/SKILL.md ]]; then
-            SKILL_USER_SECTION=$(sed -n '/^<!-- USER-SPACE -->/,/^<!-- \/USER-SPACE -->/p' "$SCRIPT_DIR/$fpath")
-            if [ -n "$SKILL_USER_SECTION" ]; then
-                COMPARE_FILE="$TMPDIR_UPDATE/skill-render.tmp"
-                render_skill_with_user_section "$REMOTE_FILE" "$SKILL_USER_SECTION" "$COMPARE_FILE"
-                REMOTE_HASH=$(hash_file "$COMPARE_FILE")
-            fi
-        fi
-        if [ "$LOCAL_HASH" != "$REMOTE_HASH" ]; then
-            DIFF_COUNT=$(diff "$SCRIPT_DIR/$fpath" "$COMPARE_FILE" 2>/dev/null | grep -c '^[<>]' || true); DIFF_COUNT=${DIFF_COUNT:-?}
-            UPDATED_FILES+=("$fpath")
-            UPDATED_LINES+=("$DIFF_COUNT")
-            # issues #965/#967: the version update.sh installed last time, before Step 5 replaces
-            # it — Step 6 tells an untouched memory copy from an edited one by it.
-            case "$fpath" in
-                memory/*.md|memory/*.yaml|memory/*.yml) record_memory_old_hash "$fpath" "$LOCAL_HASH" ;;
-            esac
-        else
-            UNCHANGED=$((UNCHANGED + 1))
-        fi
-        [ "$COMPARE_FILE" = "$REMOTE_FILE" ] || rm -f "$COMPARE_FILE"
+        UNCHANGED=$((UNCHANGED+1))
+        case "$fpath" in memory/*) $CHECK_ONLY || sync_memory_baseline_if_template "$fpath" "$tgt" ;; esac
     fi
-done
-printf "\n"
+done < <(manifest_paths)
 
-# === Step 2b: Deprecated files (obsolete L1 files to remove) ===
 DEPRECATED_FOUND=()
 DEPRECATED_REASONS=()
-DEPRECATED_TRACKED_KEPT=()
-
-# queue_deprecated PATH REASON — queue a template file for the move to the run's backup, under
-# the guards every removal shares; also used for the files a confirmed rollback leaves behind.
-queue_deprecated() {
-    local fpath="$1" freason="$2"
-    [ -z "$fpath" ] && return 0
-    # Same guard as the download loop above: a protected user file must never be
-    # deleted either, even if a future manifest lists it as deprecated by mistake
-    # (bug found 2026-07-23 — sessions/00-index.md was listed, protection didn't apply).
-    is_protected_user_file "$fpath" && return 0
-    # issue #660 (cold-context review finding): without this, a fork-declared
-    # excluded_paths entry protected a file from being silently OVERWRITTEN
-    # but not from being silently DELETED if a future upstream manifest
-    # listed the same path under deprecated_files — defeating the guarantee
-    # this whole feature exists to give.
-    is_fork_owned_path "$fpath" && return 0
-    # issue #1010 F9: a path the local template clone still tracks in git is
-    # part of that checkout; deleting it leaves the clone with a tracked
-    # deletion after a clean update. Keep it and say so once.
-    if [ -f "$SCRIPT_DIR/$fpath" ] && git -C "$SCRIPT_DIR" ls-files --error-unmatch -- "$fpath" >/dev/null 2>&1; then
-        DEPRECATED_TRACKED_KEPT+=("$fpath")
-        return 0
-    fi
-    if [ -f "$SCRIPT_DIR/$fpath" ]; then
-        DEPRECATED_FOUND+=("$fpath")
-        DEPRECATED_REASONS+=("${freason:-устарел}")
-    fi
-}
-
-if is_upstream_git_mirror; then
-    echo "  ⚠ Каталог шаблона — git-зеркало с remote upstream: удаление устаревших файлов пропущено. Их должен удалить сам канон."
-else
 while IFS='|' read -r fpath freason; do
-    queue_deprecated "$fpath" "$freason"
-done < <(
-    if py_available; then
-        $PY_BIN -c "
-import json, sys
-with open(sys.argv[1], encoding='utf-8') as f:
-    data = json.load(f)
-# 2026-08-22 (external report): a path present in BOTH the delivered files
-# set and deprecated_files is a generator inconsistency — removal deleted 10
-# files HEAD still ships, right after a clean no-change update. Delivery wins;
-# the conflict is reported, never acted on. generate-manifest.sh now filters
-# this at the source; this guard protects against a bad published manifest.
-delivered = {e.get('path') for e in data.get('files', [])}
-for entry in data.get('deprecated_files', []):
-    path = entry.get('path','')
-    if path in delivered:
-        print('  ⚠ %s: и в поставке, и в deprecated_files — удаление пропущено (несогласованный манифест)' % path, file=sys.stderr)
-        continue
-    print(path + '|' + entry.get('reason',''))
-" "$MANIFEST" || true
-    fi)
-fi
-
-# queue_rollback_leftovers — after a confirmed ROLLBACK, queue the files that only the newer
-# installed release delivered: absent from the target manifest, still byte-identical to the
-# installed manifest (an edited file is the user's and stays). Before this a rollback 0.42 → 0.41.11
-# left 24 files of 0.42 behind (WP-529 Ф270, F4 of the v0.42.0-rc.4 red team).
-queue_rollback_leftovers() {
-    local installed="$SCRIPT_DIR/update-manifest.json" fpath state kept=()
-    # The program goes through -c, not a heredoc inside <( ): bash 3.2 of macOS cannot parse the latter.
-    local scan='
-import hashlib, json, os, sys
-
-def files(path):
-    with open(path, encoding="utf-8") as fh:
-        data = json.load(fh)
-    return {e["path"]: e.get("sha256", "") for e in data.get("files", []) if isinstance(e, dict)}
-
-installed, target, root = files(sys.argv[1]), files(sys.argv[2]), sys.argv[3]
-for path in sorted(set(installed) - set(target)):
-    full = os.path.join(root, path)
-    if not os.path.isfile(full) or os.path.islink(full):
-        continue
-    with open(full, "rb") as fh:
-        digest = hashlib.sha256(fh.read()).hexdigest()
-    print(path + "|" + ("same" if digest == installed[path] else "edited"))
-'
-    is_upstream_git_mirror && return 0
-    py_available && [ -f "$installed" ] || return 0
-    while IFS='|' read -r fpath state; do
-        case "$state" in
-            same) queue_deprecated "$fpath" "есть только в установленном выпуске, откат" ;;
-            edited) kept+=("$fpath") ;;
-        esac
-    done < <($PY_BIN -c "$scan" "$installed" "$MANIFEST" "$SCRIPT_DIR")
-    if [ "${#kept[@]}" -gt 0 ]; then
-        echo "  ○ Файлы установленного выпуска, которых нет в $UPSTREAM_VERSION, изменены вами — оставлены: ${kept[*]}"
-    fi
-}
-
-if [ "${#DEPRECATED_TRACKED_KEPT[@]}" -gt 0 ]; then
-    echo "  ○ Устаревшие по манифесту, но отслеживаются git этой копии шаблона — оставлены: ${DEPRECATED_TRACKED_KEPT[*]}"
-    echo "    Удалить из своей копии: git -C \"$SCRIPT_DIR\" rm -- ${DEPRECATED_TRACKED_KEPT[*]}"
-fi
+    [ -z "$fpath" ] && continue
+    tgt="$(target_path "$fpath")"
+    [ -n "$tgt" ] && [ -f "$tgt" ] && { DEPRECATED_FOUND+=("$fpath"); DEPRECATED_REASONS+=("${freason:-устарел}"); }
+done < <(manifest_deprecated)
 
 TOTAL_CHANGES=$(( ${#NEW_FILES[@]} + ${#UPDATED_FILES[@]} + ${#DEPRECATED_FOUND[@]} ))
 
-# === Step 3: Display results ===
-echo ""
-echo "=========================================="
-echo "  Обновления экзокортекса (v$UPSTREAM_VERSION)"
-echo "=========================================="
-echo ""
+# === Исходы QWEN.md, требующие рук пилота ===
+# Три состояния, одна дверь. Объявлены ДО первого выхода из скрипта, чтобы шлюз
+# читался на любом пути, а не только на основном.
+QWEN_BASE_MISSING=false   # базы для слияния не было — QWEN.md оставлен вашей версией
+QWEN_SILENT_LOSS=0        # строк пилота, пропавших при слиянии БЕЗ маркеров конфликта
+QWEN_CONFLICTS=0          # маркеров конфликта, оставленных в QWEN.md
 
-# issue #350: files whose download failed are reported before any verdict — a partial
-# comparison must never render as "everything is current".
-if [ ${#SKIPPED_DOWNLOAD[@]} -gt 0 ]; then
-    echo "Не удалось проверить (${#SKIPPED_DOWNLOAD[@]}):"
-    for f in "${SKIPPED_DOWNLOAD[@]}"; do
-        printf "  ? %s — файл не скачался, состояние неизвестно\n" "$f"
-    done
-    echo "  Эти файлы могут отличаться от upstream и быть перезаписаны при обычном запуске."
-    echo ""
-fi
-
-# issue #660: a fork-owned path (declared in update-manifest.local.json's
-# excluded_paths) that actually diverges from upstream needs its own line —
-# folding it into an ordinary "updated" entry is exactly the silent-revert
-# report that made the fork lose the same local edit twice in one day.
-if [ ${#FORK_PROTECTED_SKIPPED[@]} -gt 0 ]; then
-    echo "Защищены форк-локальной правкой, не применены (${#FORK_PROTECTED_SKIPPED[@]}):"
-    for f in "${FORK_PROTECTED_SKIPPED[@]}"; do
-        printf "  ~ %s — локальная версия отличается от upstream, оставлена как есть (excluded_paths)\n" "$f"
-    done
-    echo ""
-fi
-
-# Same principle as SKIPPED_DOWNLOAD above, for a different failure mode
-# (peer-session 2026-08-21-09): the fallback manifest parser has no sha256,
-# so "no differences found" here means "no differences among what we could
-# verify by name only" — the verdict below must say so, not read as an
-# ordinary clean success.
-if $INTEGRITY_TAINTED; then
-    echo "⚠ Проверка целостности не выполнялась (Python недоступен) — сравнивался только состав файлов, не их содержимое."
-    echo ""
-fi
-
-# WP-529 Phase 2: the TOTAL_CHANGES=0 branch below already refuses to apply anything and
-# leaves the local manifest version untouched when a download/integrity check
-# failed. But when OTHER files genuinely changed (TOTAL_CHANGES>0), nothing
-# used to stop Step 5 from applying those and then Step 6e replacing the local
-# manifest wholesale — stamping the run as "updated to vX" while the files in
-# SKIPPED_DOWNLOAD silently stayed on the old version. Abort here, before Step 4
-# confirmation/Step 5 apply, so a partial fetch never produces a partial write.
-if [ "$TOTAL_CHANGES" -gt 0 ] && [ ${#SKIPPED_DOWNLOAD[@]} -gt 0 ] && ! $CHECK_ONLY; then
-    echo "✗ Обновление остановлено: ${#SKIPPED_DOWNLOAD[@]} файл(ов) не скачались или не прошли проверку целостности (список выше)."
-    echo "  Применение остальных ${TOTAL_CHANGES} изменений отменено — иначе локальный манифест пометил бы обновление как завершённое, а эти файлы остались бы старыми."
-    echo "  Ничего не изменено. Повторите запуск, когда сеть будет доступна."
-    exit "$EXIT_NETWORK"
-fi
-
-if [ "$TOTAL_CHANGES" -eq 0 ] && [ ${#SKIPPED_DOWNLOAD[@]} -gt 0 ]; then
-    # Not "up to date" — merely "no differences among the files we managed to fetch".
-    # The local manifest version is deliberately NOT synced here: bumping it would make
-    # the next `--check --fast` (version-only comparison) report green on the strength
-    # of a comparison that never completed. The repair-pass still runs, though — it is
-    # what fixes a stale workspace (issue #226), and a download hiccup is no reason to
-    # skip it in a real run.
-    print_extra_write_targets
-    echo "⚠ Проверка неполная: различий среди проверенных файлов нет, но ${#SKIPPED_DOWNLOAD[@]} файл(ов) скачать не удалось."
-    echo "  Повторите запуск, когда сеть будет доступна. Версия манифеста намеренно не синхронизирована."
-    if $CHECK_ONLY; then
-        assert_self_unmutated
-        # WP-529 F244: an incomplete comparison is not "up to date" — it used
-        # to exit 0 here, a green preview nobody had actually verified.
-        print_check_verdict "нельзя подтвердить"
-        echo "Причина: ${#SKIPPED_DOWNLOAD[@]} файл(ов) не скачались или не прошли проверку целостности."
-        exit "$EXIT_NETWORK"
-    else
-        # Evgenii Red Team review 2026-08-19 (defect #3 continued, found on the
-        # sibling branch below): the TOTAL_CHANGES=0 branch two if-blocks down
-        # got the transaction/build-runtime fail-closed contract in this same
-        # F6 commit — this branch, with the identical TOTAL_CHANGES=0 condition
-        # plus a download hiccup, was left with the pre-fix behavior: repair_pass
-        # writes to disk with no open transaction, so a build-runtime failure
-        # here would exit EXIT_RUNTIME with no .update-incomplete marker at all.
-        # Same three calls, same order, as the branch below.
-        require_env_before_update
-        begin_update_transaction
-        # Before repair_pass and the workspace sync: they would carry the template copy's <<<<<<< markers
-        # into the workspace CLAUDE.md and its base. After begin, so .update-incomplete stays.
-        claude_nested_markers_gate
-        repair_pass
-        # issue #541 hvost 2 (#540): Step 6 (main apply-path) never runs from
-        # this early-exit branch, so the workspace CLAUDE.md/.claude.md.base
-        # reconciliation has to happen here too, before we can honestly claim
-        # success.
-        sync_workspace_claude_md
-        run_build_runtime_or_die
-        if ! run_post_apply_backfills_or_die; then
-            exit "$EXIT_RUNTIME"
-        fi
-        # #1010 F7: the conflict gate exits BEFORE the marker is cleared: an unresolved CLAUDE.md
-        # conflict (exit 49) must leave .update-incomplete in place.
-        claude_conflict_gate
-        finish_update_transaction
-        report_settings_merge_drift
+# qwen_conflict_gate — единственная дверь для всех исходов QWEN.md, которые нельзя
+# выдавать за завершённое обновление (порт upstream claude_conflict_gate, main 8fc938b).
+# Зовётся на каждом пути выхода: пока QWEN.md не разрешён руками, прогон не «успешен».
+qwen_conflict_gate() {
+    local blocked=false
+    if [ "$QWEN_SILENT_LOSS" -gt 0 ]; then
+        echo "⚠ QWEN.md НЕ обновлён: слияние прошло без конфликтов, но потеряло ваших строк: $QWEN_SILENT_LOSS."
+        echo "  Каждая строка названа выше. Ваш файл и база оставлены нетронутыми —"
+        echo "  перенесите нужное из шаблона вручную, следующий прогон покажет расхождение снова."
+        echo ""
+        blocked=true
     fi
-    exit 0
-fi
+    if $QWEN_BASE_MISSING; then
+        echo "⚠ QWEN.md остался вашей версией — базового файла для слияния не было."
+        echo "  Сверьте §8/§9 с шаблонной версией (команда diff показана выше) и внесите правки вручную."
+        echo "  База намеренно НЕ создана: иначе следующий прогон счёл бы ваш старый файл актуальным."
+        echo ""
+        blocked=true
+    fi
+    if [ "$QWEN_CONFLICTS" -gt 0 ]; then
+        echo "⚠ В QWEN.md остались маркеры конфликта: $QWEN_CONFLICTS."
+        echo "  Разрешите их вручную (<<<<<<< / ======= / >>>>>>>), затем повторите обновление."
+        echo ""
+        blocked=true
+    fi
+    $blocked || return 0
+    exit "$EXIT_CONFLICT"
+}
 
+# === Step 2: показать ===
+echo ""
+echo "=========================================="
+echo "  Обновления среды"
+echo "=========================================="
+echo ""
+# Защита owner: user не должна делать расхождение с шаблоном невидимым (upstream #375):
+# файл не обновляем, но о том, что шаблонная версия ушла вперёд, сообщаем всегда —
+# в том числе когда обновлять больше нечего.
+if [ ${#OWNER_USER_DRIFT[@]} -gt 0 ]; then
+    echo "Ваши файлы (owner: user) — НЕ обновляются, но шаблонная версия отличается (${#OWNER_USER_DRIFT[@]}):"
+    for f in "${OWNER_USER_DRIFT[@]}"; do
+        echo "  ⚠ $f — сверьте: diff \"$SCRIPT_DIR/$f\" \"$(target_path "$f")\""
+    done
+    echo ""
+fi
 if [ "$TOTAL_CHANGES" -eq 0 ]; then
-    # issue #226: TOTAL_CHANGES=0 means SCRIPT_DIR already matches upstream — but
-    # the workspace may have stayed stale (an interrupted previous run). We fix it right here,
-    # otherwise the repair-pass below never runs (unreachable after this exit).
-    # bug-2026-07-11-update-sh-author-mode-blind-clobber: repair_pass() writes files
-    # to disk — under --check (without --fast) that is a false "preview without changes".
-    # issue #350: this is the most frequent branch, and it is exactly where the preview used to say
-    # "all up to date" and exit, while a normal run immediately repaired the working copy —
-    # writing into .claude/, memory and .iwe-runtime/. The list of targets is printed here too.
-    print_extra_write_targets
     if $CHECK_ONLY; then
-        echo "  ℹ Режим --check: repair-pass пропущен (может чинить workspace, запусти без --check)."
-        assert_self_unmutated
+        # Превью не снимает маркер незавершённого обновления от прошлого прогона:
+        # маркер несёт контракт свежести runtime, а --check ничего не пересобирает
+        # (upstream, cold review 19.08 — там же это признано критическим).
+        echo "  ℹ Режим --check: маркер незавершённого обновления не трогаю."
     else
-        # Evgenii Red Team review 2026-08-19 (defect #3): repair_pass() below
-        # writes files to disk and run_build_runtime_or_die() can fail — but
-        # this branch never called begin_update_transaction(), so a build
-        # failure here exited EXIT_RUNTIME with NO marker on disk at all.
-        # Same fail-closed contract this F6 commit already gives Step 6d
-        # (message text: "no transaction was opened" was true only because
-        # nothing ever opened one here — the actual bug was the missing open,
-        # not the message).
-        require_env_before_update
-        begin_update_transaction
-        # Before repair_pass and the workspace sync: they would carry the template copy's <<<<<<< markers
-        # into the workspace CLAUDE.md and its base. After begin, so .update-incomplete stays.
-        claude_nested_markers_gate
-        repair_pass
-        # issue #541 hvost 2 (#540): Step 6 (main apply-path) never runs from
-        # this early-exit branch, so the workspace CLAUDE.md/.claude.md.base
-        # reconciliation has to happen here too, before we can honestly claim
-        # "Всё актуально".
-        sync_workspace_claude_md
-        # issue #279: TOTAL_CHANGES=0 compares only file contents, not
-        # the version in update-manifest.json — without this the local manifest forever
-        # stays at the old version, and --check --fast (which compares only the version)
-        # falsely reports an update on every following run.
-        if [ -f "$MANIFEST" ]; then
-            LOCAL_HASH_BEFORE=$(hash_file "$SCRIPT_DIR/update-manifest.json" 2>/dev/null || true)
-            REMOTE_HASH=$(hash_file "$MANIFEST" 2>/dev/null || true)
-            if [ "$LOCAL_HASH_BEFORE" != "$REMOTE_HASH" ]; then
-                cp "$MANIFEST" "$SCRIPT_DIR/update-manifest.json" \
-                    && echo "  • update-manifest.json: версия синхронизирована (v$UPSTREAM_VERSION)"
-            fi
-        fi
-        # WP-529 F6 (Evgenii defect #5, 18.08): repair_pass may have refreshed
-        # workspace copies, and this branch used to close the transaction
-        # without ever rebuilding .iwe-runtime/ — recovery ended with a removed
-        # marker but stale substitutions. Same fail-closed contract as Step 6d.
-        run_build_runtime_or_die
-        if ! run_post_apply_backfills_or_die; then
-            exit "$EXIT_RUNTIME"
-        fi
-        # Cold review 2026-08-19 (Critical): finish must stay OUT of --check —
-        # the preview used to clear a live .update-incomplete from a previous
-        # failed run without repair or build-runtime, disarming the contract
-        # this marker now carries (runtime freshness + role-runner guard).
-        # issue #541 hvost 2 (#540): a stale workspace CLAUDE.md caught by
-        # sync_workspace_claude_md above must not be reported as "Всё актуально" —
-        # that was exactly the false success Evgenii's retry test found. Same
-        # placement as the sibling branch above: inside the non-$CHECK_ONLY
-        # else, since sync_workspace_claude_md (like repair_pass) never ran
-        # under --check and the tracking vars would otherwise still be at
-        # their initial empty/false state here regardless.
-        # #1010 F7: the gate first, so a conflict exit keeps the marker.
-        claude_conflict_gate
         finish_update_transaction
-    fi
-    # The stage B flags make sense even when there are no updates: workspace copies may have
-    # fallen behind the already-current template (repair_pass above classified them).
-    apply_settings_merge_if_requested
-    report_author_skip_summary
-    report_replaced_hooks_summary
-    report_executable_index_mismatches manifest
-    # WP-7 F267 stage 1: an install with nothing to update still gets its capability record.
-    if ! $CHECK_ONLY && [ -f "$SCRIPT_DIR/scripts/iwe-capabilities.sh" ]; then
-        bash "$SCRIPT_DIR/scripts/iwe-capabilities.sh" probe --announce \
-            || echo "  ⚠ iwe-capabilities.sh не записал состояние (не критично). Повторить: bash $SCRIPT_DIR/scripts/iwe-capabilities.sh probe"
     fi
     echo "✓ Всё актуально. Обновлений нет. ($UNCHANGED файлов проверено)"
-    $CHECK_ONLY && check_verdict_exit_clean
-    exit_clean
+    qwen_conflict_gate
+    exit 0
 fi
-
-# issue #863: rollback warning must appear before the file list, not hidden inside it.
-ROLLBACK_DETECTED=false
-ROLLBACK_UNCERTAIN=false
-_rollback_code=1
-if detect_release_rollback; then
-    _rollback_code=0
-else
-    _last_rc=$?
-    if [ "$_last_rc" -eq 2 ]; then
-        _rollback_code=2
-    fi
-fi
-if [ "$_rollback_code" -eq 0 ]; then
-    ROLLBACK_DETECTED=true
-    echo "🔴 ВНИМАНИЕ: локальная установка новее того, что доставит этот канал."
-    echo "   Применение этого обновления ОТКАТИТ установку на более старый снимок."
-    rollback_channel_hint
-    echo ""
-elif [ "$_rollback_code" -eq 2 ]; then
-    ROLLBACK_UNCERTAIN=true
-    echo "⚠️ ВНИМАНИЕ: не удалось проверить историю релиза; автоматическое применение с --yes заблокировано."
-    rollback_channel_hint
-    echo ""
-fi
-
 if [ ${#NEW_FILES[@]} -gt 0 ]; then
     echo "Новые файлы (${#NEW_FILES[@]}):"
-    for i in "${!NEW_FILES[@]}"; do
-        f="${NEW_FILES[$i]}"
-        d="${NEW_DESCS[$i]}"
-        if [ -n "$d" ]; then
-            printf "  + %-45s — %s\n" "$f" "$d"
-        else
-            printf "  + %s\n" "$f"
-        fi
-    done
+    for f in "${NEW_FILES[@]}"; do echo "  + $f"; done
     echo ""
 fi
-
 if [ ${#UPDATED_FILES[@]} -gt 0 ]; then
     echo "Обновлённые файлы (${#UPDATED_FILES[@]}):"
-    for i in "${!UPDATED_FILES[@]}"; do
-        f="${UPDATED_FILES[$i]}"
-        lines="${UPDATED_LINES[$i]}"
-        printf "  ~ %-45s — %s строк изменено\n" "$f" "$lines"
+    for f in "${UPDATED_FILES[@]}"; do
+        [ "$f" = "QWEN.md" ] && echo "  ~ $f (3-way merge, ваши правки сохраняются)" || echo "  ~ $f"
     done
     echo ""
 fi
-
 if [ ${#DEPRECATED_FOUND[@]} -gt 0 ]; then
-    echo "Устаревшие файлы — будут перенесены в резервную копию .backups/deprecated/ (${#DEPRECATED_FOUND[@]}):"
+    echo "Устаревшие файлы к удалению (${#DEPRECATED_FOUND[@]}):"
     for i in "${!DEPRECATED_FOUND[@]}"; do
-        f="${DEPRECATED_FOUND[$i]}"
-        r="${DEPRECATED_REASONS[$i]}"
-        printf "  - %-45s — %s\n" "$f" "$r"
+        printf "  - %-45s — %s\n" "${DEPRECATED_FOUND[$i]}" "${DEPRECATED_REASONS[$i]}"
     done
     echo ""
 fi
-
 echo "Не затрагиваются:"
-echo "  ✓ memory/MEMORY.md (личная оперативная память)"
-echo "  ✓ CLAUDE.md (3-way merge: ваши правки сохраняются)"
-echo "  ✓ extensions/ (ваши расширения протоколов)"
-# issue #348: params.yaml is protected only when the file already exists — on an install
-# where it is absent, it is seeded from the template. The promise "not touched" without this caveat
-# read as "my edit won't be touched", although the guard checks precisely the file's presence.
-echo "  ✓ params.yaml (ваши параметры — существующий файл не перезаписывается; отсутствующий засевается из шаблона)"
-echo "  ✓ .secrets/ (ключи)"
-echo "  ✓ .claude/settings.local.json (permissions)"
-echo "  ✓ sessions/00-index.md (журнал peer-сессий)"
-echo "  ✓ personal/ (ваши файлы)"
+echo "  ✓ memory/MEMORY.md (оперативная память)"
+echo "  ✓ memory/day-rhythm-config.yaml (личный ритм)"
+echo "  ✓ params.yaml, .qwen/settings.local.json"
+echo "  ✓ $GOVERNANCE_REPO/, extensions/ (ваши данные и расширения)"
 echo ""
+[ "$UNCHANGED" -gt 0 ] && { echo "Без изменений: $UNCHANGED файлов"; echo ""; }
 
-print_extra_write_targets
-
-if [ "$UNCHANGED" -gt 0 ]; then
-    echo "Без изменений: $UNCHANGED файлов"
-    echo ""
-fi
-
-# === Check-only mode ===
 if $CHECK_ONLY; then
-    # WP-529 F244: the real run refuses changes with skipped downloads
-    # (EXIT_NETWORK above, guarded by ! $CHECK_ONLY); the preview must not
-    # report them as installable.
-    if [ ${#SKIPPED_DOWNLOAD[@]} -gt 0 ]; then
-        assert_self_unmutated
-        print_check_verdict "нельзя подтвердить"
-        echo "Причина: ${#SKIPPED_DOWNLOAD[@]} файл(ов) не скачались или не прошли проверку целостности; настоящий запуск остановится."
-        exit "$EXIT_NETWORK"
-    fi
     echo "Режим --check: изменения не применяются."
     echo "Для применения: bash update.sh"
-
-    # WP-529 Phase 220: --dry-run-strict checks the already computed delivery plan
-    # (NEW_FILES/UPDATED_FILES of this run), and does not re-parse the text of
-    # update.sh — peer-session 2026-10-22-04-wp529-continue-items, Codex's objection
-    # to Kimi's proposal (parsing the script text is fragile duplication of
-    # logic). CHECK_ONLY finishes here, before Step 5, so this is a separate
-    # verification pass, not a branch inside the apply loops.
-    # BEGIN-TESTABLE: dry-run-strict-check
-    if $STRICT_CHECK; then
-        STRICT_FAILURES=()
-        for f in "${NEW_FILES[@]}" "${UPDATED_FILES[@]}"; do
-            case "$f" in
-                /*|*..*) STRICT_FAILURES+=("$f: путь выходит за пределы установки") ;;
-            esac
-            [ -f "$TMPDIR_UPDATE/files/$f" ] || STRICT_FAILURES+=("$f: отсутствует в загруженном плане доставки")
-        done
-        if [ "${#STRICT_FAILURES[@]}" -gt 0 ]; then
-            echo ""
-            echo "🔴 --dry-run-strict: план доставки не прошёл структурную проверку:"
-            for reason in "${STRICT_FAILURES[@]}"; do
-                echo "  - $reason"
-            done
-            print_check_verdict "нельзя ставить"
-            echo "Причина: план доставки не прошёл структурную проверку (список выше)."
-            exit "$EXIT_RUNTIME"
-        fi
-        echo "--dry-run-strict: план доставки (${#NEW_FILES[@]} новых + ${#UPDATED_FILES[@]} обновляемых) структурно корректен. Это не гарантирует отсутствие регрессий в поведении после apply."
-    fi
-    # END-TESTABLE: dry-run-strict-check
-
-    # BEGIN-TESTABLE: changelog-check-preview
-    # WP-529 Phase 220 (pilot's question 2: "what will I get, before installing"): the "Main points of
-    # this update" summary used to be printed only after apply. The release files are already
-    # downloaded to $TMPDIR_UPDATE/files/ (only changed ones are downloaded), so the diff of
-    # the local and new CHANGELOG.md is available here. Print only: the check's exit code
-    # does not depend on this block. The item selection rule (not [optional], an
-    # unmarked line is significant) is the same as in the changelog-diff-disclaimer block
-    # below; when editing one block, check the other.
-    CHANGELOG_NEW_FILE="$TMPDIR_UPDATE/files/CHANGELOG.md"
-    if [ ! -f "$CHANGELOG_NEW_FILE" ]; then
-        echo ""
-        echo "ℹ Сводка «Главное в этом обновлении» недоступна: CHANGELOG.md в этом выпуске не менялся, не входит в план доставки или не скачался (смотрите предупреждения о загрузке выше)."
-    elif [ ! -f "$SCRIPT_DIR/CHANGELOG.md" ]; then
-        # No local CHANGELOG.md (first install): diffing against nothing would list every
-        # item of every past version as "new", which is noise, not a summary.
-        echo ""
-        echo "ℹ Сводка «Главное в этом обновлении» не строится: у вас ещё нет CHANGELOG.md (первая установка), сравнивать не с чем. Полный список изменений - в CHANGELOG.md после установки."
-    else
-        CHANGELOG_OLD_TEXT=""
-        [ -f "$SCRIPT_DIR/CHANGELOG.md" ] && CHANGELOG_OLD_TEXT=$(cat "$SCRIPT_DIR/CHANGELOG.md")
-        CHANGELOG_NEW_TEXT=$(cat "$CHANGELOG_NEW_FILE")
-        PREVIEW_ADDED=$(diff <(printf '%s\n' "$CHANGELOG_OLD_TEXT") <(printf '%s\n' "$CHANGELOG_NEW_TEXT") | grep '^>' | sed 's/^> //') || true
-        PREVIEW_HIGHLIGHTS=$(printf '%s\n' "$PREVIEW_ADDED" | grep '^- ' | grep -v '^- \[optional\]') || true
-        echo ""
-        if [ -n "$PREVIEW_HIGHLIGHTS" ]; then
-            echo "Главное в этом обновлении (то, что вы получите после установки):"
-            # A CHANGELOG item can be a whole paragraph; the board shows the first
-            # sentence, cut at a word boundary after PREVIEW_MAX_CHARS. Full text stays in CHANGELOG.md.
-            PREVIEW_MAX_CHARS=160
-            while IFS= read -r preview_line; do
-                preview_line=${preview_line#- }
-                preview_line=$(printf '%s' "$preview_line" | sed -E 's/^([^.!?]*[.!?])[[:space:]].*$/\1/')
-                if [ "${#preview_line}" -gt "$PREVIEW_MAX_CHARS" ]; then
-                    preview_line=${preview_line:0:$PREVIEW_MAX_CHARS}
-                    preview_line="${preview_line% *}…"
-                fi
-                echo "  + $preview_line"
-            done <<< "$PREVIEW_HIGHLIGHTS"
-        elif [ -n "$PREVIEW_ADDED" ]; then
-            echo "В CHANGELOG.md нового выпуска есть только необязательные пункты ([optional]); значимых изменений нет."
-        else
-            echo "ℹ Сводка «Главное в этом обновлении» недоступна: в CHANGELOG.md нового выпуска нет добавленных пунктов."
-        fi
-    fi
-    # END-TESTABLE: changelog-check-preview
-
-    assert_self_unmutated
-    check_verdict_exit_clean
+    exit 0
+fi
+if ! $AUTO_YES; then
+    read -rp "Применить обновления? (y/n) " ans
+    case "$ans" in y|Y) ;; *) echo "Отменено."; exit 0 ;; esac
 fi
 
-# === Step 4: Confirmation ===
-if [ "$ROLLBACK_DETECTED" = true ]; then
-    # issue #863: automatic/scheduled runs must not silently roll back a newer install.
-    if $AUTO_YES; then
-        echo "🔴 Остановлено: обнаружен откат на более старый релиз, а --yes запрещает интерактивное подтверждение." >&2
-        echo "   Для явного отката запустите без --yes и введите ROLLBACK на запрос подтверждения." >&2
-        rollback_channel_hint >&2
-        exit "$EXIT_USAGE"
-    fi
-    echo "🔴 Это ОТКАТ на более старый релиз. Чтобы продолжить, введите ROLLBACK явно."
-    read -p "Применить ОТКАТ? (введите ROLLBACK для подтверждения / anything else для отмены) " -r
+# === Step 3: бэкап памяти ===
+if [ -d "$QWEN_MEMORY_DIR" ] && [ -n "$(ls -A "$QWEN_MEMORY_DIR" 2>/dev/null)" ]; then
+    MEM_BAK="$QWEN_MEMORY_DIR.bak-$(date +%Y%m%d-%H%M%S)"
+    cp -r "$QWEN_MEMORY_DIR" "$MEM_BAK"
     echo ""
-    if [ "$REPLY" != "ROLLBACK" ]; then
-        echo "Отменено."
-        exit 0
-    fi
-    queue_rollback_leftovers
-elif [ "$ROLLBACK_UNCERTAIN" = true ]; then
-    # issue #863: history could not be verified; require explicit manual approval.
-    if $AUTO_YES; then
-        echo "🔴 Остановлено: не удалось проверить историю релиза, а --yes запрещает интерактивное подтверждение." >&2
-        echo "   Запустите без --yes и подтвердите обновление вручную, либо используйте IWE_UPDATE_CHANNEL=main." >&2
-        exit "$EXIT_USAGE"
-    fi
-    read -p "Продолжить, несмотря на невозможность проверить откат? (y/n) " -n 1 -r
-    echo ""
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        echo "Отменено."
-        exit 0
-    fi
-elif ! $AUTO_YES; then
-    read -p "Применить обновления? (y/n) " -n 1 -r
-    echo ""
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        echo "Отменено."
-        exit 0
-    fi
+    echo "Бэкап памяти: $MEM_BAK"
 fi
 
-# === Step 5: Apply updates ===
+# === Step 4: применение ===
 echo ""
 echo "Применяю обновления..."
-require_backup_root_writable
-require_env_before_update
-backup_clone_memory_edits_before_apply || exit "$EXIT_RUNTIME"
 begin_update_transaction
-remember_untouched_memory_before_apply
-
-# WP-529 Phase 220: snapshot of CHANGELOG.md before overwrite — the source for the diff and
-# disclaimer after the apply loops below. We snapshot by file content (not by git tag):
-# the tag of the current revision does not prove which version was installed on the
-# user's side before this run, and may be absent altogether (peer-session
-# 2026-10-22-02-wp529-peer-continue, Codex's proposal accepted over Kimi's git tag).
-CHANGELOG_SNAPSHOT=""
-[ -f "$SCRIPT_DIR/CHANGELOG.md" ] && CHANGELOG_SNAPSHOT=$(cat "$SCRIPT_DIR/CHANGELOG.md")
-
 APPLIED=0
 REMOVED=0
-AUTHOR_SKIPPED=0
-APPLIED_PATHS=()
+RULES_BACKUP_DIR=""       # каталог бэкапа правил этого прогона, создаётся при первой перезаписи
+RULES_SAFE_TO_UPDATE="|"  # снимок «какие правила совпадали с последним применённым эталоном»
 
-# --- WP-529 Phase 245 (step 2, wiring): Step 5 writes into the template clone only ---
-# via a frozen plan and the single executor setup/lib/apply-op.sh. All
-# conditions (author_diverged, author_release_regression, skipping update.sh,
-# CLAUDE.md merge outcomes) are resolved when the plan is BUILT — the apply phase has
-# no conditions. The plan is built under a temporary name and frozen with a single mv;
-# after that the executor only reads it. There is one write root — the template clone
-# (SCRIPT_DIR); writes outside it (workspace, memory, .backups — including the move of
-# deprecated) remain direct calls of their own functions, this is the increment boundary.
-UPDATE_PLAN_TMP="$TMPDIR_UPDATE/update-plan.build.$$"
-UPDATE_PLAN_FILE="$TMPDIR_UPDATE/update-plan.tsv"
-UPDATE_PLAN_COUNT=0
-UPDATE_PLAN_MSG=()
-UPDATE_PLAN_MKDIRS="|"
+# === Снимок-эталон для .qwen/rules/* (адаптация upstream 30efdb5, v0.38.2) ===
+# Апстрим сравнивает деплой с СОБСТВЕННОЙ старой копией шаблона (SCRIPT_DIR до того, как
+# сетевой шаг перезаписал её новым содержимым) — так отличает «правило сменилось само
+# по себе» от «пилот правил его руками». В офлайне это не работает: папка FMT-репо
+# (SCRIPT_DIR) заменяется целиком ДО запуска скрипта, старой версии внутри просто нет —
+# буквальный порт сравнивал бы новый шаблон с деплоем и принимал ЛЮБОЕ шаблонное
+# изменение за ручную правку пилота, блокируя обычные обновления (найдено проверкой 10.08).
+#
+# Решение: держим свой эталон — скрытую копию каждого развёрнутого правила, обновляемую
+# после каждого успешного применения. Сравниваем деплой с ЭТИМ эталоном, не с новым
+# шаблоном. Совпадает → с последнего обновления никто руками не лез → безопасно
+# перезаписывать. Эталона ещё нет (первый прогон после этой правки) → безопасно, эталон
+# заведётся этим же прогоном — единственная цена бутстрапа: самая первая перезапись после
+# обновления скрипта не защищена, как и в апстриме на пустой истории.
+RULES_BASELINE_DIR="$WORKSPACE_DIR/.qwen-rules.baseline"
 
-# The executor is delivered by the manifest: in the transition run (the first version with this
-# mechanism) it arrives with the update itself in $TMPDIR_UPDATE/files, afterwards it
-# already lies in the installation. Neither there nor there — the installation is broken, this is not a fallback.
-APPLY_OP_LIB=""
-for _apply_op_candidate in "$TMPDIR_UPDATE/files/setup/lib/apply-op.sh" "$SCRIPT_DIR/setup/lib/apply-op.sh"; do
-    if [ -f "$_apply_op_candidate" ]; then
-        APPLY_OP_LIB="$_apply_op_candidate"
-        break
+rule_baseline_path() {
+    printf '%s/%s' "$RULES_BASELINE_DIR" "${1#.qwen/rules/}"
+}
+
+record_rule_workspace_state() {
+    local fpath="$1" dst baseline
+    case "$fpath" in .qwen/rules/*) ;; *) return 0 ;; esac
+    dst="$(target_path "$fpath")"
+    baseline="$(rule_baseline_path "$fpath")"
+    if [ ! -f "$dst" ] || [ ! -f "$baseline" ] || [ "$(hash_file "$dst")" = "$(hash_file "$baseline")" ]; then
+        RULES_SAFE_TO_UPDATE="${RULES_SAFE_TO_UPDATE}${fpath}|"
     fi
-done
-if [ -z "$APPLY_OP_LIB" ]; then
-    echo "ОШИБКА: исполнитель плана setup/lib/apply-op.sh не найден ни среди скачанных файлов обновления, ни в установке." >&2
-    exit "$EXIT_RUNTIME"
-fi
-# shellcheck source=setup/lib/apply-op.sh
-. "$APPLY_OP_LIB"
-
-# The executor's roots must be canonical directories: the clone may lie
-# behind a link (/tmp -> /private/tmp on macOS), plan paths are built from the physical one.
-UPDATE_CLONE_ROOT=$(cd -P "$SCRIPT_DIR" && pwd -P) || {
-    echo "ОШИБКА: не разрешить физический путь клона шаблона: $SCRIPT_DIR" >&2
-    exit "$EXIT_RUNTIME"
-}
-APPLY_OP_ROOTS=("$UPDATE_CLONE_ROOT")
-
-if ! declare -F update_journal_hook >/dev/null 2>&1; then
-    # update_journal_hook intent|done|skip OP_ID — a stub of the future rollback
-    # journal with a fixed contract: intent is called before the operation's
-    # temporary file is created, done — only after a successful rename, skip —
-    # when the target is already in the "after" state (does not occur at this step: a repeat
-    # run rebuilds the plan from the live tree). A nonzero hook code
-    # stops the run before any mutation of the operation. No journal is kept; with
-    # IWE_UPDATE_JOURNAL_FAKE_LOG each call is written as a line "event op_id"
-    # to that file, and a write failure is read as a refusal of the real journal.
-    update_journal_hook() {
-        [ -n "${IWE_UPDATE_JOURNAL_FAKE_LOG:-}" ] || return 0
-        printf '%s %s\n' "$1" "$2" >> "$IWE_UPDATE_JOURNAL_FAKE_LOG"
-    }
-fi
-
-# update_mode_umask BASE — permissions of the created file: BASE (three octal
-# digits), masked by umask, as cp does for a new file.
-update_mode_umask() {
-    local _um
-    _um=$(umask)
-    printf '%03o\n' "$(( 8#$1 & ~8#$_um ))"
 }
 
-# update_mode_plus_x MODE — MODE with the bits that `chmod +x` would add
-# (a+x, masked by umask).
-update_mode_plus_x() {
-    local _um
-    _um=$(umask)
-    printf '%03o\n' "$(( 8#$1 | ( 8#111 & ~8#$_um ) ))"
+rule_was_safe_to_update() {
+    case "$RULES_SAFE_TO_UPDATE" in *"|$1|"*) return 0 ;; *) return 1 ;; esac
 }
 
-# Pattern of "executable" paths of the apply loops: files arrive via raw
-# `curl -o` without permissions, so +x is set at delivery (on a temporary
-# file before rename). issue #308: .githooks/* is not cosmetic (git silently skips a
-# non-executable hook); wp-list.py/check-claude-md-links.py — 755 in git upstream.
-# WP-529 Ф270 (F1 of the rc.3 red team): 54 programs that are 755 in git matched no pattern and
-# arrived non-executable on upgrade (scripts/iwe-notify among them: notify.sh looks it up with
-# `[ -x ]`, so every Telegram notification stopped). A delivered file that starts with `#!` is
-# a program meant to be run directly, so it gets +x too; SRC is the downloaded payload.
-update_needs_exec_bit() {
-    case "$1" in
-        *.sh | .githooks/* | .claude/bin/* | scripts/wp-list.py | scripts/check-claude-md-links.py) return 0 ;;
+# Обновить эталон текущим (уже применённым) содержимым — вызывается после каждого
+# успешного копирования правила, чтобы следующий прогон сравнивал с актуальной версией.
+save_rule_baseline() {
+    local fpath="$1" dst="$2" baseline
+    case "$fpath" in .qwen/rules/*) ;; *) return 0 ;; esac
+    baseline="$(rule_baseline_path "$fpath")"
+    mkdir -p "$(dirname "$baseline")"
+    cp "$dst" "$baseline"
+}
+
+# Бэкап правила перед перезаписью (upstream 4ae0906): в .qwen/rules/ живут файлы,
+# которые пилот правит чаще всего, а USER-SPACE есть не в каждом из них.
+backup_rule_before_overwrite() {
+    local fpath="$1" dst="$2" backup
+    case "$fpath" in .qwen/rules/*) ;; *) return 0 ;; esac
+    [ -f "$dst" ] || return 0
+    [ -z "$RULES_BACKUP_DIR" ] && RULES_BACKUP_DIR="$WORKSPACE_DIR/.backups/rules-pre-update/$(date +%Y%m%d-%H%M%S)-$$"
+    backup="$RULES_BACKUP_DIR/${fpath#.qwen/rules/}"
+    mkdir -p "$(dirname "$backup")"
+    cp "$dst" "$backup"
+    # Построчно не отчитываемся: каталог бэкапа называется один раз в итоге прогона.
+}
+
+# prune_backup_dirs PARENT PREFIX — удалить старые каталоги бэкапа PARENT/PREFIX<дата>-<время>*
+# (порт апстрима #1006/#1208, адаптированный). Каждый прогон с применением оставляет копии в
+# трёх местах, и раньше их никто не чистил. Шаблон имени — свой, ветки: <ГГГГММДД>-<ЧЧММСС>
+# (апстримный <…>T<…>Z здесь не совпал бы ни с одним каталогом, и чистка молча ничего не
+# делала бы). Срок — IWE_MEMORY_BACKUP_KEEP_DAYS (по умолчанию 30); три самых свежих
+# остаются всегда, даже старые. Сбой чистки обновление не роняет.
+prune_backup_dirs() {
+    local parent="$1" prefix="$2" days="${IWE_MEMORY_BACKUP_KEEP_DAYS:-30}"
+    local d i keep=3 removed=0
+    local -a found=()
+    case "$days" in
+        ''|*[!0-9]*)
+            echo "  ⚠ IWE_MEMORY_BACKUP_KEEP_DAYS=\"$days\" — не число дней, старые бэкапы не удалены" >&2
+            return 0 ;;
     esac
-    [ -n "${2:-}" ] && [ -f "$2" ] && [ "$(head -c 2 "$2")" = "#!" ]
-}
-
-# update_dest_mode REL — current permissions of the target in the clone: cp into an existing file
-# preserves its permissions, the executor repeats them on the temporary file.
-# Special bits (setuid/setgid/sticky) are not reproduced: the executor accepts
-# only three octal digits, and a 4-digit target mode must not abort
-# the whole run — we take the three low digits (owner/group/others).
-update_dest_mode() {
-    local _mode
-    _mode=$(apply_op__mode_of "$UPDATE_CLONE_ROOT/$1") || return 1
-    _mode=$(apply_op__norm_mode "$_mode")
-    printf '%s\n' "${_mode:$((${#_mode} - 3))}"
-}
-
-# update_plan_add TYPE REL [ARG [MODE]] — one plan line; REL is relative to the
-# clone, the plan gets an absolute canonical path. A build failure — exit
-# before the first plan write (the installation tree is not yet touched).
-update_plan_add() {
-    apply_op_plan_add "$UPDATE_PLAN_TMP" "$1" "$UPDATE_CLONE_ROOT/$2" "${3:--}" "${4:--}" || {
-        echo "ОШИБКА: не построить операцию плана ($1 $2); прогон остановлен до первой записи." >&2
-        exit "$EXIT_RUNTIME"
-    }
-    UPDATE_PLAN_COUNT=$((UPDATE_PLAN_COUNT + 1))
-}
-
-# update_plan_mkdirs_for REL — explicit mkdir operations for REL's missing parents,
-# deduplicated; there is no `mkdir -p` inside a create operation, each directory is
-# its own operation with its own op_id, the parent before the child.
-update_plan_mkdirs_for() {
-    local _dir _i
-    local _dirs=()
-    _dir=$(dirname "$1")
-    while [ "$_dir" != "." ]; do
-        if [ -d "$UPDATE_CLONE_ROOT/$_dir" ]; then break; fi
-        case "$UPDATE_PLAN_MKDIRS" in
-            *"|$_dir|"*) break ;;
-        esac
-        _dirs+=("$_dir")
-        UPDATE_PLAN_MKDIRS="${UPDATE_PLAN_MKDIRS}${_dir}|"
-        _dir=$(dirname "$_dir")
+    [ -d "$parent" ] || return 0
+    # Glob раскрывается по имени, а имя начинается с даты и времени: последние элементы — самые свежие.
+    for d in "$parent/$prefix"[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9][0-9][0-9]*; do
+        [ -d "$d" ] && [ ! -L "$d" ] && found+=("$d")
     done
-    _i=$((${#_dirs[@]} - 1))
-    while [ "$_i" -ge 0 ]; do
-        update_plan_add mkdir "${_dirs[$_i]}" - "$(update_mode_umask 777)"
-        _i=$((_i - 1))
+    for (( i = 0; i < ${#found[@]} - keep; i++ )); do
+        d="${found[$i]}"
+        [ -n "$(find "$d" -maxdepth 0 -mtime +"$days" 2>/dev/null)" ] || continue
+        if rm -rf -- "$d"; then
+            removed=$((removed + 1))
+        else
+            echo "  ⚠ не удалось удалить старый бэкап: $d" >&2
+        fi
     done
-}
-
-# update_plan_add_file REL SRC — write or replace depending on the target;
-# permissions repeat the previous cp semantics (a new file — 666&~umask, an existing one
-# keeps its own), the executability pattern — as in the previous apply loops.
-update_plan_add_file() {
-    local _rel="$1" _src="$2" _mode
-    if [ -e "$UPDATE_CLONE_ROOT/$_rel" ] || [ -L "$UPDATE_CLONE_ROOT/$_rel" ]; then
-        _mode=$(update_dest_mode "$_rel") || {
-            echo "ОШИБКА: не прочитать права цели $_rel; прогон остановлен до первой записи." >&2
-            exit "$EXIT_RUNTIME"
-        }
-        if update_needs_exec_bit "$_rel" "$_src"; then
-            _mode=$(update_mode_plus_x "$_mode")
-        fi
-        update_plan_add replace "$_rel" "$_src" "$_mode"
-    else
-        update_plan_mkdirs_for "$_rel"
-        _mode=$(update_mode_umask 666)
-        if update_needs_exec_bit "$_rel" "$_src"; then
-            _mode=$(update_mode_plus_x "$_mode")
-        fi
-        update_plan_add write "$_rel" "$_src" "$_mode"
-    fi
-}
-
-apply_op_plan_new "$UPDATE_PLAN_TMP"
-
-for f in "${NEW_FILES[@]}"; do
-    record_rule_workspace_state "$f"
-    if author_diverged "$f"; then
-        echo "  ⚠ $f — author_mode: локально изменён/удалён, не восстанавливаю. Сверь: git -C \"$SCRIPT_DIR\" status -- \"$f\""
-        AUTHOR_SKIPPED=$((AUTHOR_SKIPPED + 1))
-        continue
-    fi
-    update_plan_add_file "$f" "$TMPDIR_UPDATE/files/$f"
-    UPDATE_PLAN_MSG[UPDATE_PLAN_COUNT]="  + $f"
-    APPLIED_PATHS+=("$f")
-    APPLIED=$((APPLIED + 1))
-done
-
-for f in "${UPDATED_FILES[@]}"; do
-    record_rule_workspace_state "$f"
-    # issue #238: author_mode guard BEFORE all the special cases below (CLAUDE.md 3-way merge,
-    # SKILL.md USER-SPACE preserve, generic cp) — otherwise an unmerged author edit
-    # in any of them suffers the same fate that already wiped 66 files (86cf080 closed only the
-    # .claude/* branch in repair_pass()/Step 6, not this, earlier entry point).
-    if author_diverged "$f"; then
-        echo "  ⚠ $f — author_mode: несмёрженные правки, файл не тронут."
-        echo "    Сверь: diff \"$TMPDIR_UPDATE/files/$f\" \"$SCRIPT_DIR/$f\""
-        AUTHOR_SKIPPED=$((AUTHOR_SKIPPED + 1))
-        continue
-    elif author_release_regression "$f" "$TMPDIR_UPDATE/files/$f"; then
-        echo "  ⚠ $f — author_mode: локальная копия уже равна main, но release-канал старее (фикс влит, релиза под него ещё не было) — файл не тронут."
-        echo "    Хотите намеренно синхронизироваться с релизом — запустите: IWE_UPDATE_CHANNEL=main bash update.sh"
-        AUTHOR_SKIPPED=$((AUTHOR_SKIPPED + 1))
-        continue
-    fi
-    # issue #505 root, part 2: update.sh is delivered ONLY by Step 0's
-    # self-update (fetch, compare, replace, re-exec). Applying it here did two
-    # kinds of damage at once: `cp` truncated the very inode bash was still
-    # reading (execution continued into garbage — "line 1875: command not
-    # found", rc=127, stale .update-incomplete), and the placeholder
-    # substitution pass below then baked the install's real paths into the
-    # freshly applied copy's own {{KEY}} sed templates — after which the local
-    # hash never matches upstream again and every run re-applies it. A
-    # residual diff here (e.g. an already-baked local copy) is healed by the
-    # next run's Step 0, which fetches the clean snapshot copy.
-    if [ "$f" = "update.sh" ]; then
-        echo "  ~ $f — пропущен: доставляется только самообновлением Шага 0 (issue #505)"
-        continue
-    fi
-    APPLIED_PATHS+=("$f")
-    # Special handling for CLAUDE.md: 3-way merge preserving user customizations.
-    # The merge is computed when the plan is built into staging files under
-    # $TMPDIR_UPDATE; outcomes that write a file become plan operations
-    # from staging, outcome diagnostics are printed right here, the apply phase silently
-    # executes (the line "  ~ ..." — after a successful apply_op).
-    if [ "$f" = "CLAUDE.md" ] && [ -f "$SCRIPT_DIR/$f" ]; then
-        CLAUDE_PLAN_COUNT_BEFORE=$UPDATE_PLAN_COUNT
-        BASE_FILE="$SCRIPT_DIR/.claude.md.base"
-        NEW_FILE="$TMPDIR_UPDATE/files/$f"
-        CURRENT_FILE="$SCRIPT_DIR/$f"
-
-        if [ -f "$BASE_FILE" ] && [ -s "$CURRENT_FILE" ] && { claude_template_copy_is_delivered "$CURRENT_FILE" \
-                || claude_template_copy_matches_legacy_base "$CURRENT_FILE" "$BASE_FILE"; }; then
-            # setup.sh up to 0.36 wrote this template base from the SUBSTITUTED workspace copy, and
-            # restore_claude_placeholders cannot undo every key (GOVERNANCE_REPO among them): merging
-            # the raw copy against it conflicted on each such line the release changed (0.42 rc.9, row 3).
-            # A copy proven to be the delivered one has nothing to keep, so it is replaced and the base
-            # realigned; a copy vouched for only by HEAD still goes through the merge below.
-            claude_record_delivered "$NEW_FILE"
-            update_plan_add_file "CLAUDE.md" "$NEW_FILE"
-            UPDATE_PLAN_MSG[UPDATE_PLAN_COUNT]="  ~ $f обновлён (копия в каталоге шаблона не правилась, слияние не нужно)"
-            update_plan_add_file ".claude.md.base" "$NEW_FILE"
-        elif [ -f "$BASE_FILE" ] && command -v git >/dev/null 2>&1; then
-            # Migrate any legacy substituted base/current to raw placeholders before
-            # merging. Both persisted template files remain safe for public forks.
-            RAW_BASE_FILE="$TMPDIR_UPDATE/claude-base-raw.md"
-            RAW_CURRENT_FILE="$TMPDIR_UPDATE/claude-current-raw.md"
-            restore_claude_placeholders "$BASE_FILE" "$RAW_BASE_FILE"
-            restore_claude_placeholders "$CURRENT_FILE" "$RAW_CURRENT_FILE"
-            # git merge-file modifies the first argument in place
-            MERGE_TMP="$TMPDIR_UPDATE/claude-merge.md"
-            cp "$RAW_CURRENT_FILE" "$MERGE_TMP"
-
-            if git merge-file -p "$MERGE_TMP" "$RAW_BASE_FILE" "$NEW_FILE" > "$TMPDIR_UPDATE/claude-merged.md" 2>/dev/null; then
-                # Clean merge — no conflict markers. Still verify no pilot line
-                # silently vanished (issue #555) before trusting "clean".
-                SILENT_LOSS=$(detect_claude_silent_loss "$RAW_BASE_FILE" "$RAW_CURRENT_FILE" "$TMPDIR_UPDATE/claude-merged.md")
-                if [ "$SILENT_LOSS" -gt 0 ]; then
-                    CLAUDE_SILENT_LOSS_FILES+=("$CURRENT_FILE")
-                    echo "  ⚠ $f НЕ тронут — слияние потеряло бы $SILENT_LOSS строк(и) без маркеров конфликта."
-                    echo "    Сверьте вручную: diff \"$CURRENT_FILE\" \"$NEW_FILE\""
-                else
-                    update_plan_add_file "CLAUDE.md" "$TMPDIR_UPDATE/claude-merged.md"
-                    UPDATE_PLAN_MSG[UPDATE_PLAN_COUNT]="  ~ $f (3-way merge, чисто)"
-                    update_plan_add_file ".claude.md.base" "$NEW_FILE"
-                fi
-            else
-                CONFLICT_COUNT=$(grep -c '^<<<<<<<' "$TMPDIR_UPDATE/claude-merged.md" 2>/dev/null || true); CONFLICT_COUNT=${CONFLICT_COUNT:-0}
-                if [ "$CONFLICT_COUNT" -gt 0 ]; then
-                    # Conflicts detected — the plan installs the merged file with markers
-                    update_plan_add_file "CLAUDE.md" "$TMPDIR_UPDATE/claude-merged.md"
-                    UPDATE_PLAN_MSG[UPDATE_PLAN_COUNT]="  ~ $f (3-way merge, $CONFLICT_COUNT конфликтов — разрешите вручную)
-    Конфликты обозначены <<<<<<< / ======= / >>>>>>>"
-                    update_plan_add_file ".claude.md.base" "$NEW_FILE"
-                    CLAUDE_CONFLICTS=$((CLAUDE_CONFLICTS + CONFLICT_COUNT))
-                else
-                    # Non-zero without a single marker is not a conflict: git did not merge.
-                    # This branch used to "treat it as success" and copy the (empty) output
-                    # over the file.
-                    claude_merge_failed "$CURRENT_FILE" "$NEW_FILE"
-                fi
-            fi
-        elif [ ! -f "$BASE_FILE" ] && claude_template_copy_is_replaceable "$CURRENT_FILE"; then
-            # B1: nothing to merge in an unedited template copy, upstream goes in
-            # as is. No base is written here (setup.sh: the template repo never
-            # receives one); sync_workspace_claude_md() in Step 6 merges the
-            # workspace copy against the workspace base, keeping the pilot's edits.
-            # The record first, from the source: nothing can change what it hashes, and an interrupt
-            # before the replace finds the record already in place (a record outside the clone
-            # root — a direct call, not a plan operation).
-            claude_record_delivered "$NEW_FILE"
-            update_plan_add_file "CLAUDE.md" "$NEW_FILE"
-            UPDATE_PLAN_MSG[UPDATE_PLAN_COUNT]="  ~ $f обновлён (копия в каталоге шаблона совпадает с доставленной ранее или с закоммиченной в клоне; ваша правка, закоммиченная в клоне, остаётся в его истории git)"
-        else
-            # issue #336: no base file (first migration or lost .claude.md.base) — a
-            # blind overwrite silently discarded any pilot edit to
-            # §8/§9 that wasn't wrapped in explicit <!-- USER-SPACE --> markers (those
-            # markers don't exist in the real §8/§9 format). Without a real base there
-            # is no safe 3-way merge — leave the pilot's file untouched and surface it
-            # the same way an unresolved merge conflict is surfaced, instead of guessing.
-            USER_SECTION=$(sed -n '/^<!-- USER-SPACE/,/^<!-- \/USER-SPACE/p' "$CURRENT_FILE")
-            if [ -n "$USER_SECTION" ] && ! CLAUDE_BACKUP_DIR=$(claude_backup_before_replace "$CURRENT_FILE"); then
-                # #1004: no backup, no replacement.
-                CLAUDE_BASE_MISSING_FILES+=("$CURRENT_FILE")
-                echo "  ⚠ $f НЕ тронут — не удалось сделать резервную копию перед заменой."
-            elif [ -n "$USER_SECTION" ]; then
-                echo "  ⚠ $f: правки вне блока USER-SPACE будут заменены версией шаблона; резервная копия: $CLAUDE_BACKUP_DIR"
-                # The result (the template version with USER-SPACE restored) is assembled
-                # in staging; the former code edited CURRENT_FILE in place with the same
-                # three steps after cp.
-                CLAUDE_STAGED_FILE="$TMPDIR_UPDATE/claude-userspace-result.md"
-                cp "$NEW_FILE" "$CLAUDE_STAGED_FILE"
-                sed_inplace '/^<!-- USER-SPACE/,/^<!-- \/USER-SPACE/d' "$CLAUDE_STAGED_FILE"
-                echo "" >> "$CLAUDE_STAGED_FILE"
-                printf '%s\n' "$USER_SECTION" >> "$CLAUDE_STAGED_FILE"
-                update_plan_add_file "CLAUDE.md" "$CLAUDE_STAGED_FILE"
-                UPDATE_PLAN_MSG[UPDATE_PLAN_COUNT]="  ~ $f (USER-SPACE сохранён, базовый файл создан)"
-                update_plan_add_file ".claude.md.base" "$NEW_FILE"
-            else
-                # issue #541 hvost 2 (Evgenii Red Team v0.38.11): a retry right
-                # after this exact run used to silently "succeed". Writing
-                # .claude.md.base = NEW_FILE here while leaving CURRENT_FILE
-                # untouched creates a false ancestry — the next run's 3-way
-                # merge sees base == upstream and treats the untouched, still-
-                # stale CURRENT_FILE as an intentional pilot customization,
-                # merging cleanly and clearing .update-incomplete without
-                # CLAUDE.md ever actually catching up. Leave the base absent
-                # too, so every retry keeps re-detecting the same missing-base
-                # state honestly until the pilot resolves it by hand.
-                CLAUDE_BASE_MISSING_FILES+=("$CURRENT_FILE")
-                echo "  ⚠ $f НЕ тронут — базовый файл для слияния отсутствовал."
-                echo "    Сверьте свои правки §8/§9 вручную с шаблонной версией: diff \"$CURRENT_FILE\" \"$NEW_FILE\""
-                if [ -f "${WORKSPACE_DIR:-}/.claude.md.base" ]; then
-                    echo "    База в рабочей папке есть, но копия в каталоге шаблона не совпадает ни с файлом прошлого обновления (update-manifest.json), ни с закоммиченным в клоне, ни с записанным при последней замене: похоже, её правили вручную."
-                fi
-            fi
-        fi
-        # issue #1493: every "НЕ тронут" outcome above adds no plan operation.
-        # APPLIED_PATHS means "this run wrote the file", so an untouched CLAUDE.md
-        # must leave it, or the install-paths guard reads its old install-time
-        # lines as new additions and aborts the update.
-        if [ "$UPDATE_PLAN_COUNT" -eq "$CLAUDE_PLAN_COUNT_BEFORE" ]; then
-            unset "APPLIED_PATHS[$((${#APPLIED_PATHS[@]} - 1))]"
-        fi
-    elif [[ "$f" == .claude/skills/*/SKILL.md ]]; then
-        # USER-SPACE preserve for L1 skill spec files (no install_constants in SCRIPT_DIR — already {{KEY}})
-        CURR_SKILL_FILE="$SCRIPT_DIR/$f"
-        if [ -f "$CURR_SKILL_FILE" ]; then
-            USER_SECTION=$(sed -n '/^<!-- USER-SPACE -->/,/^<!-- \/USER-SPACE -->/p' "$CURR_SKILL_FILE")
-        else
-            USER_SECTION=""
-        fi
-        if [ -n "$USER_SECTION" ]; then
-            # render into staging (the "USER-SPACE is present" condition was decided above, at
-            # build time); the staging name is unique per operation — the plan keeps
-            # the source fingerprint from the moment of freezing.
-            SKILL_STAGED_FILE="$TMPDIR_UPDATE/skill-staged-$UPDATE_PLAN_COUNT.md"
-            render_skill_with_user_section "$TMPDIR_UPDATE/files/$f" "$USER_SECTION" "$SKILL_STAGED_FILE"
-            update_plan_add_file "$f" "$SKILL_STAGED_FILE"
-            UPDATE_PLAN_MSG[UPDATE_PLAN_COUNT]="  ~ $f (USER-SPACE preserved)"
-        else
-            update_plan_add_file "$f" "$TMPDIR_UPDATE/files/$f"
-            UPDATE_PLAN_MSG[UPDATE_PLAN_COUNT]="  ~ $f"
-        fi
-    else
-        update_plan_add_file "$f" "$TMPDIR_UPDATE/files/$f"
-        UPDATE_PLAN_MSG[UPDATE_PLAN_COUNT]="  ~ $f"
-    fi
-    APPLIED=$((APPLIED + 1))
-done
-
-# Plan freeze: rename to the final name once, afterwards read-only.
-mv "$UPDATE_PLAN_TMP" "$UPDATE_PLAN_FILE"
-
-# Execution: the order (strictly consecutive from 1) and the preconditions of each operation
-# are checked by the executor; the lines "  + f "/"  ~ f " are printed only after a
-# successful apply_op so the output does not lie on a stop. The first error of any
-# operation stops the whole run, the plan's tail is not applied; a repeated
-# run will rebuild the plan from the live tree.
-apply_op_begin "$UPDATE_PLAN_FILE" || {
-    echo "ОШИБКА: замороженный план обновления не прошёл проверку перед записью; дерево установки не тронуто." >&2
-    exit "$EXIT_RUNTIME"
-}
-_update_plan_id=1
-while [ "$_update_plan_id" -le "$APPLY_OP_TOTAL" ]; do
-    update_journal_hook intent "$_update_plan_id" || {
-        echo "ОШИБКА: журнальный хук отклонил операцию $_update_plan_id; прогон остановлен до записи этой операции." >&2
-        exit "$EXIT_RUNTIME"
-    }
-    if apply_op "$_update_plan_id"; then
-        update_journal_hook "done" "$_update_plan_id" || {
-            echo "ОШИБКА: журнальный хук не подтвердил операцию $_update_plan_id; прогон остановлен." >&2
-            exit "$EXIT_RUNTIME"
-        }
-        if [ -n "${UPDATE_PLAN_MSG[$_update_plan_id]:-}" ]; then
-            echo "${UPDATE_PLAN_MSG[$_update_plan_id]}"
-        fi
-    else
-        echo "ОШИБКА: применение обновления остановлено на операции $_update_plan_id из $APPLY_OP_TOTAL; хвост плана не применялся, маркер .update-incomplete сохранён." >&2
-        exit "$EXIT_RUNTIME"
-    fi
-    _update_plan_id=$((_update_plan_id + 1))
-done
-apply_op_end
-
-# BEGIN-TESTABLE: changelog-diff-disclaimer
-# WP-529 Phase 220: CHANGELOG.md diff and disclaimer — only if the content really
-# changed (not on every run). The decision was recorded by peer-session
-# 2026-10-22-02-wp529-peer-continue + the continuation 2026-10-22-04: --check/--dry-run
-# does not guarantee the absence of regressions after the real update — an honest
-# warning here closes only "didn't know what changed", not the regression risk
-# itself (that is closed by --dry-run-strict above).
-if [ -n "$CHANGELOG_SNAPSHOT" ] && [ ! -f "$SCRIPT_DIR/CHANGELOG.md" ]; then
-    # Cold-review (2026-10-22): existed before apply, gone after (removal,
-    # not UPDATED_FILES) — a rare path (CHANGELOG.md is currently in no removal
-    # list), but the diff without this branch would have been silently skipped, although the content
-    # changed substantively (to "absent").
-    echo ""
-    echo "⚠ CHANGELOG.md был удалён этим обновлением (ранее присутствовал)."
-elif [ -f "$SCRIPT_DIR/CHANGELOG.md" ]; then
-    CHANGELOG_AFTER=$(cat "$SCRIPT_DIR/CHANGELOG.md")
-    if [ "$CHANGELOG_AFTER" != "$CHANGELOG_SNAPSHOT" ]; then
-        # WP-529 Phase 220 continuation (2026-10-22, "the why layer"): highlight significant
-        # items (not [optional]) ahead of the full diff — reuses the already
-        # existing Changelog-Tag classification (CLAUDE.md: security/
-        # migration/behavior/optional), does not introduce a new layer of entry authorship.
-        # An unmarked line is also considered significant (CLAUDE.md:
-        # "absence of a tag does not mean safe").
-        ADDED_LINES=$(diff <(printf '%s\n' "$CHANGELOG_SNAPSHOT") <(printf '%s\n' "$CHANGELOG_AFTER") | grep '^>' | sed 's/^> //')
-        HIGHLIGHTS=$(printf '%s\n' "$ADDED_LINES" | grep '^- ' | grep -v '^- \[optional\]') || true
-        if [ -n "$HIGHLIGHTS" ]; then
-            echo ""
-            echo "Главное в этом обновлении:"
-            printf '%s\n' "$HIGHLIGHTS" | sed 's/^/  + /'
-        fi
-        echo ""
-        echo "Изменения в CHANGELOG.md:"
-        # [ -n ] before printing — otherwise an empty $ADDED_LINES (the diff only removed,
-        # added nothing) prints one stray line "  + " (cold-review).
-        [ -n "$ADDED_LINES" ] && printf '%s\n' "$ADDED_LINES" | sed 's/^/  + /'
-        echo ""
-        echo "⚠ Чистый --check/--dry-run не гарантирует отсутствие регрессий после этого обновления — он проверяет совпадение файлов, не поведение. Для структурной проверки плана доставки используйте --dry-run-strict."
-    fi
-fi
-# END-TESTABLE: changelog-diff-disclaimer
-
-# issue #229: hard-require frontmatter.sh now — NEW_FILES/UPDATED_FILES above have
-# just delivered it to disk if this is the first run after upgrading from a
-# pre-2.4.0 install (the soft source near SCRIPT_DIR could not find it yet then).
-# Everything below this point (repair_pass, Step 6 memory copy, hot-budget
-# validator) calls get_field(), so a missing file here is a real delivery bug
-# (manifest/git tracking), not a bootstrap-ordering race — fail loudly.
-source "$SCRIPT_DIR/.claude/lib/frontmatter.sh" || {
-    echo "ОШИБКА: .claude/lib/frontmatter.sh отсутствует после применения обновлений." >&2
-    exit 1
-}
-
-# Detect pre-existing nested conflict markers before we propagate merged files.
-# This prevents stacking new 3-way merges on top of unresolved ones (issue #31).
-claude_nested_markers_gate
-
-# CLAUDE.md conflict (issue #226): warn and remember, but keep going — propagation
-# and commit of everything else must not be blocked by one unresolved merge.
-if [ "$CLAUDE_CONFLICTS" -gt 0 ]; then
-    echo ""
-    echo "ОШИБКА: CLAUDE.md содержит неразрешённые конфликты слияния."
-    echo "  Конфликты обозначены <<<<<<< / ======= / >>>>>>>"
-    echo "  Разрешите их вручную в $SCRIPT_DIR/CLAUDE.md после завершения обновления."
-    CLAUDE_CONFLICT_DETECTED=true
-    CLAUDE_CONFLICT_FILES+=("$SCRIPT_DIR/CLAUDE.md")
-fi
-
-# Deprecated files are never deleted outright (issue #1010 F9 follow-up): each
-# one is MOVED into a per-run backup directory, so a file the manifest wrongly
-# retired, or a local edit to it, can be restored by hand. Layout of one run:
-#   $WORKSPACE_DIR/.backups/deprecated/<UTC timestamp>-<pid>/
-#     template/<rel>             the file from SCRIPT_DIR (local template clone)
-#     workspace/<rel>            its propagated copy under $WORKSPACE_DIR/.claude/
-#     memory/<rel without memory/>  its copy in the Claude memory dir
-# Old run directories are deliberately never rotated: a backup that update.sh
-# deletes on its own would defeat the purpose of keeping it.
-DEPRECATED_BACKUP_DIR="$WORKSPACE_DIR/.backups/deprecated/$(date -u +%Y%m%dT%H%M%SZ)-$$"
-
-# physical_dir DIR — print DIR with every symlink resolved; fails if DIR is missing.
-physical_dir() {
-    (cd -P "$1" 2>/dev/null && pwd -P)
-}
-
-# move_deprecated_to_backup ROOT REL KIND DISPLAY — move ROOT/REL to
-# $DEPRECATED_BACKUP_DIR/KIND/REL and print one line naming DISPLAY. Returns 1 and
-# leaves the file in place (with a warning) when the move is not provably safe or
-# fails; never aborts the run.
-# Symlinks: the LINK itself is moved, never its target. The old code rm'ed the
-# link (target untouched); moving it is the reversible equivalent and still reads
-# or writes nothing outside ROOT. What must resolve inside ROOT is the directory
-# that holds the entry — a symlinked parent directory would move a file that
-# lives outside ROOT, so that case is refused.
-move_deprecated_to_backup() {
-    local root="$1" rel="$2" kind="$3" display="$4"
-    local src="$root/$rel" dest="$DEPRECATED_BACKUP_DIR/$kind/$rel"
-    local root_real parent_real dest_parent_real
-    case "/$rel/" in
-        //|*/../*|*/./*|*//*)
-            echo "  ⚠ $display: недопустимый путь в манифесте, файл оставлен на месте." >&2
-            return 1 ;;
-    esac
-    root_real=$(physical_dir "$root") && parent_real=$(physical_dir "$(dirname "$src")") || {
-        echo "  ⚠ $display: каталог файла недоступен, файл оставлен на месте." >&2
-        return 1
-    }
-    case "$parent_real/" in
-        "$root_real"/*) ;;
-        *)
-            echo "  ⚠ $display: каталог файла ведёт за пределы $root (символическая ссылка), файл оставлен на месте." >&2
-            return 1 ;;
-    esac
-    if [ -L "$WORKSPACE_DIR/.backups" ] || [ -L "$WORKSPACE_DIR/.backups/deprecated" ]; then
-        echo "  ⚠ $display: каталог резервных копий .backups — символическая ссылка, файл оставлен на месте." >&2
-        return 1
-    fi
-    if [ -e "$dest" ] || [ -L "$dest" ]; then
-        echo "  ⚠ $display: в резервной копии уже есть $dest, не перезаписываю — файл оставлен на месте." >&2
-        return 1
-    fi
-    if ! mkdir -p "$(dirname "$dest")" 2>/dev/null \
-       || ! dest_parent_real=$(physical_dir "$(dirname "$dest")"); then
-        echo "  ⚠ $display: не удалось создать каталог резервной копии $(dirname "$dest"), файл оставлен на месте." >&2
-        return 1
-    fi
-    case "$dest_parent_real/" in
-        "$(physical_dir "$DEPRECATED_BACKUP_DIR")"/*) ;;
-        *)
-            echo "  ⚠ $display: каталог резервной копии ведёт за пределы $DEPRECATED_BACKUP_DIR, файл оставлен на месте." >&2
-            return 1 ;;
-    esac
-    if ! mv -- "$src" "$dest" 2>/dev/null; then
-        echo "  ⚠ $display: не удалось перенести в резервную копию $DEPRECATED_BACKUP_DIR, файл оставлен на месте." >&2
-        return 1
-    fi
-    # Template files head the list; their propagated copies are indented below.
-    local indent="  "
-    [ "$kind" = template ] || indent="    "
-    echo "${indent}- $display (устарел, перенесён в резервную копию: $DEPRECATED_BACKUP_DIR)"
-}
-
-# remove_propagated_copies REL — move away the copies of a deprecated template
-# file that update.sh propagated out of SCRIPT_DIR: workspace .claude/ (L1 files)
-# and the Claude memory dir (relative path from memory/, not basename,
-# symmetric with repair_pass() delivery, issue #287).
-remove_propagated_copies() {
-    local f="$1" mem_rel
-    case "$f" in .claude/*)
-        if [ -f "$WORKSPACE_DIR/$f" ] || [ -L "$WORKSPACE_DIR/$f" ]; then
-            move_deprecated_to_backup "$WORKSPACE_DIR" "$f" workspace "$WORKSPACE_DIR/$f" || true
-        fi
-        ;;
-    esac
-    case "$f" in memory/*.md|memory/*.yaml|memory/*.yml)
-        mem_rel="${f#memory/}"
-        if [ -n "${CLAUDE_MEMORY_DIR:-}" ] && \
-           { [ -f "$CLAUDE_MEMORY_DIR/$mem_rel" ] || [ -L "$CLAUDE_MEMORY_DIR/$mem_rel" ]; }; then
-            move_deprecated_to_backup "$CLAUDE_MEMORY_DIR" "$mem_rel" memory "$CLAUDE_MEMORY_DIR/$mem_rel" || true
-        fi
-        ;;
-    esac
+    [ "$removed" -gt 0 ] && echo "Удалено старых бэкапов (старше $days дн.) в $parent: $removed"
     return 0
 }
 
-# Move deprecated files into the run's backup directory
-for i in "${!DEPRECATED_FOUND[@]}"; do
-    f="${DEPRECATED_FOUND[$i]}"
-    fpath="$SCRIPT_DIR/$f"
-    if [ -f "$fpath" ] || [ -L "$fpath" ]; then
-        if move_deprecated_to_backup "$SCRIPT_DIR" "$f" template "$f"; then
-            REMOVED=$((REMOVED + 1))
-            remove_propagated_copies "$f"
-        fi
-    fi
-done
-# issue #1010 F9: the template clone keeps a git-tracked deprecated file, but
-# its propagated copies are not part of that checkout and still go — otherwise
-# a deprecated skill/hook/rule stayed active in the workspace forever.
-for f in ${DEPRECATED_TRACKED_KEPT[@]+"${DEPRECATED_TRACKED_KEPT[@]}"}; do
-    remove_propagated_copies "$f"
-done
-# Clean up empty deprecated directories
-for i in "${!DEPRECATED_FOUND[@]}"; do
-    f="${DEPRECATED_FOUND[$i]}"
-    dir="$SCRIPT_DIR/$(dirname "$f")"
-    [ "$dir" = "$SCRIPT_DIR/." ] && continue
-    [ -d "$dir" ] && [ -z "$(ls -A "$dir" 2>/dev/null)" ] && rmdir "$dir" 2>/dev/null && echo "  - $(dirname "$f")/ (пустая директория удалена)"
-done
-
-# === Step 5b: Re-substitute placeholders + ensure .exocortex.env in workspace ===
-# WP-273 Stage 2: substituted files live in $WORKSPACE_DIR/.iwe-runtime/, not in FMT.
-# Substitution in FMT files is no longer performed. CLAUDE.md is substituted separately (3-way merge).
-# Locating .exocortex.env: workspace (Variant F) → FMT (legacy ≤0.28.x).
-echo ""
-echo "Подстановка переменных..."
-
-# Recheck the path just before Step 5b writes to it. A file switched to a
-# symlink/non-file after the early preflight must not be edited through here.
-if [ -L "$WORKSPACE_DIR/.exocortex.env" ] || \
-   { [ -e "$WORKSPACE_DIR/.exocortex.env" ] && [ ! -f "$WORKSPACE_DIR/.exocortex.env" ]; }; then
-    echo "ОШИБКА: .exocortex.env больше не является обычным файлом; маркер .update-incomplete сохранён." >&2
-    exit "$EXIT_RUNTIME"
-fi
-if [ ! -f "$WORKSPACE_DIR/.exocortex.env" ] && [ -L "$SCRIPT_DIR/.exocortex.env" ]; then
-    echo "ОШИБКА: legacy .exocortex.env является символической ссылкой; маркер .update-incomplete сохранён." >&2
-    exit "$EXIT_RUNTIME"
-fi
-
-if [ -f "$WORKSPACE_DIR/.exocortex.env" ]; then
-    ENV_FILE="$WORKSPACE_DIR/.exocortex.env"
-elif [ -f "$SCRIPT_DIR/.exocortex.env" ]; then
-    ENV_FILE="$SCRIPT_DIR/.exocortex.env"
-    echo "  ⚠ .exocortex.env найден в FMT (legacy). Будет мигрирован в \$WORKSPACE_DIR/ при первом setup ≥0.7.0."
-else
-    ENV_FILE="$WORKSPACE_DIR/.exocortex.env"  # for further auto-generation (migration C5)
-fi
-
-if [ -f "$ENV_FILE" ]; then
-    # Validate: only KEY=VALUE lines allowed (no shell commands)
-    if grep -qE '^\s*(source|eval|exec|\.|`|;|\$\()' "$ENV_FILE" 2>/dev/null; then
-        echo "  ОШИБКА: .exocortex.env содержит недопустимые конструкции. Пропускаю подстановку."
-        echo "  Пересоздайте: bash setup.sh"
-    else
-        # Read variables safely (only simple KEY=VALUE)
-        # Use read -r line + split on first '=' to handle values containing '=' (e.g. URLs, tokens)
-        while IFS= read -r line; do
-            # Skip comments and empty lines
-            case "$line" in \#*|"") continue ;; esac
-            # Split on first '=' only
-            key="${line%%=*}"
-            value="${line#*=}"
-            # Trim whitespace from key
-            key=$(echo "$key" | tr -d '[:space:]')
-            # issue #316-fix2: see the same comment in substitute_claude_placeholders() —
-            # non-source parser, quotes from quoted (#223) values remain
-            # literally in the line and break DETECT_WS/[ -d ... ] below unless stripped.
-            value=$(echo "$value" | tr -d '"' | tr -d "'")
-            [ -z "$key" ] && continue
-            # Export for use below (secrets: L4_DATABASE_URL etc. are loaded but not substituted into files)
-            declare "ENV_$key=$value"
-        done < "$ENV_FILE"
-
-        # WP-273 Stage 2: substitution in FMT files is no longer performed.
-        # Substituted values are generated by build-runtime.sh in .iwe-runtime/ (Step 6d below, BEFORE roles reinstall).
-        # This closes R4.6 (self-heal): build-runtime is idempotent, re-running
-        # update.sh recreates the runtime even if the previous one was interrupted.
-        :  # placeholder substitution NO-OP in FMT
-
-        # === Preserve secrets: L4_BACKEND, L4_DATABASE_URL ===
-        # These are NOT substituted into template files.
-        # If they exist in .exocortex.env, they must NOT be overwritten by update.sh.
-
-        # === Auto-add GOVERNANCE_REPO + IWE_TEMPLATE to legacy .exocortex.env (0.28.5+) ===
-        # If .exocortex.env was created before 0.28.5, these keys are absent; append them.
-        if ! grep -q '^GOVERNANCE_REPO=' "$ENV_FILE" 2>/dev/null; then
-            # Resolve workspace: ENV_WORKSPACE_DIR (if present) → fallback dirname $SCRIPT_DIR
-            DETECT_WS="${ENV_WORKSPACE_DIR:-$(dirname "$SCRIPT_DIR")}"
-            DETECTED_GOV=""
-            if [ -d "${DETECT_WS}/${IWE_GOVERNANCE_REPO:-DS-strategy}" ]; then
-                DETECTED_GOV="${IWE_GOVERNANCE_REPO:-DS-strategy}"
-            else
-                for d in "${DETECT_WS}"/DS-*; do
-                    case "${d##*/}" in
-                        DS-*strategy*) DETECTED_GOV="${d##*/}"; break ;;
-                    esac
-                done
-            fi
-            if [ -z "$DETECTED_GOV" ]; then
-                DETECTED_GOV="${IWE_GOVERNANCE_REPO:-DS-strategy}"
-                echo "  ⚠ Governance repo не найден в $DETECT_WS — fallback ${IWE_GOVERNANCE_REPO:-DS-strategy}. Проверьте .exocortex.env вручную."
-            fi
-            echo "GOVERNANCE_REPO=\"$DETECTED_GOV\"" >> "$ENV_FILE"
-            echo "  ✓ Добавлено GOVERNANCE_REPO=$DETECTED_GOV в .exocortex.env (миграция 0.28.5)"
-            ENV_GOVERNANCE_REPO="$DETECTED_GOV"
-        fi
-        if ! grep -q '^IWE_TEMPLATE=' "$ENV_FILE" 2>/dev/null; then
-            echo "IWE_TEMPLATE=\"$SCRIPT_DIR\"" >> "$ENV_FILE"
-            echo "  ✓ Добавлено IWE_TEMPLATE=$SCRIPT_DIR в .exocortex.env (миграция 0.28.5)"
-            ENV_IWE_TEMPLATE="$SCRIPT_DIR"
-        fi
-
-        # === Auto-add IWE_SCRIPTS (peer-session 2026-09-08-32, Evgenii's Day
-        # Open report) === Was never in placeholders: before this fix, so no
-        # generated plist could ever carry it — the launchd jobs silently ran
-        # without it (strategist.sh:357-366 fell back to the free-form prompt).
-        if ! grep -q '^IWE_SCRIPTS=' "$ENV_FILE" 2>/dev/null; then
-            echo "IWE_SCRIPTS=\"$SCRIPT_DIR/scripts\"" >> "$ENV_FILE"
-            echo "  ✓ Добавлено IWE_SCRIPTS=$SCRIPT_DIR/scripts в .exocortex.env (WP-529 Ф94)"
-            ENV_IWE_SCRIPTS="$SCRIPT_DIR/scripts"
-        fi
-
-        # === WP-273 Stage 2: IWE_RUNTIME for Generated runtime architecture (F) ===
-        if ! grep -q '^IWE_RUNTIME=' "$ENV_FILE" 2>/dev/null; then
-            DETECT_WS_RT="${ENV_WORKSPACE_DIR:-$WORKSPACE_DIR}"
-            echo "IWE_RUNTIME=\"$DETECT_WS_RT/.iwe-runtime\"" >> "$ENV_FILE"
-            echo "  ✓ Добавлено IWE_RUNTIME=$DETECT_WS_RT/.iwe-runtime (миграция WP-273 → 0.29.0)"
-            ENV_IWE_RUNTIME="$DETECT_WS_RT/.iwe-runtime"
-        fi
-
-        # WP-5 Phase 43: launchd does not reliably export USER/LOGNAME.  Keep the
-        # Unix login name as explicit runtime input so generated plist files
-        # never infer it from their own minimal environment.
-        if ! grep -q '^USER_NAME=' "$ENV_FILE" 2>/dev/null; then
-            DETECTED_USER_NAME=$(id -un 2>/dev/null || true)
-            if [ -z "$DETECTED_USER_NAME" ]; then
-                echo "  ОШИБКА: не удалось определить Unix login для USER_NAME; добавьте его в .exocortex.env вручную."
-            else
-                echo "USER_NAME=$DETECTED_USER_NAME" >> "$ENV_FILE"
-                echo "  ✓ Добавлено USER_NAME=$DETECTED_USER_NAME в .exocortex.env (WP-5 Ф43)"
-            fi
-        fi
-
-        # === Re-quote unquoted values in existing .exocortex.env (issue #781) ===
-        # #223/#316 taught setup.sh/update.sh to write values in quotes, but
-        # no path fixed an existing file created before the fix —
-        # `TIMEZONE_DESC=4:00 UTC` without quotes breaks any `source
-        # .exocortex.env` (bash treats the tail after the space as a command,
-        # `UTC: command not found`, rc 127). We fix only values where
-        # there is really no space in the written form, the line-by-line parse (line-parser
-        # above) has already confirmed a valid KEY — we just append quotes where
-        # they are not yet present. The list was extended by review after the first fix (#786):
-        # GOVERNANCE_REPO/IWE_TEMPLATE/IWE_SCRIPTS/IWE_RUNTIME were written by this
-        # same update.sh without quotes a bit lower in the file (migrations 0.28.5/WP-273/
-        # WP-529) — the same class of defect on paths containing spaces.
-        for _key in TIMEZONE_DESC GITHUB_USER WORKSPACE_DIR CLAUDE_PATH \
-                    CLAUDE_PROJECT_SLUG HOME_DIR USER_NAME \
-                    GOVERNANCE_REPO IWE_TEMPLATE IWE_SCRIPTS IWE_RUNTIME; do
-            _raw_line=$(grep -E "^${_key}=" "$ENV_FILE" 2>/dev/null | head -1)
-            [ -z "$_raw_line" ] && continue
-            _raw_value="${_raw_line#*=}"
-            case "$_raw_value" in
-                \"*\"|\'*\') continue ;;  # already in double or single quotes
-                *[[:space:]]*)
-                    _quoted=$(sed_escape_replacement "$_raw_value")
-                    sed_inplace "s|^${_key}=.*|${_key}=\"${_quoted}\"|" "$ENV_FILE"
-                    echo "  ✓ $_key взят в кавычки в .exocortex.env (issue #781, значение содержало пробел)"
-                    ;;
-            esac
-        done
-
-        # === Migrate .exocortex.env from FMT to workspace (WP-273 Stage 2) ===
-        # If .exocortex.env lives in FMT (legacy ≤0.28.x), copy it to the workspace.
-        # FMT stays read-only. Workspace = source-of-truth user state.
-        if [ "$ENV_FILE" = "$SCRIPT_DIR/.exocortex.env" ] && [ ! -f "$WORKSPACE_DIR/.exocortex.env" ]; then
-            cp "$ENV_FILE" "$WORKSPACE_DIR/.exocortex.env"
-            chmod 600 "$WORKSPACE_DIR/.exocortex.env"
-            echo "  ✓ .exocortex.env скопирован в $WORKSPACE_DIR/ (миграция WP-273 → 0.29.0)"
-            echo "    Старая копия в FMT остаётся для backward compat; уберите вручную после проверки."
-        fi
-
-        # === Migrate ~/.iwe-env if present (Phase 8 migration scenario) ===
-        IWE_ENV_GLOBAL="$HOME/.iwe-env"
-        if [ -f "$IWE_ENV_GLOBAL" ]; then
-            MIGRATED_KEYS=0
-            # Check which keys are missing from .exocortex.env
-            for migrate_key in L4_BACKEND L4_DATABASE_URL; do
-                eval "existing=\${ENV_${migrate_key}:-}"
-                if [ -z "$existing" ]; then
-                    # Extract from ~/.iwe-env
-                    migrated_val=$(grep "^${migrate_key}=" "$IWE_ENV_GLOBAL" 2>/dev/null | head -1)
-                    migrated_val="${migrated_val#*=}"
-                    if [ -n "$migrated_val" ]; then
-                        echo "" >> "$ENV_FILE"
-                        echo "${migrate_key}=${migrated_val}" >> "$ENV_FILE"
-                        MIGRATED_KEYS=$((MIGRATED_KEYS + 1))
-                    fi
-                fi
-            done
-            if [ "$MIGRATED_KEYS" -gt 0 ]; then
-                echo "  ✓ Мигрировано $MIGRATED_KEYS ключей из ~/.iwe-env → .exocortex.env"
-                echo "  ~/.iwe-env больше не нужен. Удалить вручную: rm $IWE_ENV_GLOBAL"
-            fi
-        fi
-    fi
-else
-    # The preflight above covered the normal missing-file case. A file removed
-    # concurrently during apply must fail closed rather than inventing config
-    # after CLAUDE.md and other template files have already been copied.
-    echo "ОШИБКА: .exocortex.env исчез во время обновления; маркер .update-incomplete сохранён." >&2
-    echo "  Восстановите $WORKSPACE_DIR/.exocortex.env и повторите обновление." >&2
-    printf '  Команда: IWE_UPDATE_CHANNEL=%s bash %q --yes\n' \
-        "$UPDATE_CHANNEL" "$SCRIPT_DIR/update.sh" >&2
-    exit "$EXIT_RUNTIME"
-fi
-
-# Check only files produced by build-runtime. The directory also preserves
-# session state and isolated worktrees; scanning it recursively reported
-# placeholders in old source copies as defects of the current installation
-# and took minutes on a long-lived workspace (issue #1084).
-RUNTIME_CHECK_DIR="${WORKSPACE_DIR}/.iwe-runtime"
-if [ -d "$RUNTIME_CHECK_DIR" ]; then
-    if REMAINING=$(bash "$SCRIPT_DIR/scripts/lib/runtime-placeholder-count.sh" \
-        "$SCRIPT_DIR/.claude/runtime-overlay.yaml" "$RUNTIME_CHECK_DIR"); then
-        if [ "$REMAINING" -gt 0 ]; then
-            echo "  ⚠ $REMAINING собранных runtime-файлов содержат незаменённые переменные."
-            echo "  Проверьте .exocortex.env (значения placeholders) и перезапустите: bash $SCRIPT_DIR/setup/build-runtime.sh"
-        fi
-    else
-        echo "  ⚠ Проверка переменных собранного runtime не завершилась; проверьте runtime-overlay.yaml и повторите build-runtime.sh." >&2
-    fi
-fi
-
-# === Step 6: Reinstall platform-space ===
-echo ""
-echo "Обновление platform-space..."
-
-# Copy CLAUDE.md to workspace root
-sync_workspace_claude_md
-
-# Copy memory files to Claude projects directory
-if [ -d "$CLAUDE_MEMORY_DIR" ]; then
-    MEM_UPDATED=0
-    for f in "${NEW_FILES[@]}" "${UPDATED_FILES[@]}"; do
-        case "$f" in
-            memory/*.md|memory/*.yaml|memory/*.yml)
-                fname=$(basename "$f")
-                # Relative path from memory/, not basename — preserves nesting
-                # (memory/reference/agent-core.md), symmetric to repair_pass() (issue #287).
-                dst="$CLAUDE_MEMORY_DIR/${f#memory/}"
-                mkdir -p "$(dirname "$dst")"
-                if [ "$fname" != "MEMORY.md" ]; then
-                    if is_personal_config "$fname" && [ -f "$dst" ]; then
-                        echo "  ✓ $fname — личный L4-конфиг, не перезаписан"
-                    elif is_author_mode && [ -f "$dst" ]; then
-                        # issue #238: the same class already closed for the .claude/* branches —
-                        # this branch too blindly copied SCRIPT_DIR over the live copy.
-                        # An owner: user copy stays out of the author_mode counters
-                        # (report_author_user_memory), as before #965/#967.
-                        if is_user_owned_memory "$dst"; then
-                            report_author_user_memory "$f" "$dst"
-                        else
-                            report_author_skip "$f" "$dst"
-                        fi
-                    elif apply_memory_policy "$f" "$dst" "$(memory_old_hash "$f")"; then
-                        # issues #965/#967: whatever its owner: marker, a copy equal to the
-                        # version installed last time (or to one in the clone's history) is
-                        # refreshed after a backup; an edited one is kept with a command.
-                        # The replaced and kept files are summed up at the end of repair_pass().
-                        MEM_UPDATED=$((MEM_UPDATED + 1))
-                    fi
+# Копирование платформенного файла с сохранением пользовательской секции (upstream 3318d72).
+# Суффикс для строки отчёта отдаётся через USER_SPACE_NOTE, а не через stdout: внутри
+# пишет в лог backup_rule_before_overwrite, и общий поток склеил бы лог с возвращаемым
+# значением в одну строку.
+USER_SPACE_NOTE=""
+copy_preserving_user_space() {
+    local src="$1" dst="$2" fpath="$3" usr=""
+    USER_SPACE_NOTE=""
+    if [ -f "$dst" ] && has_user_space_slot "$fpath"; then
+        # Guard дивергенции (upstream 30efdb5, адаптация — см. комментарий у
+        # record_rule_workspace_state) — только для .qwen/rules/*, скиллы им не
+        # покрываются (апстрим вводит его тоже только для .claude/rules/*). Снимок уже
+        # решил «безопасно ли» до начала обновления; здесь — только применение решения.
+        case "$fpath" in
+            .qwen/rules/*)
+                if ! rule_was_safe_to_update "$fpath"; then
+                    backup_rule_before_overwrite "$fpath" "$dst"
+                    USER_SPACE_NOTE=" — НЕ обновлён, рабочая копия отличается от последнего применённого эталона (сверьте: diff \"$src\" \"$dst\")"
+                    return 1
                 fi
                 ;;
         esac
-    done
-    if [ "$MEM_UPDATED" -gt 0 ]; then
-        echo "  ✓ $MEM_UPDATED memory-файлов обновлено в $CLAUDE_MEMORY_DIR"
+        backup_rule_before_overwrite "$fpath" "$dst"
+        usr="$(sed -n '/^<!-- USER-SPACE/,/^<!-- \/USER-SPACE/p' "$dst")"
     fi
-    echo "  ✓ memory/MEMORY.md — не тронут"
-fi
+    cp "$src" "$dst"
+    if [ -n "$usr" ]; then
+        sed_inplace '/^<!-- USER-SPACE/,/^<!-- \/USER-SPACE/d' "$dst"
+        printf '\n%s\n' "$usr" >> "$dst"
+        USER_SPACE_NOTE=" (USER-SPACE сохранён)"
+    fi
+    save_rule_baseline "$fpath" "$dst"
+}
 
-# Propagate skills, hooks, rules, lib, config, detectors to workspace if changed.
-# lib/config/detectors — runtime dependencies of the capture bus (capture-bus.sh) and the detectors.
-for f in "${NEW_FILES[@]}" "${UPDATED_FILES[@]}"; do
-    case "$f" in
-        .claude/skills/*/SKILL.md)
-            src="$SCRIPT_DIR/$f"
-            dst="$WORKSPACE_DIR/$f"
-            if is_author_mode && [ -f "$dst" ]; then
-                # --templated: deployed SKILL.md carries substituted install_constants,
-                # a raw blob can never match template history — "authored" would lie.
-                report_author_skip "$f" "$dst" templated
-                continue
-            fi
-            skip_author_readonly_target "$f" "$dst" && continue
-            mkdir -p "$(dirname "$dst")"
-            # 1. Extract USER_SECTION from workspace before overwriting
-            if [ -f "$dst" ]; then
-                USER_SECTION=$(sed -n '/^<!-- USER-SPACE -->/,/^<!-- \/USER-SPACE -->/p' "$dst" 2>/dev/null || true)
+# detect_qwen_silent_loss BASE PRE_MERGE_CURRENT MERGED — port of upstream
+# detect_claude_silent_loss (issue #555, main f5593e1). A "clean" `git merge-file`
+# exit (no <<<<<<< markers) can still make a pilot's customized line vanish from
+# the result — reported live where diff3 resolved a genuine conflict in the
+# platform's favour without ever surfacing markers. This does not try to explain
+# WHY (diff3's line-alignment heuristic is opaque and was not reliably
+# reproducible in isolation) — it verifies the OUTCOME instead: every line the
+# pilot added or changed relative to BASE must still be present somewhere in
+# MERGED. Prints one warning line per lost line to stderr, echoes the lost-line
+# count to stdout for the caller to branch on.
+#
+# BEST-EFFORT WARNING, NOT A PRESERVATION GUARANTEE — inherited limits, same as
+# upstream: `grep -F` matches anywhere in the file, so a short line survives as a
+# substring of an unrelated one ("offline" reads as present inside "Do not use
+# offline mode"); lines the pilot DELETED are not covered; `sort -u` collapses
+# duplicates, so losing one of two identical lines goes unreported. A zero count
+# means "nothing obvious was dropped", not "nothing was dropped".
+detect_qwen_silent_loss() {
+    local base="$1" before="$2" merged="$3" lost=0 line
+    while IFS= read -r line; do
+        [ -n "$line" ] || continue
+        grep -qF -- "$line" "$merged" || {
+            echo "    ⚠ ваша строка пропала при слиянии без маркеров конфликта: $line" >&2
+            lost=$((lost + 1))
+        }
+    done < <(LC_ALL=C comm -13 <(LC_ALL=C sort -u "$base") <(LC_ALL=C sort -u "$before"))
+    echo "$lost"
+}
+
+apply_file() {
+    local fpath="$1"
+    local tgt; tgt="$(target_path "$fpath")"
+    local src="$SCRIPT_DIR/$fpath"
+    local bn; bn="$(basename "$fpath")"
+
+    if [ "$fpath" = "QWEN.md" ]; then
+        local new="$TMPDIR_UPDATE/QWEN.md.new"
+        cp "$src" "$new"; substitute_placeholders "$new"
+        local base="$WORKSPACE_DIR/.qwen.md.base"
+        # Port of upstream issue #711 pre-check (main aa870ed): a previous run left
+        # unresolved <<<<<<< markers and the pilot has not resolved them yet. Merging
+        # again would treat the marker lines as content and nest new markers inside.
+        # Re-surface the conflict through the gate without touching file or base.
+        if [ -f "$tgt" ] && grep -q '^<<<<<<<' "$tgt" 2>/dev/null; then
+            local pending; pending=$(grep -c '^<<<<<<<' "$tgt")
+            QWEN_CONFLICTS=$((QWEN_CONFLICTS + pending))
+            echo "  ~ QWEN.md (неразрешённый конфликт с прошлого запуска — сначала разрешите маркеры вручную)"
+            return 0
+        fi
+        if [ -f "$base" ] && [ -f "$tgt" ] && command -v git >/dev/null 2>&1; then
+            local merged="$TMPDIR_UPDATE/QWEN.md.merged"
+            cp "$tgt" "$merged"
+            if git merge-file -p "$merged" "$base" "$new" > "$TMPDIR_UPDATE/QWEN.md.out" 2>/dev/null; then
+                # Чистый выход merge-file ещё не значит, что правки пилота уцелели (#555):
+                # сверяем результат, а не код возврата. $merged здесь — до-слияночная копия.
+                local lost; lost="$(detect_qwen_silent_loss "$base" "$merged" "$TMPDIR_UPDATE/QWEN.md.out")"
+                if [ "$lost" -gt 0 ]; then
+                    # Не трогаем НИ файл, НИ базу — обе стороны, и обязательно вместе.
+                    # Записать результат = стереть оригинал (бэкапа QWEN.md здесь нет);
+                    # двинуть базу = лишить следующий прогон шанса заметить расхождение.
+                    # Апстрим (f5593e1) на этом исходе оставляет нетронутым и то, и другое.
+                    QWEN_SILENT_LOSS=$((QWEN_SILENT_LOSS + lost))
+                    echo "  ⚠ QWEN.md НЕ обновлён: слияние без конфликтов потеряло ваших строк: $lost"
+                    return 0
+                fi
+                cp "$TMPDIR_UPDATE/QWEN.md.out" "$tgt"; cp "$new" "$base"
+                echo "  ~ QWEN.md (3-way merge, чисто)"
             else
-                USER_SECTION=""
+                local cc; cc=$(grep -c '^<<<<<<<' "$TMPDIR_UPDATE/QWEN.md.out" 2>/dev/null || echo 0)
+                cp "$TMPDIR_UPDATE/QWEN.md.out" "$tgt"
+                if [ "$cc" -gt 0 ]; then
+                    # Базу НЕ двигаем, пока маркеры не разрешены. Иначе следующий прогон
+                    # сравнит базу с шаблоном, увидит совпадение, пропустит QWEN.md — и
+                    # отрапортует «Всё актуально», хотя <<<<<<< всё ещё в файле пилота.
+                    # Тот же приём, что веткой выше при молчаливой потере строк (#555).
+                    # В апстриме база уезжает и на конфликте — заведён отдельный issue,
+                    # здесь ветка идёт на строку впереди.
+                    QWEN_CONFLICTS=$((QWEN_CONFLICTS + cc))
+                    echo "  ~ QWEN.md (3-way merge, $cc конфликтов — разрешите вручную: <<<<<<< / ======= / >>>>>>>)"
+                else
+                    cp "$new" "$base"
+                    echo "  ~ QWEN.md (3-way merge)"
+                fi
             fi
-            # 2. Extract install_constants values from workspace frontmatter
-            if [ -f "$dst" ]; then
-                IC_BLOCK=$(awk '/^install_constants:/{found=1} found && /^[a-z][^:]+:/ && !/^install_constants:/{exit} found{print}' "$dst" 2>/dev/null || true)
+        elif [ ! -f "$tgt" ]; then
+            # Первая установка: терять нечего.
+            cp "$new" "$tgt"; cp "$new" "$base"
+            echo "  ~ QWEN.md (создан)"
+        else
+            # Базового файла для слияния нет. Если пилот обозначил свою секцию маркерами —
+            # переносим её и создаём базу. Если маркеров нет, слепой cp стирал бы правки
+            # в §8/§9 (они маркерами не обёрнуты) — файл не трогаем и предупреждаем,
+            # как это делает шаблон (upstream #336).
+            local usr; usr="$(sed -n '/^<!-- USER-SPACE/,/^<!-- \/USER-SPACE/p' "$tgt")"
+            if [ -n "$usr" ]; then
+                cp "$new" "$tgt"
+                sed_inplace '/^<!-- USER-SPACE/,/^<!-- \/USER-SPACE/d' "$tgt"
+                printf '\n%s\n' "$usr" >> "$tgt"
+                cp "$new" "$base"
+                echo "  ~ QWEN.md (USER-SPACE сохранён, базовый файл создан)"
             else
-                IC_BLOCK=""
+                # Базу здесь НЕ создаём (порт upstream 8fc938b, #541). Прежняя версия
+                # писала сюда новый шаблон как базу, оставляя старый файл пилота: на
+                # следующем прогоне источник совпадал с базой, QWEN.md считался
+                # неизменённым, и пилот видел «Всё актуально» со старыми инструкциями.
+                # Ложная родословная. Без базы расхождение всплывает каждый прогон,
+                # пока его не разрешат руками.
+                QWEN_BASE_MISSING=true
+                echo "  ⚠ QWEN.md НЕ тронут — базового файла для слияния не было."
+                echo "    Сверьте свои правки §8/§9 вручную: diff \"$tgt\" \"$SCRIPT_DIR/QWEN.md\""
+                return 0
             fi
-            # 3. Copy src (with {{KEY}} placeholders) → dst
-            cp "$src" "$dst"
-            # 4. Substitute install_constants: {{KEY}} → VALUE
-            if [ -n "$IC_BLOCK" ]; then
-                while IFS=': ' read -r key val; do
-                    key="${key#"${key%%[! ]*}"}"
-                    val="${val#"${val%%[! ]*}"}"
-                    [[ "$key" =~ ^[A-Z_]+$ ]] && [ -n "$val" ] || continue
-                    sed_inplace "s|{{${key}}}|${val}|g" "$dst"
-                done <<< "$IC_BLOCK"
-            fi
-            # 5. Reinject USER_SECTION
-            if [ -n "$USER_SECTION" ]; then
-                reinject_user_section "$dst" "$USER_SECTION"
-                echo "  ✓ $f → workspace (USER-SPACE preserved)"
-            else
-                echo "  ✓ $f → workspace"
-            fi
-            ;;
-        # issue #891: the .claude/*.yaml|.claude/*.yml|.claude/*.example arm
-        # covers loose top-level .claude/ files (rules-registry.yaml among
-        # them -- sql-pii-guard.sh's AR.112/AR.113 source). They were
-        # manifest-checksummed but matched no branch here before, so a fresh
-        # NEW_FILES entry for one silently fell through this loop and never
-        # reached disk. None of them carry a USER-SPACE block, so the same
-        # helper as the subdir arms is enough.
-        .claude/skills/*|.claude/hooks/*|.claude/rules/*|.claude/rules-lazy/*|.claude/lib/*|.claude/bin/*|.claude/config/*|.claude/detectors/*|.claude/scripts/*|.claude/agents/*|.claude/styles/*|.claude/templates/*|.claude/*.yaml|.claude/*.yml|.claude/*.example)
-            src="$SCRIPT_DIR/$f"
-            dst="$WORKSPACE_DIR/$f"
-            if is_author_mode && [ -f "$dst" ]; then
-                report_author_skip "$f" "$dst"
-                continue
-            fi
-            skip_author_readonly_target "$f" "$dst" && continue
-            mkdir -p "$(dirname "$dst")"
-            if copy_platform_file_preserving_user_space "$src" "$dst" "$f"; then
-                # .claude/bin holds extension-less executables (guarded-rm, issue #940)
-                case "$f" in .claude/bin/*) chmod +x "$dst" ;; esac
-                echo "  ✓ $f → workspace"
-            fi
-            ;;
-        .claude/settings.json)
-            # See repair_pass() comment above (bug-2026-07-11) — never blind-overwrite,
-            # workspace copy carries user hooks/permissions the template doesn't have.
-            dst="$WORKSPACE_DIR/$f"
-            if [ ! -f "$dst" ]; then
-                mkdir -p "$(dirname "$dst")"
-                cp "$SCRIPT_DIR/$f" "$dst"
-                echo "  ✓ $f → workspace (new install)"
-            elif [ "$APPLY_SETTINGS_MERGE" = "true" ]; then
-                # Stage B is applied as a single block AFTER the propagation loop
-                # (apply_settings_merge_if_requested) — only silence here,
-                # so as not to double the output for a file that landed in UPDATED.
-                :
-            fi
-            ;;
-    esac
+        fi
+    else
+        case "$fpath" in
+            memory/*)
+                apply_memory_file "$fpath" "$src" "$tgt" && APPLIED=$((APPLIED+1))
+                return 0
+                ;;
+        esac
+        mkdir -p "$(dirname "$tgt")"
+        if ! copy_preserving_user_space "$src" "$tgt" "$fpath"; then
+            echo "  ⚠ $fpath$USER_SPACE_NOTE"
+            return 0
+        fi
+        case "$fpath" in *.sh) chmod +x "$tgt" ;; esac
+        echo "  ~ $fpath$USER_SPACE_NOTE"
+    fi
+    APPLIED=$((APPLIED+1))
+}
+
+# Снимок дивергенции — ДО первого apply_file, иначе после первого копирования
+# рабочая копия уже равна новому шаблону и снимок не отличит «пилот правил» от
+# «мы только что записали» (upstream 30efdb5).
+for f in "${NEW_FILES[@]}" "${UPDATED_FILES[@]}"; do record_rule_workspace_state "$f"; done
+
+for f in "${NEW_FILES[@]}";     do apply_file "$f"; done
+for f in "${UPDATED_FILES[@]}"; do apply_file "$f"; done
+
+# deprecated cleanup
+for i in "${!DEPRECATED_FOUND[@]}"; do
+    f="${DEPRECATED_FOUND[$i]}"; tgt="$(target_path "$f")"
+    [ -n "$tgt" ] && [ -f "$tgt" ] && rm -f "$tgt" && echo "  - $f (удалён: устарел)" && REMOVED=$((REMOVED+1))
 done
 
-# Stage B: settings merge on an explicit flag — outside the propagation loop, so that it
-# also works on a repeated run, when the template's settings.json is no longer in UPDATED.
-apply_settings_merge_if_requested
-report_settings_merge_drift
-
-# === Step 5d: Repair-pass for critical runtime files ===
-# Runs AFTER propagation so that repair does not duplicate the work of NEW_FILES/UPDATED_FILES.
-# For the function definition see repair_pass() before Step 2 (needed there too for the early-exit branch).
-repair_pass
-
-# === Step 5e: Hot-budget validator (issue #228) ===
-# CLAUDE.md §4 policy: at most 150 lines in total across memory/*.md with horizon: hot.
-# Warning-only (not a hard fail) — exceeding must not block delivery of everything else
-# (the same principle as CLAUDE.md conflict handling, issue #226).
-HOT_BUDGET_LIMIT=150
-if [ -d "$CLAUDE_MEMORY_DIR" ]; then
-    HOT_LINES=0
-    HOT_FILES=()
-    for mem_file in "$CLAUDE_MEMORY_DIR"/*.md; do
-        [ -f "$mem_file" ] || continue
-        if [ "$(get_field "$mem_file" horizon)" = "hot" ]; then
-            # awk NR (not wc -l) — wc -l counts newlines and undercounts by 1
-            # for files without a trailing newline, silently hiding an overrun.
-            n=$(awk 'END{print NR}' "$mem_file")
-            HOT_LINES=$((HOT_LINES + n))
-            HOT_FILES+=("$(basename "$mem_file"): $n")
-        fi
-    done
-    if [ "$HOT_LINES" -gt "$HOT_BUDGET_LIMIT" ]; then
-        echo ""
-        echo "  ⚠ HOT-бюджет превышен: $HOT_LINES строк (лимит $HOT_BUDGET_LIMIT) в $CLAUDE_MEMORY_DIR"
-        for entry in "${HOT_FILES[@]}"; do echo "      - $entry"; done
-        echo "    Понизьте horizon: hot → warm для части файлов или сократите содержимое."
+# repair-pass (lite): scope-файлы, отсутствующие в target, — досоздать
+while IFS='|' read -r fpath _; do
+    [ -z "$fpath" ] && continue
+    tgt="$(target_path "$fpath")"; [ -z "$tgt" ] && continue
+    src="$SCRIPT_DIR/$fpath"; [ -f "$src" ] || continue
+    bn="$(basename "$fpath")"
+    [ "$bn" = "MEMORY.md" ] && continue
+    [ "$fpath" = "QWEN.md" ] && continue
+    if [ ! -f "$tgt" ]; then
+        mkdir -p "$(dirname "$tgt")"; cp "$src" "$tgt"
+        case "$fpath" in *.sh) chmod +x "$tgt" ;; memory/*) save_memory_baseline "$fpath" "$tgt" ;; esac
+        echo "  ⟲ $fpath (восстановлен)"; APPLIED=$((APPLIED+1))
     fi
-fi
+done < <(manifest_paths)
 
-# (Step 6b removed — repo rename no longer supported, no link migration needed)
-
-# === Step 6b2: Self-heal missing extensions/ (WP-7 Phase 133) ===
-# setup.sh never created $WORKSPACE_DIR/extensions/ before this fix (only
-# read from it — MCP_USER below, day-open-hooks-runner.sh step 0), so every
-# install that ran setup.sh before this fix landed and will never re-run
-# setup.sh is stuck without it. day-open-hooks.sh's fail-closed contract
-# ("every install ships extensions/") then aborts the canonical Day Open
-# pipeline on every single run — confirmed live (Ruslan, 2026-09-09).
-# Idempotent no-op once the directory exists, same as any other self-heal.
-if ! $CHECK_ONLY; then
-    mkdir -p "$WORKSPACE_DIR/extensions"
-fi
-
-MCP_TEMPLATE="$SCRIPT_DIR/.mcp.json"
-MCP_WORKSPACE="$WORKSPACE_DIR/.mcp.json"
-MCP_USER="$WORKSPACE_DIR/extensions/mcp-user.json"
-
-# === Step 6c: Migrate workspace .mcp.json to Gateway ===
-# Strategy: migrate in-place first (preserving user servers), then fallback to template copy.
-# This preserves any user-added MCP servers that are NOT in extensions/mcp-user.json.
-
-if [ -f "$MCP_WORKSPACE" ] && py_available; then
-    # issue #402 (defect 2): path via argv, not interpolated — see FILES_MATCH above.
-    $PY_BIN -c "
-import json, sys
-
-with open(sys.argv[1], encoding='utf-8') as f:
-    data = json.load(f)
-
-servers = data.get('mcpServers', {})
-old_keys = [k for k in servers if k in ('knowledge-mcp', 'digital-twin-mcp', 'personal-knowledge-mcp')]
-changed = False
-
-if old_keys:
-    # Remove old stdio servers
-    for k in old_keys:
-        del servers[k]
-    changed = True
-
-if 'iwe-knowledge' not in servers:
-    # Add new remote Gateway
-    servers['iwe-knowledge'] = {'type': 'http', 'url': 'https://mcp.aisystant.com/mcp'}
-    changed = True
-
-if changed:
-    # Move iwe-knowledge to the front, keep all other servers
-    ordered = {'iwe-knowledge': servers.pop('iwe-knowledge')}
-    ordered.update(servers)
-    data['mcpServers'] = ordered
-    with open(sys.argv[1], 'w', encoding='utf-8') as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
-        f.write('\n')
-    removed = ', '.join(old_keys) if old_keys else ''
-    msg = '  ✓ .mcp.json мигрирован'
-    if removed:
-        msg += ': ' + removed + ' → iwe-knowledge (Gateway)'
-    else:
-        msg += ': добавлен iwe-knowledge (Gateway)'
-    print(msg)
-" "$MCP_WORKSPACE" 2>/dev/null
-elif [ ! -f "$MCP_WORKSPACE" ] && [ -f "$MCP_TEMPLATE" ]; then
-    # No workspace .mcp.json — copy from template.
-    # issue #786: a bare cp left {{HOME_DIR}} literally — ext-railway did not
-    # start. The same substitution procedure that is already applied to CLAUDE.md.
-    if substitute_claude_placeholders "$MCP_TEMPLATE" "$MCP_WORKSPACE"; then
-        echo "  ✓ .mcp.json создан из шаблона (Gateway)"
-    else
-        echo "  ✗ не удалось создать $MCP_WORKSPACE из шаблона"
-    fi
-elif [ -f "$MCP_WORKSPACE" ] && ! py_available; then
-    # No python3 — check if already migrated, otherwise warn
-    if grep -q 'iwe-knowledge' "$MCP_WORKSPACE" 2>/dev/null; then
-        echo "  ✓ .mcp.json уже содержит iwe-knowledge"
-    else
-        echo "  ⚠ .mcp.json: python3 не найден, автомиграция пропущена."
-        echo "    Замените knowledge-mcp/digital-twin-mcp на iwe-knowledge вручную."
-        echo "    Образец: $MCP_TEMPLATE"
-    fi
-fi
-
-# issue #786 (a gap found by review after the first fix): the three branches above only fix
-# "the file does not exist yet" or "the server is outdated". The issue author reported a file
-# BYTE-IDENTICAL to the template — the python migration does not touch such a file
-# (changed stays false, no stale keys), and without python3 the branch just
-# warns. {{HOME_DIR}} in an already existing workspace file was not healed by
-# any path. We check and fix separately, regardless of what
-# happened above.
-if [ -f "$MCP_WORKSPACE" ] && grep -qF '{{HOME_DIR}}' "$MCP_WORKSPACE" 2>/dev/null; then
-    if sed_inplace "s|{{HOME_DIR}}|$(sed_escape_replacement "${ENV_HOME_DIR:-$HOME}")|g" "$MCP_WORKSPACE"; then
-        echo "  ✓ .mcp.json: {{HOME_DIR}} подставлен в уже существующем файле (issue #786)"
-    else
-        echo "  ✗ .mcp.json: не удалось подставить {{HOME_DIR}} в уже существующий файл"
-    fi
-fi
-
-# WP-7 (template cleanup, 2026-11-01): until this release the template .mcp.json
-# shipped the author's ext-railway server, whose command is a wrapper from the author's
-# secrets directory. The user does not have this file, so the server crashed on every
-# agent start. Step 6c above keeps all of the user's servers, so a single
-# removal from the template fixes only new installs; here is the migration for
-# already installed copies.
-#
-# One rule for all cases: an entry is removed only if its command points
-# to the railway wrapper in the home folder (with the path substituted or with an
-# unsubstituted placeholder) AND this file is not in place. If the file exists, the person
-# connected railway themselves, and the entry stays. Existence is checked by bash, not by
-# Python: on Windows native Python does not understand Git Bash paths like /c/Users/...
-# The step comes AFTER the home folder substitution and BEFORE merging in mcp-user.json:
-# a railway that the person described themselves in extensions/mcp-user.json will be merged
-# back. Python or jq — whichever is available; if neither is present the step is skipped
-# with a message (like the merge below): cutting JSON by text replacement is unreliable.
-# BEGIN-TESTABLE: drop-dead-railway-mcp
-drop_dead_railway_mcp() {
-    local mcp_file="$1" home_dir="${2%/}"
-    local tpl_cmd='{{HOME_DIR}}/.secrets/mcp-railway.sh'
-    local real_cmd="$home_dir/.secrets/mcp-railway.sh"
-    local tmp removed
-
-    [ -f "$mcp_file" ] || return 0
-    grep -qF 'mcp-railway.sh' "$mcp_file" 2>/dev/null || return 0
-    [ -e "$real_cmd" ] && return 0
-
-    # .mcp.json is a symlink (e.g. from a home-files manager): mv would replace the
-    # symlink with a regular file and silently break the user's setup. We do not touch it,
-    # and say what to remove by hand.
-    if [ -L "$mcp_file" ]; then
-        echo "  ○ .mcp.json — ярлык, автоматическая чистка пропущена: в нём осталась запись railway без файла запуска."
-        echo "    Удалите сервер с командой .../.secrets/mcp-railway.sh в исходном файле, на который ведёт ярлык."
-        return 0
-    fi
-
-    tmp=$(mktemp "${mcp_file}.railway.XXXXXX") || {
-        echo "  ✗ .mcp.json: не удалось создать временный файл, ext-railway не проверен"
-        return 0
-    }
-    # The .mcp.json permissions are preserved: mktemp creates a file with mode 600, and after
-    # mv that would silently replace the user's permissions. The mode is remembered before writing
-    # (GNU stat, otherwise BSD stat) and set on the temporary file before mv. Not
-    # cp -p: that would carry a "read-only" mode (400/444) over to the temporary file
-    # BEFORE writing, and writing to it would fail.
-    local mode
-    mode=$(stat -c '%a' "$mcp_file" 2>/dev/null || stat -f '%Lp' "$mcp_file" 2>/dev/null) || mode=""
-    if [ -z "$mode" ]; then
-        rm -f "$tmp"
-        echo "  ✗ .mcp.json: не удалось прочитать права файла, ext-railway не проверен"
-        return 0
-    fi
-    if py_available; then
-        removed=$($PY_BIN - "$mcp_file" "$tmp" "$tpl_cmd" "$real_cmd" <<'PY'
-import json, sys
-
-src, dst, tpl_cmd, real_cmd = sys.argv[1:5]
-with open(src, encoding='utf-8') as f:
-    data = json.load(f)
-servers = data.get('mcpServers')
-removed = []
-if isinstance(servers, dict):
-    for name, cfg in list(servers.items()):
-        if isinstance(cfg, dict) and cfg.get('command') in (tpl_cmd, real_cmd):
-            del servers[name]
-            removed.append(name)
-if removed:
-    with open(dst, 'w', encoding='utf-8') as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
-        f.write('\n')
-print(' '.join(removed))
-PY
-        ) || removed="__error__"
-    elif command -v jq >/dev/null 2>&1; then
-        # As in the Python branch: only object entries; a value of another type
-        # (null, string) is left alone by the filter rather than deleted along the way.
-        local jq_match='(.value | type) == "object" and (.value.command == $tpl or .value.command == $real)'
-        removed=$(jq -r --arg tpl "$tpl_cmd" --arg real "$real_cmd" \
-            "[(.mcpServers // {}) | objects | to_entries[] | select($jq_match) | .key] | join(\" \")" \
-            "$mcp_file" 2>/dev/null) || removed="__error__"
-        if [ -n "$removed" ] && [ "$removed" != "__error__" ]; then
-            jq --arg tpl "$tpl_cmd" --arg real "$real_cmd" \
-                ".mcpServers |= with_entries(select(($jq_match) | not))" \
-                "$mcp_file" > "$tmp" 2>/dev/null || removed="__error__"
-        fi
-    else
-        rm -f "$tmp"
-        echo "  ○ .mcp.json: нет ни python3, ни jq — проверка устаревшего ext-railway пропущена"
-        echo "    Если агент сообщает, что ext-railway не запускается, удалите этот сервер из .mcp.json вручную."
-        return 0
-    fi
-
-    if [ "$removed" = "__error__" ]; then
-        rm -f "$tmp"
-        echo "  ✗ .mcp.json: не удалось разобрать файл, ext-railway не проверен"
-    elif [ -n "$removed" ]; then
-        if chmod "$mode" "$tmp" && mv "$tmp" "$mcp_file"; then
-            echo "  ✓ .mcp.json: убран неработающий сервер railway ($removed) — файла его запуска нет в домашней папке"
-        else
-            rm -f "$tmp"
-            echo "  ✗ .mcp.json: не удалось записать файл, ext-railway не убран"
-        fi
-    else
-        rm -f "$tmp"
-    fi
-    return 0
-}
-# END-TESTABLE: drop-dead-railway-mcp
-drop_dead_railway_mcp "$MCP_WORKSPACE" "${ENV_HOME_DIR:-$HOME}"
-
-# Merge extensions/mcp-user.json into workspace .mcp.json (always, if both exist)
-if [ -f "$MCP_WORKSPACE" ] && [ -f "$MCP_USER" ]; then
-    if command -v jq >/dev/null 2>&1; then
-        USER_COUNT=$(jq '.mcpServers | length' "$MCP_USER" 2>/dev/null || echo "0")
-        if [ "$USER_COUNT" -gt 0 ]; then
-            MCP_MERGED=$(jq -s '.[0].mcpServers * .[1].mcpServers | {mcpServers: .}' "$MCP_WORKSPACE" "$MCP_USER" 2>/dev/null)
-            if [ -n "$MCP_MERGED" ]; then
-                echo "$MCP_MERGED" > "$MCP_WORKSPACE"
-                echo "  ✓ .mcp.json — $USER_COUNT пользовательских MCP из extensions/mcp-user.json добавлены"
-            fi
-        fi
-    else
-        echo "  ○ .mcp.json — jq не установлен, мёрж extensions/mcp-user.json пропущен"
-        echo "    Установите jq: brew install jq"
-    fi
-fi
-
-# === Step 6d: Rebuild generated runtime BEFORE roles reinstall (WP-273 R5 fix) ===
-# Evgeny's Round 5 found an ordering problem: roles reinstall was called BEFORE build-runtime,
-# so install.sh took plists from a stale .iwe-runtime/ or legacy FMT with placeholders.
-# The correct order: first rebuild .iwe-runtime/ from the current FMT + .exocortex.env,
-# then install.sh of each role (reading from the fresh runtime).
+# === Step 5: generated runtime (.iwe-runtime/, params.yaml, .qwen/sync-manifest.yaml) ===
 run_build_runtime_or_die
 
-# Linux scheduler ownership is checked immediately before touching the user's
-# systemd units or crontab. A secondary workspace must never claim the primary
-# installation's schedule, and a missing schedule is not proof of ownership.
-linux_systemd_strategist_owned() {
-    local unit root count current_root service timer expected_command
-    current_root="$(canonical_workspace_path "$WORKSPACE_DIR")"
-    for unit in iwe-strategist-morning iwe-strategist-weekreview; do
-        service="$HOME/.config/systemd/user/$unit.service"
-        timer="$HOME/.config/systemd/user/$unit.timer"
-        [ -f "$service" ] && [ -f "$timer" ] || return 1
-        [ ! -L "$service" ] && [ ! -L "$timer" ] || return 1
-        [ ! -e "$service.d" ] && [ ! -e "$timer.d" ] || return 1
-        ! grep -q '^EnvironmentFile=' "$service" || return 1
-        count=$(grep -c '^Environment=IWE_WORKSPACE=' "$service" || true)
-        [ "$count" -eq 1 ] || return 1
-        root=$(sed -n 's/^Environment=IWE_WORKSPACE=//p' "$service")
-        [ "$(canonical_workspace_path "$root")" = "$current_root" ] || return 1
-        count=$(grep -c '^Unit=' "$timer" || true)
-        [ "$count" -eq 1 ] && grep -Fxq "Unit=$unit.service" "$timer" || return 1
-        expected_command="$WORKSPACE_DIR/.iwe-runtime/roles/strategist/scripts/strategist.sh"
-        count=$(grep -c '^ExecStart=' "$service" || true)
-        [ "$count" -eq 1 ] || return 1
-        case "$unit" in
-            iwe-strategist-morning) grep -Fxq "ExecStart=$expected_command morning" "$service" || return 1 ;;
-            iwe-strategist-weekreview) grep -Fxq "ExecStart=$expected_command week-review" "$service" || return 1 ;;
-        esac
-    done
-}
-
-linux_cron_strategist_owned() {
-    local cron_text expected_prefix expected_command begin end line
-    local minute hour day month weekday command
-    local inside=false begins=0 ends=0 morning=0 weekreview=0
-    command -v crontab >/dev/null 2>&1 || return 1
-    cron_text=$(crontab -l 2>/dev/null) || return 1
-    [ -f "$SCRIPT_DIR/roles/lib/scheduler-cron.sh" ] || return 1
-    # This helper defines the exact prefix written by the role installer.
-    # A partially edited block is left untouched for manual reconciliation.
-    . "$SCRIPT_DIR/roles/lib/scheduler-cron.sh"
-    expected_prefix=$(IWE_TEMPLATE="$SCRIPT_DIR" \
-        IWE_WORKSPACE="$WORKSPACE_DIR" \
-        IWE_RUNTIME="$WORKSPACE_DIR/.iwe-runtime" \
-        IWE_GOVERNANCE_REPO="${EFFECTIVE_GOVERNANCE_REPO:-$(effective_governance_repo)}" \
-        iwe_cron_env_prefix)
-    expected_command="$WORKSPACE_DIR/.iwe-runtime/roles/strategist/scripts/strategist.sh"
-    begin='# BEGIN IWE-strategist (cron fallback, issue #454)'
-    end='# END IWE-strategist'
-    while IFS= read -r line; do
-        case "$line" in
-            "$begin")
-                if $inside || [ "$begins" -ne 0 ]; then return 1; fi
-                inside=true
-                begins=$((begins + 1))
-                ;;
-            "$end")
-                if ! $inside; then return 1; fi
-                inside=false
-                ends=$((ends + 1))
-                ;;
-            *)
-                if $inside; then
-                    case "$line" in *'#'*|'') return 1 ;; esac
-                    read -r minute hour day month weekday command <<EOF
-$line
-EOF
-                    [ -n "$command" ] || return 1
-                    case "$command" in
-                        "$expected_prefix $expected_command morning >> $HOME/logs/strategist/cron-morning.log 2>&1")
-                            morning=$((morning + 1)) ;;
-                        "$expected_prefix $expected_command week-review >> $HOME/logs/strategist/cron-weekreview.log 2>&1")
-                            weekreview=$((weekreview + 1)) ;;
-                        *) return 1 ;;
-                    esac
-                else
-                    case "$line" in
-                        \#*|'') ;;
-                        *strategist.sh*) return 1 ;;
-                    esac
-                fi
-                ;;
-        esac
-    done <<EOF
-$cron_text
-EOF
-    ! $inside && [ "$begins" -eq 1 ] && [ "$ends" -eq 1 ] &&
-        [ "$morning" -eq 1 ] && [ "$weekreview" -eq 1 ]
-}
-
-reinstall_linux_strategist() {
-    local systemd_dir="$HOME/.config/systemd/user" cron_text="" systemd_found=false cron_found=false
-    local role_dir="$SCRIPT_DIR/roles/strategist" unit state active_units=()
-    local cron_backup_dir cron_backup
-
-    for unit in iwe-strategist-morning iwe-strategist-weekreview; do
-        if [ -e "$systemd_dir/$unit.service" ] || [ -L "$systemd_dir/$unit.service" ] ||
-           [ -e "$systemd_dir/$unit.timer" ] || [ -L "$systemd_dir/$unit.timer" ]; then
-            systemd_found=true
-        fi
-    done
-    if ! command -v crontab >/dev/null 2>&1; then
-        echo "  ○ Linux-расписание Стратега не изменено: crontab недоступен, отсутствие второго расписания не подтверждено"
-        return 0
-    fi
-    if ! cron_text=$(crontab -l 2>&1); then
-        case "$cron_text" in
-            *'no crontab for '*) cron_text="" ;;
-            *)
-                echo "  ○ Linux-расписание Стратега не изменено: не удалось прочитать crontab"
-                return 0
-                ;;
-        esac
-    fi
-    if printf '%s\n' "$cron_text" | grep -Eq '^# (BEGIN|END) IWE-strategist( |$)|^[[:space:]]*[^#[:space:]].*strategist\.sh'; then
-        cron_found=true
-    fi
-
-    if $HOST_GLOBAL_OWNER_CONFLICT; then
-        echo "  ○ Linux-расписание Стратега не изменено: $HOST_GLOBAL_OWNER_CONFLICT_REASON"
-        return 0
-    fi
-    if $systemd_found && $cron_found; then
-        echo "  ○ Linux-расписание Стратега не изменено: найдены и systemd, и cron; выберите один вручную"
-        return 0
-    fi
-    if $systemd_found; then
-        if ! command -v systemctl >/dev/null 2>&1 ||
-           ! systemctl --user list-timers --no-legend >/dev/null 2>&1; then
-            echo "  ○ Linux-расписание Стратега не изменено: нет пользовательской шины systemd; переход на cron требует ручного решения"
-            return 0
-        fi
-        if ! linux_systemd_strategist_owned; then
-            echo "  ○ Linux-расписание Стратега не изменено: владелец systemd units не подтверждён"
-            return 0
-        fi
-        for unit in iwe-strategist-morning iwe-strategist-weekreview; do
-            state=$(systemctl --user is-enabled "$unit.timer" 2>/dev/null || true)
-            case "$state" in
-                disabled|masked|masked-runtime) continue ;;
-                enabled) ;;
-                *)
-                    echo "  ○ Linux-расписание Стратега не изменено: неизвестное состояние $unit.timer ($state)"
-                    return 0
-                    ;;
-            esac
-            if [ "$(systemctl --user is-active "$unit.timer" 2>/dev/null || true)" != active ]; then
-                echo "  ○ Linux-расписание Стратега не изменено: $unit.timer включён, но остановлен; запуск требует ручного решения"
-                return 0
-            fi
-            active_units+=("$unit.timer")
-        done
-        if [ "${#active_units[@]}" -eq 0 ]; then
-            echo "  ○ Linux-расписание Стратега отключено пользователем; автоматическая переустановка пропущена"
-            return 0
-        fi
-    elif $cron_found; then
-        if command -v systemctl >/dev/null 2>&1 &&
-           systemctl --user list-timers --no-legend >/dev/null 2>&1; then
-            echo "  ○ Linux-расписание Стратега не изменено: cron установлен при доступном systemd; переход требует ручного решения"
-            return 0
-        fi
-        if ! linux_cron_strategist_owned; then
-            echo "  ○ Linux-расписание Стратега не изменено: владелец cron-блока не подтверждён или задание отключено"
-            return 0
-        fi
-        cron_backup_dir="$HOME/.local/state/iwe/cron-backups"
-        mkdir -p -m 700 "$cron_backup_dir"
-        chmod 700 "$cron_backup_dir"
-        if ! cron_backup=$(mktemp "$cron_backup_dir/strategist.XXXXXXXX"); then
-            echo "  ⚠ Стратег: не удалось создать резервную копию crontab" >&2
-            return 1
-        fi
-        chmod 600 "$cron_backup"
-        if ! crontab -l > "$cron_backup"; then
-            rm -f "$cron_backup"
-            echo "  ⚠ Стратег: не удалось сохранить crontab перед обновлением" >&2
-            return 1
-        fi
-        echo "  • Предыдущее расписание cron сохранено: $cron_backup"
-    else
-        echo "  ○ Linux-расписание Стратега не найдено; автоматическая установка без доказательства владения пропущена"
-        return 0
-    fi
-
-    if ! IWE_WORKSPACE="$WORKSPACE_DIR" \
-         IWE_TEMPLATE="$SCRIPT_DIR" \
-         IWE_SCRIPTS="$SCRIPT_DIR/scripts" \
-         IWE_RUNTIME="$WORKSPACE_DIR/.iwe-runtime" \
-         IWE_GOVERNANCE_REPO="${EFFECTIVE_GOVERNANCE_REPO:-$(effective_governance_repo)}" \
-         bash "$role_dir/install.sh"; then
-        echo "  ⚠ Стратег: переустановка расписания не завершена; проверьте её вручную"
-        return 1
-    fi
-    if $systemd_found; then
-        for unit in "${active_units[@]}"; do
-            if ! systemctl --user restart "$unit"; then
-                echo "  ⚠ $unit: новое время не применено; перезапустите таймер вручную"
-                return 1
-            fi
-        done
-    fi
-    echo "  ✓ Стратег: Linux-расписание обновлено"
-}
-
-print_optional_linux_role_instruction() {
-    local role="$1" display="$2"
-    printf '  ○ %s: если расписание установлено вручную, обновите его: ' "$display"
-    printf 'IWE_WORKSPACE=%q IWE_TEMPLATE=%q IWE_RUNTIME=%q IWE_SCRIPTS=%q IWE_GOVERNANCE_REPO=%q bash %q\n' \
-        "$WORKSPACE_DIR" "$SCRIPT_DIR" "$WORKSPACE_DIR/.iwe-runtime" \
-        "$SCRIPT_DIR/scripts" "${EFFECTIVE_GOVERNANCE_REPO:-$(effective_governance_repo)}" \
-        "$SCRIPT_DIR/roles/$role/install.sh"
-}
-
-# Reinstall roles if changed (AFTER build-runtime — install reads from the fresh .iwe-runtime/)
-ROLES_CHANGED=false
-STRATEGIST_CHANGED=false
-SYNCHRONIZER_CHANGED=false
-EXTRACTOR_CHANGED=false
-for f in "${NEW_FILES[@]}" "${UPDATED_FILES[@]}"; do
-    case "$f" in roles/*)
-        ROLES_CHANGED=true
-        ;;
-    esac
-    case "$f" in roles/strategist/*|roles/lib/*)
-        STRATEGIST_CHANGED=true
-        ;;
-    esac
-    case "$f" in roles/synchronizer/*|roles/lib/*)
-        SYNCHRONIZER_CHANGED=true
-        ;;
-    esac
-    case "$f" in roles/extractor/*|roles/lib/*)
-        EXTRACTOR_CHANGED=true
-        ;;
-    esac
-done
-
-if $ROLES_CHANGED && [ "$(uname -s)" != Linux ] && command -v launchctl >/dev/null 2>&1; then
-    # issue #768: role installers register real launchd jobs under the
-    # current user's real $HOME — a foreign/unowned host-global state must
-    # not have those jobs reloaded pointing at this copy.
-    if $HOST_GLOBAL_OWNER_CONFLICT; then
-        echo ""
-        echo "  ○ Переустановка launchd-ролей пропущена: $HOST_GLOBAL_OWNER_CONFLICT_REASON"
-    else
-    echo ""
-    echo "Роли обновлены. Переустановка..."
-    # WP-529 Phase 94 (peer-session 2026-09-08-32): $HOME/.iwe-paths is a legacy
-    # path install-iwe-paths.sh stopped writing — sourcing it here silently
-    # no-op'd (`[ -f ... ] && .` is not an error if the file is absent), so
-    # role installers ran without IWE_RUNTIME/IWE_TEMPLATE/IWE_SCRIPTS in
-    # their environment. update.sh already knows all of these; pass them
-    # explicitly instead of relying on a file that may not exist.
-    ROLE_REINSTALL_GOV="${EFFECTIVE_GOVERNANCE_REPO:-$(effective_governance_repo)}"
-    # BEGIN-TESTABLE: role-reinstall-loop (setup/test-update-issue-1143.sh
-    # extracts exactly this block by these two sentinel comments and evals
-    # it in a sandbox — keep the sentinels on their own line, verbatim, if
-    # this block moves or is edited).
-    # WP-529 Ф270, finding M1 (rc.13 Mac check): setup.sh --core leaves the
-    # auto:true roles out and records that in .iwe-install-mode, but this
-    # loop installed them anyway. Kept apart from is_auto: the role still
-    # wants to run on its own, the user just did not allow it here.
-    core_mode=false
-    [ "$(head -n 1 "$WORKSPACE_DIR/.iwe-install-mode" 2>/dev/null | tr -d '\r\t ')" = "core" ] && core_mode=true
-    for role_dir in "$SCRIPT_DIR"/roles/*/; do
-        [ -f "$role_dir/install.sh" ] && [ -f "$role_dir/role.yaml" ] || continue
-        role_name="$(basename "$role_dir")"
-        is_auto=false
-        grep -q 'auto:.*true' "$role_dir/role.yaml" 2>/dev/null && is_auto=true
-
-        # An auto:true role is not touched at all on a core install, even if
-        # some of its jobs are on disk: install.sh (strategist) loads every
-        # job it has, and no file on disk proves which ones the user loaded
-        # by hand (peer session 2026-11-12-16, Kimi and Codex).
-        if $core_mode && $is_auto; then
-            echo "  ○ $role_name: установка в урезанном режиме (--core) — роль не трогаем."
-            echo "    Включить или обновить: bash \"${role_dir}install.sh\""
-            continue
-        fi
-
-        # issue #1143: a role with auto:false (synchronizer, extractor) is
-        # never reinstalled here, so a user who installed it before the
-        # plist template changed (e.g. 0.40.0 added IWE_SCRIPTS, line 62)
-        # keeps running the stale plist forever — update.sh only knows how
-        # to activate a role the user never asked for (that's what `auto`
-        # means), not how to refresh one already on disk. Detect "already
-        # installed" generically: every role's install.sh declares its own
-        # `PLIST_DST=` line (same convention across synchronizer/extractor);
-        # the role is already installed if that file exists on disk.
-        plist_dst=""
-        plist_dst_line="$(grep -m1 '^PLIST_DST=' "$role_dir/install.sh" 2>/dev/null)" || true
-        if [ -n "$plist_dst_line" ]; then
-            plist_dst="$(eval "$plist_dst_line"; printf '%s' "$PLIST_DST")"
-        fi
-        already_installed=false
-        [ -n "$plist_dst" ] && [ -f "$plist_dst" ] && already_installed=true
-
-        if $is_auto || $already_installed; then
-            # install.sh unconditionally does `launchctl unload` + `load`
-            # (that's correct for auto:true and for a first-time install),
-            # but for an already-installed auto:false role the user may
-            # have deliberately `launchctl unload`-ed it while leaving the
-            # plist file in place — its `load` would fire RunAtLoad once
-            # before we could undo it, dispatching a job the user turned
-            # off. Detect that case before calling install.sh and tell it
-            # to skip `load` outright (IWE_SKIP_LOAD) instead of racing a
-            # load-then-unload after the fact.
-            was_loaded=false
-            skip_load=""
-            if ! $is_auto && [ -n "$plist_dst" ]; then
-                plist_label="$(basename "$plist_dst" .plist)"
-                launchctl list "$plist_label" >/dev/null 2>&1 && was_loaded=true
-                $was_loaded || skip_load=1
-            fi
-
-            # Only stderr is captured (2>&1 then 1>/dev/null): its last line
-            # tells the user why the installer failed.
-            if installer_stderr="$(IWE_WORKSPACE="$WORKSPACE_DIR" \
-                IWE_TEMPLATE="$SCRIPT_DIR" \
-                IWE_SCRIPTS="$SCRIPT_DIR/scripts" \
-                IWE_RUNTIME="$WORKSPACE_DIR/.iwe-runtime" \
-                IWE_GOVERNANCE_REPO="$ROLE_REINSTALL_GOV" \
-                IWE_SKIP_LOAD="$skip_load" \
-                bash "$role_dir/install.sh" 2>&1 1>/dev/null)"; then
-                echo "  ✓ $role_name переустановлен"
-            else
-                installer_rc=$?
-                echo "  ○ $role_name: переустановка не удалась (код $installer_rc). Повторить: bash \"${role_dir}install.sh\""
-                [ -z "$installer_stderr" ] || printf '    %s\n' "${installer_stderr##*$'\n'}"
-            fi
-        fi
-    done
-    # END-TESTABLE: role-reinstall-loop
-    fi
+# === Step 6: ~/.iwe-paths (lookup-слой путей, ~/.zshenv и ~/.bashrc; идемпотентно) ===
+if [ -f "$SCRIPT_DIR/setup/install-iwe-paths.sh" ]; then
+    bash "$SCRIPT_DIR/setup/install-iwe-paths.sh" \
+        --workspace "$WORKSPACE_DIR" --governance "$GOVERNANCE_REPO" --template "$SCRIPT_DIR" --quiet 2>&1 | sed 's/^/  /' || true
 fi
 
-if [ "$(uname -s)" = Linux ] && ! $CHECK_ONLY && [ -z "${SETUP_CI:-}" ]; then
-    if $STRATEGIST_CHANGED; then
-        echo ""
-        echo "Роли обновлены. Проверка Linux-расписания..."
-        reinstall_linux_strategist
-    fi
-    # These roles have auto:false. Updating their files must not silently
-    # activate an optional scheduler that the user installed only by choice.
-    if $SYNCHRONIZER_CHANGED; then
-        print_optional_linux_role_instruction synchronizer Синхронизатор
-    fi
-    if $EXTRACTOR_CHANGED; then
-        print_optional_linux_role_instruction extractor Экстрактор
-    fi
-fi
-
-# === Step 6d2: Regenerate hot-files.list (issue #294/#291) ===
-# Keep the shipped scripts/hot-files.list neutral. The generator writes the
-# install-specific governance path under .iwe-runtime (#388).
-if [ -f "$SCRIPT_DIR/scripts/generate-hot-files-list.sh" ]; then
-    if $CHECK_ONLY; then
-        echo "  [CHECK] Would regenerate .iwe-runtime/hot-files.list (bash $SCRIPT_DIR/scripts/generate-hot-files-list.sh)"
-    else
-        HOTFILES_OUTPUT=$(IWE_ROOT="$WORKSPACE_DIR" bash "$SCRIPT_DIR/scripts/generate-hot-files-list.sh" 2>&1) && \
-            echo "$HOTFILES_OUTPUT" | sed 's/^/  /' || \
-            { echo "$HOTFILES_OUTPUT" | sed 's/^/  /'; echo "  ⚠ .iwe-runtime/hot-files.list не пересобран — запусти вручную: bash $SCRIPT_DIR/scripts/generate-hot-files-list.sh"; }
-    fi
-fi
-
-# === Step 6e: Replace local manifest with downloaded remote manifest ===
-# Replaces entire manifest (files + deprecated_files + version), not just version field.
-# This ensures validators (D1/D9/D10) and future updates see the correct file list.
-# Fork-local exclusions live in update-manifest.local.json (issue #247) —
-# never written by this script, merged by check-manifest-coverage.py and 6f below.
-if [ -f "$MANIFEST" ]; then
-    cp "$MANIFEST" "$SCRIPT_DIR/update-manifest.json" \
-        && echo "  • update-manifest.json: заменён remote manifest (v$UPSTREAM_VERSION)"
-    APPLIED_PATHS+=("update-manifest.json")
-fi
-
-# === Step 6f: Orphan detection — L1 files not in manifest ===
-# Warn about files present on disk in L1 directories that are not listed in
-# update-manifest.json (neither in files[] nor deprecated_files[]).
-# These may be stale user customisations or files left over from a renamed skill.
-# Never auto-deletes; always informational only.
-if py_available && [ -f "$SCRIPT_DIR/update-manifest.json" ]; then
-    ORPHAN_OUTPUT=""
-    if ! ORPHAN_OUTPUT=$($PY_BIN - "$SCRIPT_DIR" 2>&1 <<'PYEOF'
-import json, os, sys
-
-script_dir = os.path.realpath(sys.argv[1])
-manifest_path = os.path.join(script_dir, "update-manifest.json")
-
-with open(manifest_path, encoding='utf-8') as f:
-    manifest = json.load(f)
-
-def _path(e): return e["path"] if isinstance(e, dict) else e
-known = {_path(e) for e in manifest.get("files", [])}
-deprecated = {_path(e) for e in manifest.get("deprecated_files", [])}
-all_known = known | deprecated
-
-# Fork-local exclusions (issue #247): files the user deliberately keeps in L1
-# directories are not orphans. Same schema as manifest excluded_paths.
-local_manifest_path = os.path.join(script_dir, "update-manifest.local.json")
-local_excluded = []
-if os.path.isfile(local_manifest_path):
-    try:
-        with open(local_manifest_path, encoding='utf-8') as f:
-            local_excluded = [_path(e) for e in json.load(f).get("excluded_paths", [])]
-    except (json.JSONDecodeError, TypeError) as exc:
-        print(f"  [warn] update-manifest.local.json unreadable, ignored: {exc}")
-
-def _locally_excluded(rel):
-    return any(rel == e.rstrip("/") or rel.startswith(e.rstrip("/") + "/")
-               for e in local_excluded)
-
-L1_DIRS = [".claude/hooks", ".claude/rules", ".claude/skills"]
-L1_PREFIXES = ["memory/protocol-"]
-
-orphans = []
-for base in L1_DIRS:
-    full_base = os.path.join(script_dir, base)
-    if not os.path.isdir(full_base):
-        continue
-    for root, dirs, files in os.walk(full_base):
-        for fname in files:
-            full = os.path.join(root, fname)
-            # issue #680: manifest paths always use "/" (JSON convention);
-            # os.path.relpath returns "\" on Windows, so every file compared
-            # false-orphan there without this normalization.
-            rel = os.path.relpath(full, script_dir).replace(os.sep, "/")
-            if rel not in all_known and not _locally_excluded(rel):
-                tag = "[maybe-L3]" if "extensions/" in rel else "[orphan]"
-                orphans.append((tag, rel))
-
-for tag, rel in sorted(orphans):
-    print(f"  {tag} {rel}")
-PYEOF
-    ); then
-        echo "  ⚠ Проверка orphan-файлов не выполнена; обновление уже применено и остаётся успешным."
-        echo "$ORPHAN_OUTPUT" | sed 's/^/    /'
-        ORPHAN_OUTPUT=""
-    fi
-    if [ -n "$ORPHAN_OUTPUT" ]; then
-        echo ""
-        echo "⚠  Файлы в L1-директориях не найдены в манифесте (не удалять автоматически):"
-        echo "$ORPHAN_OUTPUT"
-        echo "   [orphan]   — возможно устаревший платформенный файл; удалите вручную или"
-        echo "               добавьте в deprecated_files если это намеренно удалённый артефакт."
-        echo "   [maybe-L3] — возможно пользовательское расширение (extensions/)."
-    fi
-fi
-
-# === Step 7: Validate applied changes ===
-echo ""
-echo "Проверка применённых изменений..."
-
-validate_no_install_values_in_applied_additions() {
-    local env_file="$WORKSPACE_DIR/.exocortex.env"
-    local key value fpath applied_additions added_line target_file target_sha256
-    local applied_line_count target_line_count
-    local i failed=0
-    local -a install_keys=() install_values=()
-
-    [ -f "$env_file" ] || return 0
-    [ "${#APPLIED_PATHS[@]}" -gt 0 ] || return 0
-
-    for key in WORKSPACE_DIR HOME_DIR CLAUDE_PATH IWE_TEMPLATE IWE_RUNTIME; do
-        value=$(grep -E "^${key}=" "$env_file" 2>/dev/null |
-            head -1 | cut -d= -f2- |
-            sed -E 's/^"//; s/"$//; s/^'"'"'//; s/'"'"'$//')
-        [ -n "$value" ] || continue
-        # issue #397: the guard looks for the value as a SUBSTRING in all added lines.
-        # For paths (WORKSPACE_DIR etc.) this makes sense — an accidental match with an
-        # absolute personal path is unlikely. But CLAUDE_PATH from setup defaults to
-        # a bare command name (`claude`), not a path: the substring "claude" matches in almost
-        # any added template file (comments, names like claude-peer-adapter.sh, etc.)
-        # and turns the guard into a permanent false block. A guard value without
-        # "/" carries no path meaning — only real absolute paths distinguish a personal installation.
-        case "$value" in
-            */*) ;;
-            *) continue ;;
-        esac
-        install_keys+=("$key")
-        install_values+=("$value")
-    done
-
-    # issue #524: provenance belongs to the exact target release, not the old
-    # installation fork's history. First accept a whole file whose bytes match
-    # its unique target-manifest hash. This also works in the deliberately
-    # tainted no-Python mode, which exits 4 after applying the update.
-    #
-    # A legitimate 3-way merge cannot match the whole-file hash. For that case,
-    # fall through to the already integrity-verified downloaded target payload:
-    # each install-valued line must exist in that exact same target file and may
-    # occur no more often than in the target. Cross-file matches, unverified
-    # payloads and locally duplicated canonical lines remain fail-closed.
-    #
-    # Deterministic in both environments (Codex peer review, 2026-08-24-07):
-    # the python path and the shell fallback give the same result on one manifest
-    # — P0 does not stay reproducible only in environments without python3/python.
-    # Upstream manifest of this run; the reader itself is manifest_sha256_of (top level).
-    manifest_sha256_for_path() {
-        manifest_sha256_of "$MANIFEST" "$1"
-    }
-
-    for fpath in "${APPLIED_PATHS[@]}"; do
-        if [ -f "$SCRIPT_DIR/$fpath" ] && target_sha256=$(manifest_sha256_for_path "$fpath") \
-           && [ "$(hash_file "$SCRIPT_DIR/$fpath")" = "$target_sha256" ]; then
-            echo "  install-path guard: $fpath exempt (byte-identical to target manifest sha256)" >&2
-            continue
-        fi
-        echo "  install-path guard: $fpath -- no manifest hash match, falling back to verified target-line provenance" >&2
-        # The full current contents of the file on disk, not a git diff of the working
-        # tree against HEAD. A cold-context review found a live hole: if the file
-        # is already COMMITTED before this run (a second update.sh run after a
-        # manual commit, a pre-commit hook, etc.) — the git diff between working
-        # tree and HEAD is empty for this file (no difference), applied_additions
-        # becomes an empty string, "[ -n ... ] || continue" silently
-        # skips the file ENTIRELY from the check — a real leak passes
-        # unnoticed. A file in APPLIED_PATHS means "this run touched it",
-        # regardless of git status — what must be scanned is what
-        # actually lies on disk right now.
-        if [ -f "$SCRIPT_DIR/$fpath" ]; then
-            applied_additions=$(sed -n 'p' "$SCRIPT_DIR/$fpath")
-        else
-            continue
-        fi
-        [ -n "$applied_additions" ] || continue
-
-        target_file="${TMPDIR_UPDATE:-}/files/$fpath"
-
-        while IFS= read -r added_line || [ -n "$added_line" ]; do
-            for i in "${!install_keys[@]}"; do
-                [[ "$added_line" == *"${install_values[$i]}"* ]] || continue
-
-                # The exception is scoped to the identical target file and to
-                # the target's exact multiplicity of this full line. A local
-                # duplicate of an otherwise canonical line has no provenance.
-                # Cross-file text and unverified payloads never establish it.
-                if [ "${INTEGRITY_TAINTED:-true}" != false ] || \
-                   [ ! -f "$target_file" ] || \
-                   ! grep -Fqx -- "$added_line" "$target_file"; then
-                    echo "  ✗ install-value ${install_keys[$i]} найден в новой строке обновления:" >&2
-                    printf '    %s\n' "$fpath" >&2
-                    failed=1
-                    continue
-                fi
-                applied_line_count=$(grep -Fxc -- "$added_line" "$SCRIPT_DIR/$fpath" || true)
-                target_line_count=$(grep -Fxc -- "$added_line" "$target_file" || true)
-                if [ "$applied_line_count" -gt "$target_line_count" ]; then
-                    echo "  ✗ install-value ${install_keys[$i]} продублирован сверх проверенного target payload:" >&2
-                    printf '    %s\n' "$fpath" >&2
-                    failed=1
-                fi
-            done
-        done <<<"$applied_additions"
-    done
-
-    [ "$failed" -eq 0 ]
-}
-
-if ! validate_no_install_values_in_applied_additions; then
-    echo "  ОШИБКА: обновление остановлено, чтобы не оставить install paths в шаблоне." >&2
-    exit 1
-fi
-
-if [ "${#APPLIED_PATHS[@]}" -gt 0 ]; then
-    echo "  ✓ Установочные пути не попали в применённые строки."
-    echo "  ℹ Изменения оставлены незакоммиченными: проверьте их и синхронизируйте форк через git."
-    report_executable_index_mismatches manifest
-else
-    echo "  Нет изменений шаблона для проверки."
-fi
-
-# === Step 7.5: Migration hint — initial-marker for old clones (0.28.5+) ===
-# If the user has a Strategy.md without the IWE-INITIAL-NEEDED marker — give a hint.
-# This is for users who cloned before 0.28.5 (the skeleton marker appeared in 0.28.5).
-# WP-273 0.29.4 R6.4 fix: after WP-273 .exocortex.env lives in the workspace, not in FMT.
-# Previously $SCRIPT_DIR (FMT) was used → the file is not there → the hint was never shown.
-ENV_FILE="${WORKSPACE_DIR}/.exocortex.env"
-if [ -f "$ENV_FILE" ]; then
-    ENV_WS=$(grep -E '^WORKSPACE_DIR=' "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'")
-    ENV_GOV=$(grep -E '^GOVERNANCE_REPO=' "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'")
-    USER_STRATEGY="${ENV_WS:-}/${ENV_GOV:-DS-strategy}/docs/Strategy.md"
-    if [ -f "$USER_STRATEGY" ] && ! grep -qF 'IWE-INITIAL-NEEDED' "$USER_STRATEGY"; then
-        if grep -qE '^created: YYYY-MM-DD$|^updated: YYYY-MM-DD$' "$USER_STRATEGY" 2>/dev/null; then
-            echo ""
-            echo "⚠ Strategy.md выглядит как seed-скелет, но без маркера IWE-INITIAL-NEEDED (0.28.5+)."
-            echo "  Чтобы /strategy-session корректно ушёл в initial flow, добавьте маркер:"
-            echo "    bash $SCRIPT_DIR/scripts/migrate-initial-marker.sh"
-        fi
-    fi
-fi
-
-# === Step 7.6–7.9: post-apply governance backfills ===
-# The same helper also runs in TOTAL_CHANGES=0 recovery branches. Otherwise a
-# failed first backfill could leave .update-incomplete, while a zero-diff retry
-# skipped the failing action and incorrectly cleared the marker.
-if ! run_post_apply_backfills_or_die; then
-    exit "$EXIT_RUNTIME"
-fi
-
-# replace_updater_after_rollback — a confirmed rollback ran on the newer updater (Step 0 kept it);
-# leaving it in place mixed the candidate's update.sh with the 0.41.11 manifest until the next run
-# (WP-529 Ф270, F4 of the v0.42.0-rc.4 red team). Same rename as Step 0: this process keeps its
-# open inode.
-replace_updater_after_rollback() {
-    [ "$ROLLBACK_DETECTED" = true ] && [ -n "${STEP0_OLDER_UPDATER:-}" ] && [ -f "$STEP0_OLDER_UPDATER" ] \
-        || return 0
-    local staged="$SCRIPT_DIR/.update.sh.staged.$$"
-    if cp "$STEP0_OLDER_UPDATER" "$staged" && chmod +x "$staged" && mv -f "$staged" "$SCRIPT_DIR/update.sh"; then
-        echo "  • update.sh: заменён версией выпуска v$UPSTREAM_VERSION (откат)"
-    else
-        rm -f "$staged"
-        echo "  ⚠ update.sh: не удалось заменить версией v$UPSTREAM_VERSION — её поставит следующий запуск."
-    fi
-}
-replace_updater_after_rollback
-
-# === Done ===
+# === Готово ===
 echo ""
 echo "=========================================="
-SUMMARY_MSG="  Обновление завершено ($APPLIED файлов"
-[ "$REMOVED" -gt 0 ] && SUMMARY_MSG="$SUMMARY_MSG, $REMOVED устаревших перенесено в резервную копию"
-SUMMARY_MSG="$SUMMARY_MSG)"
-echo "$SUMMARY_MSG"
-if [ "${AUTHOR_SKIPPED:-0}" -gt 0 ]; then
-    echo "  ⚠ author_mode: $AUTHOR_SKIPPED файлов пропущено (несмёрженные локальные правки)."
-    echo "    Синхронизация — через promote-скрипты, либо вручную после git push."
-fi
-report_author_skip_summary
-report_replaced_hooks_summary
+SUMMARY="  Обновление завершено ($APPLIED файлов"
+[ "$REMOVED" -gt 0 ] && SUMMARY="$SUMMARY, $REMOVED удалено"
+SUMMARY="$SUMMARY)"
+echo "$SUMMARY"
 echo "=========================================="
 echo ""
-echo "Перезапустите Claude Code для применения обновлений в memory/."
-
-# issue #1280 (WP-561 Phase 46 tail, 22.10): update.sh never commits its own
-# delivery into the governance repo (it only copies files there -- see the
-# backfill_* functions above) -- that commit is always a separate, later
-# action by the pilot or an agent on their behalf. When the canonical
-# checkout is frozen (WP-520, default on), that later `git commit` is exactly
-# the direct write the freeze gate exists to block, with no WP to bind it to
-# (community report, issue #1280; peer-session 2026-10-22-17, Claude+Kimi+
-# Codex). `update-delivery` is now an allowed housekeeping reason (same
-# closed whitelist as day/week/month-close, session-open-gate.sh).
-# The hint stages only what this run delivers into the governance repo
-# (backfill_* write scripts/ and .githooks/), never `git add -A`, which would
-# also sweep the operator's unrelated edits (issue #1280 follow-up). No
-# --canonical-owner: the housekeeping branch of session-guard.sh exits before
-# it is read, and no exclusive-owner refusal exists there.
-GOVERNANCE_REPO_FOR_DELIVERY_HINT=$(effective_governance_repo 2>/dev/null) || GOVERNANCE_REPO_FOR_DELIVERY_HINT=""
-if [ -n "$GOVERNANCE_REPO_FOR_DELIVERY_HINT" ]; then
-    GOVERNANCE_DIR_FOR_DELIVERY_HINT="$WORKSPACE_DIR/$GOVERNANCE_REPO_FOR_DELIVERY_HINT"
-    if [ -d "$GOVERNANCE_DIR_FOR_DELIVERY_HINT/.git" ]; then
-        echo ""
-        echo "Если $GOVERNANCE_REPO_FOR_DELIVERY_HINT нужно закоммитить (канонический чекаут может быть заморожен, WP-520):"
-        # The path to session-guard.sh is from the JUST UPDATED template ($SCRIPT_DIR/scripts),
-        # not from the governance repo: update.sh does not deliver session-guard.sh there, and the hint
-        # with the governance path fails on a community install right away (issue #1280, a finding from
-        # a live review on 25.10). --agent is expanded in the operator's session, not when
-        # update.sh runs: the line is printed with an escaped \${IWE_AGENT...}, otherwise
-        # a run from a regular terminal would bake in a foreign/empty name (peer finding WP-7 Phase 259).
-        # the open-gate guard matches only semaphores of the form ${IWE_AGENT}-*.open.
-        DELIVERY_PATHS_FOR_HINT="scripts"
-        # Only when git already tracks it: an untracked or ignored .githooks/
-        # makes `git add`/`git commit -- .githooks` fail and stops the chain.
-        [ -n "$(git -C "$GOVERNANCE_DIR_FOR_DELIVERY_HINT" ls-files -- .githooks 2>/dev/null)" ] \
-            && DELIVERY_PATHS_FOR_HINT="scripts .githooks"
-        echo "  bash \"$SCRIPT_DIR/scripts/session-guard.sh\" open --housekeeping update-delivery --agent \"\${IWE_AGENT:-claude-code}\""
-        echo "  (cd \"$GOVERNANCE_DIR_FOR_DELIVERY_HINT\" && git add -- $DELIVERY_PATHS_FOR_HINT && git diff --cached --name-only && git commit -m \"chore: sync template update\" -- $DELIVERY_PATHS_FOR_HINT)"
-        echo "  bash \"$SCRIPT_DIR/scripts/session-guard.sh\" close --housekeeping update-delivery --agent \"\${IWE_AGENT:-claude-code}\""
-        echo "  Стейджатся только пути доставки ($DELIVERY_PATHS_FOR_HINT); остальные незакоммиченные правки в $GOVERNANCE_REPO_FOR_DELIVERY_HINT останутся как были."
-        echo "  Важно: open, commit и close выполняй внутри ОДНОЙ сессии агента — страж привязывает семафор к её harness_session_id; open из обычного терминала с последующим commit из сессии агента пропущен не будет (issue #1280)."
-    fi
-fi
-
-# issue #226: the rest of the delivery (memory/hooks/skills, repair-pass, commit) has already been
-# done above regardless of the conflict — now we report and exit with an error,
-# so that CI/wrapper scripts see the failure, and the pilot sees the list of files to resolve.
-if $CLAUDE_CONFLICT_DETECTED; then
+[ -n "$RULES_BACKUP_DIR" ] && { echo "Прежние версии правил: $RULES_BACKUP_DIR"; echo ""; }
+[ -n "$MEMORY_BACKUP_DIR" ] && { echo "Прежние версии заменённых файлов памяти: $MEMORY_BACKUP_DIR"; echo ""; }
+if [ ${#MEMORY_KEPT[@]} -gt 0 ]; then
+    echo "Файлы памяти оставлены как есть (${#MEMORY_KEPT[@]}) — команды сверки выше:"
+    for f in "${MEMORY_KEPT[@]}"; do echo "  ⚠ $f"; done
     echo ""
-    echo "⚠ CLAUDE.md содержит неразрешённые конфликты слияния в:"
-    for cf in "${CLAUDE_CONFLICT_FILES[@]}"; do echo "  - $cf"; done
-    echo "  Разрешите их вручную (маркеры <<<<<<< / ======= / >>>>>>>) и закоммитьте отдельно."
 fi
-
-# issue #336: a separate case — not a conflict (no markers), the file is not touched
-# because of a missing base file for the merge. A different message does not mislead
-# the pilot into searching for nonexistent <<<<<<< markers.
-if [ "${#CLAUDE_BASE_MISSING_FILES[@]}" -gt 0 ]; then
-    echo ""
-    echo "⚠ CLAUDE.md не тронут (нет базового файла для слияния) в:"
-    for cf in "${CLAUDE_BASE_MISSING_FILES[@]}"; do echo "  - $cf"; done
-    echo "  Сверьте свои правки §8/§9 вручную (см. diff-команду в выводе выше) и закоммитьте отдельно."
-fi
-
-# issue #555: separate from both blocks above — base existed, merge reported
-# clean, but a pilot line still vanished (see detect_claude_silent_loss).
-if [ "${#CLAUDE_SILENT_LOSS_FILES[@]}" -gt 0 ]; then
-    echo ""
-    echo "⚠ CLAUDE.md не тронут (слияние потеряло бы вашу правку без предупреждения) в:"
-    for cf in "${CLAUDE_SILENT_LOSS_FILES[@]}"; do echo "  - $cf"; done
-    echo "  Пропавшие строки — в предупреждениях выше. Сверьте вручную и закоммитьте отдельно."
-fi
-
-# WP-7 F193: git failed, no merge was made (see claude_merge_failed).
-if [ "${#CLAUDE_MERGE_FAILED_FILES[@]}" -gt 0 ]; then
-    echo ""
-    echo "⚠ CLAUDE.md не тронут (git не выдал слияния) в:"
-    for cf in "${CLAUDE_MERGE_FAILED_FILES[@]}"; do echo "  - $cf"; done
-    echo "  Проверьте, что git работает (git --version), и перезапустите update.sh: файл не менялся, повтор безопасен."
-fi
-
-if $CLAUDE_CONFLICT_DETECTED || [ "${#CLAUDE_BASE_MISSING_FILES[@]}" -gt 0 ] || [ "${#CLAUDE_SILENT_LOSS_FILES[@]}" -gt 0 ] \
-    || [ "${#CLAUDE_MERGE_FAILED_FILES[@]}" -gt 0 ]; then
-    exit "$EXIT_CONFLICT"
-fi
-
-# WP-7 F267 stage 1: refresh the record of what this installation has (programs, gateway,
-# backup target) after the files are in place. Best effort: never changes the update result.
-if [ -f "$SCRIPT_DIR/scripts/iwe-capabilities.sh" ]; then
-    bash "$SCRIPT_DIR/scripts/iwe-capabilities.sh" probe --announce \
-        || echo "  ⚠ iwe-capabilities.sh не записал состояние (не критично). Повторить: bash $SCRIPT_DIR/scripts/iwe-capabilities.sh probe"
-fi
-
+echo "Перезапустите qwen для применения обновлений в памяти и .qwen/."
+# Чистка старых бэкапов — только в режиме применения (--check вышел раньше). Копии этого
+# прогона самые свежие и попадают в три сохраняемых.
+prune_backup_dirs "$WORKSPACE_DIR/.backups/memory-pre-update" ""
+prune_backup_dirs "$WORKSPACE_DIR/.backups/rules-pre-update" ""
+prune_backup_dirs "$(dirname "$QWEN_MEMORY_DIR")" "$(basename "$QWEN_MEMORY_DIR").bak-"
 finish_update_transaction
-exit_clean
-
-# --- end of update.sh ---
+# Доставка файлов завершена и маркер снят — но если QWEN.md остался неразрешённым,
+# прогон не «успешен»: шлюз назовёт исход и выйдет кодом EXIT_CONFLICT.
+qwen_conflict_gate

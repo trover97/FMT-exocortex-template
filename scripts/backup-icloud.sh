@@ -9,7 +9,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/../.claude/lib/iwe-env-bootstrap.sh" || exit 1
+source "$SCRIPT_DIR/../.qwen/lib/iwe-env-bootstrap.sh" || exit 1
 
 IWE_DIR="${WORKSPACE_DIR}"
 BACKUP_DIR="$IWE_ICLOUD_BACKUP_DIR"
@@ -54,7 +54,7 @@ if ! tar ${SELF_EXCLUDE[@]+"${SELF_EXCLUDE[@]}"} --exclude='.git' \
     --exclude='__pycache__' \
     --exclude='_backups' \
     --exclude='.DS_Store' \
-    --exclude='.claude/worktrees' \
+    --exclude='.qwen/worktrees' \
     --exclude='.iwe-runtime/isolated-worktrees' \
     -czf "$BACKUP_DIR/$ARCHIVE" \
     -C "$(dirname "$IWE_DIR")" "$(basename "$IWE_DIR")/"; then

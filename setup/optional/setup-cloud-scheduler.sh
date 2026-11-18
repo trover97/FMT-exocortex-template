@@ -1,4 +1,11 @@
 #!/bin/bash
+# === OFFLINE / NO-SCHEDULER GUARD (qwen-macos-offline) ===
+# Эта ветка: macOS, сознательно без планировщика (launchd) — политика офлайн-сборки.
+# Установка задач по расписанию не выполняется. Рабочие скрипты роли запускаются
+# ВРУЧНУЮ — см. MANUAL-JOBS.md в корне репозитория.
+echo "[$(basename "$(dirname "$0")")] Планировщик отключён (offline-сборка). Запуск задач — вручную, см. MANUAL-JOBS.md" >&2
+exit 0
+# === /GUARD ===
 # Cloud Scheduler (GitHub Actions) setup for IWE
 # DP.SC.019 — Autonomous IWE operation (basic level)
 #

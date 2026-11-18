@@ -1,0 +1,16 @@
+# Hooks deliberately not registered in the template .qwen/settings.json.
+# Format: one file name per line; everything after # is the reason.
+# Checked by: scripts/check-orphan-hooks.sh (issue #310, #323).
+#
+# The list is not a place where defects become invisible. Each line must
+# name the reason and the next step. An empty reason = a defect, not an exception.
+#
+# Libraries and CLIs located next to the hooks (rule-engine.sh, residency-gate-*.sh,
+# agent-trace-uploader.sh) are NOT added to this list: they carry the marker
+# `# claude-hook: false — …` in the header, and the watchdog recognizes it itself (2026-08-04,
+# peer session on issues #310/#321/#323).
+#
+agent-trace-recorder.sh     # local telemetry (tool traces in the home directory): enabled by the user's deliberate opt-in, the retention contract is not defined — off by default in the template. To enable: add to settings.json Stop+PostToolUse.
+# QWEN-OFFLINE:A15 — не подключены в ветке qwen-macos-offline (правило A15 адаптера).
+session-open-gate.sh        # под Qwen блокировал бы КАЖДЫЙ git commit/push: семафор с harness_session_id пишет только session-guard.sh и только из CLAUDE_CODE_SESSION_ID (у Qwen это QWEN_CODE_SESSION_ID). Следующий шаг: подключать, когда session-guard научится Qwen.
+pull-on-touch.sh            # офлайн-сборка: git pull без сети не нужен, обновления приходят архивом (UPDATE.md). Следующий шаг: нет, пока сборка офлайн.

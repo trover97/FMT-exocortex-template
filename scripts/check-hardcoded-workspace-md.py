@@ -7,7 +7,7 @@ does not exist on an install with another workspace location; the agent gets
 an empty result and takes it for a fact. The accepted form is
 `${IWE_WORKSPACE:-$HOME/IWE}` (honours the environment, keeps the default).
 
-Scope: .claude/skills, .claude/rules*, .claude/commands, memory, roles.
+Scope: .qwen/skills, .qwen/rules*, .qwen/commands, memory, roles.
 User guides (docs/, README) are not scanned: there `~/IWE` is the instruction
 "create the folder here".
 
@@ -21,13 +21,13 @@ import os
 import re
 import sys
 
-SCOPE = (".claude/skills/", ".claude/rules", ".claude/commands", "memory/", "roles/")
+SCOPE = (".qwen/skills/", ".qwen/rules", ".qwen/commands", "memory/", "roles/")
 SKIP_DIRS = {".git", "node_modules", "seed"}
 SKIP_FILES = {"CHANGELOG.md"}
 # the accepted parameterized form is not a violation: the preceding ":-" marks it
 HARDCODED = re.compile(r"(?<!:-)(~/IWE|\$HOME/IWE|\$\{HOME\}/IWE)(?=[/\s`\"')\]]|$)")
 EXEMPT = re.compile(r"хардкод|hardcod|захардкож|~~|expanduser|echo \$HOME/IWE|tr '/' '-'", re.I)
-EXEMPT_FILES = {"memory/dry-run-contract.md", ".claude/rules/formatting.md"}
+EXEMPT_FILES = {"memory/dry-run-contract.md", ".qwen/rules/formatting.md"}
 
 
 def scan(root):

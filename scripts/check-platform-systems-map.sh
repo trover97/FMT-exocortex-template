@@ -5,7 +5,7 @@ set -euo pipefail
 
 TEMPLATE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 # setup.sh keeps this script in workspace/FMT-exocortex-template/scripts,
-# while it copies the skills and user memory to workspace/.claude and memory.
+# while it copies the skills and user memory to workspace/.qwen and memory.
 workspace="${IWE_WORKSPACE:-}"
 if [ -z "$workspace" ]; then
     case "$TEMPLATE_ROOT" in

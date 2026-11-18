@@ -12,7 +12,7 @@ related:
   realizes: [DP.SC.NNN]                # Constraint Analyst service clause в твоём Pack
   uses:
     - DP.WP.NNN                        # Stage Dependency Map (формат выхода) в твоём Pack
-    - .claude/skills/bottleneck-pick   # инструмент-носитель алгоритма
+    - .qwen/skills/bottleneck-pick   # инструмент-носитель алгоритма
   downstream_consumers:
     - DP.ROLE.001 IWE Creator (пилот)  — открывает зонтичный РП, получает выбор bottleneck + карту этапов
     - DP.ROLE.012 Стратег              — при отборе НЭП на стратегической сессии

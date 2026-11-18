@@ -98,7 +98,7 @@ done <<< "$FILES_PY"
 # last GPLv2 release, no coreutils/Homebrew needed to hit this one. No safe
 # runtime guard exists for it (unlike the constructs above): the fix is to
 # not use it (portable `tr '[:upper:]' '[:lower:]'`, already the idiom
-# elsewhere in this repo — e.g. update.sh, .claude/hooks/sql-pii-guard.sh).
+# elsewhere in this repo — e.g. update.sh, .qwen/hooks/sql-pii-guard.sh).
 # Only checked under a shebang that doesn't itself guarantee bash 4+ — a
 # script pinned to an explicit newer-bash interpreter path is exempt.
 while IFS= read -r file; do

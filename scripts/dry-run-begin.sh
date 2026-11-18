@@ -45,18 +45,18 @@ fail() { echo "dry-run-begin: $*" >&2; exit 1; }
 # criterion is the NTFS ACL of %LOCALAPPDATA%\iwe-dry-run, elsewhere 0700.
 # State and the token are written only after the check has passed.
 # The copy is the one the installed gate loads: in a workspace
-# (<ws>/FMT-exocortex-template/scripts/ next to <ws>/.claude/hooks/) that is
-# <ws>/.claude/lib, never the template's own copy, so a partial update cannot
+# (<ws>/FMT-exocortex-template/scripts/ next to <ws>/.qwen/hooks/) that is
+# <ws>/.qwen/lib, never the template's own copy, so a partial update cannot
 # make begin and the gate apply different criteria. A workspace gate without
 # its library is refused: a rehearsal the gate cannot read would lock it.
 # Outside a workspace (the template checkout itself) the template copy is used.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-if [ -f "$SCRIPT_DIR/../../.claude/hooks/dry-run-gate.sh" ]; then
-    DRY_RUN_LIB="$SCRIPT_DIR/../../.claude/lib/dry-run-dir.sh"
+if [ -f "$SCRIPT_DIR/../../.qwen/hooks/dry-run-gate.sh" ]; then
+    DRY_RUN_LIB="$SCRIPT_DIR/../../.qwen/lib/dry-run-dir.sh"
 else
-    DRY_RUN_LIB="$SCRIPT_DIR/../.claude/lib/dry-run-dir.sh"
+    DRY_RUN_LIB="$SCRIPT_DIR/../.qwen/lib/dry-run-dir.sh"
 fi
-# shellcheck source=../.claude/lib/dry-run-dir.sh
+# shellcheck source=../.qwen/lib/dry-run-dir.sh
 { [ -r "$DRY_RUN_LIB" ] && . "$DRY_RUN_LIB"; } || fail "$DRY_RUN_LIB missing — cannot locate dry-run state (run update.sh)"
 dry_run_resolve_paths || fail "$DRY_RUN_ERR"
 DRY_DIR="$DRY_RUN_DIR"

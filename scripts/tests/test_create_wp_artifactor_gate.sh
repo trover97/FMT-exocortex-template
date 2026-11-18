@@ -72,7 +72,7 @@ expect_refused() {
     fail "$label: message fragment '$fragment' missing; output: $OUT"
   fi
   wp_dirs=$(find "$CASE_ROOT/strategy/inbox" -mindepth 1 -maxdepth 1 -type d -name 'WP-*' | wc -l | tr -d ' ')
-  if [ "$wp_dirs" -eq 0 ] && [ ! -e "$CASE_ROOT/.claude/state/wp-numbers" ] \
+  if [ "$wp_dirs" -eq 0 ] && [ ! -e "$CASE_ROOT/.qwen/state/wp-numbers" ] \
     && cmp -s "$CASE_ROOT/registry.before" "$CASE_ROOT/strategy/docs/WP-REGISTRY.md"; then
     pass "$label: refused before any write (no WP folder, no number reserved, REGISTRY untouched)"
   else

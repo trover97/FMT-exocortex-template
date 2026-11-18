@@ -3,7 +3,7 @@
 # see DP.SC.159, DP.ROLE.059
 # hook-promote.sh — promote a personal hook into the IWE platform template
 #
-# Flow: personal folder/<hook>.sh → substitutions → FMT/.claude/hooks/<hook>.sh
+# Flow: personal folder/<hook>.sh → substitutions → FMT/.qwen/hooks/<hook>.sh
 #
 # Usage:
 #   bash hook-promote.sh <path-to-hook> [--dry-run]
@@ -25,7 +25,7 @@ GOV_REPO_AUTHOR="${IWE_GOVERNANCE_REPO:-DS-strategy}"
 GOV_REPO_TMPL="DS-strategy"
 
 fname=$(basename "$SRC")
-DEST="$FMT_DIR/.claude/hooks/$fname"
+DEST="$FMT_DIR/.qwen/hooks/$fname"
 
 echo "🔄 Промоция хука: $fname"
 echo "   Откуда: $SRC"
@@ -81,7 +81,7 @@ cp "$tmp_file" "$DEST"
 chmod +x "$DEST"
 rm -rf "$tmp_dir"
 
-echo "✅ Промотирован: FMT/.claude/hooks/$fname"
+echo "✅ Промотирован: FMT/.qwen/hooks/$fname"
 
 CHANGELOG_SCRIPT="$FMT_DIR/scripts/changelog-append.sh"
 if [[ -f "$CHANGELOG_SCRIPT" ]]; then IWE_TEMPLATE="$FMT_DIR" bash "$CHANGELOG_SCRIPT"; fi
@@ -95,4 +95,4 @@ else
 fi
 
 echo "Следующий шаг:"
-echo "  cd $FMT_DIR && git add .claude/hooks/$fname CHANGELOG.md update-manifest.json && git commit -m 'feat: promote $fname to platform'"
+echo "  cd $FMT_DIR && git add .qwen/hooks/$fname CHANGELOG.md update-manifest.json && git commit -m 'feat: promote $fname to platform'"

@@ -14,7 +14,7 @@
 # 4. MEMORY.md — skeleton (few lines in the WP table)             [pristine only]
 # 5. Required files exist                                         [pristine + installed]
 # 6. No hardcoded paths to FMT/scripts|roles in protocols (WP-219)  [pristine + installed]
-# 7. settings.json hooks ↔ .claude/hooks/ cross-ref (issue #13)   [pristine + installed]
+# 7. settings.json hooks ↔ .qwen/hooks/ cross-ref (issue #13)   [pristine + installed]
 # 8. No stale FPF semantic references                             [pristine + staged]
 # 9. SKILL.md claims of an active hook match settings.json (#1109) [pristine + installed]
 
@@ -52,12 +52,12 @@ done
 FAIL=0
 
 # Guard: post-setup state + default pristine mode -> suggest installed mode and exit.
-# Stable detector: {{WORKSPACE_DIR}} in pristine FMT/CLAUDE.md is guaranteed (§4 Memory, Working Directory section).
+# Stable detector: {{WORKSPACE_DIR}} in pristine FMT/QWEN.md is guaranteed (§4 Memory, Working Directory section).
 # Previously the detector was {{HOME_DIR}} from §9; §9 in the distribution is now an empty stub (issue #883), no placeholder there.
 if [ "$MODE" = "pristine" ] \
-   && [ -f "$TEMPLATE_DIR/CLAUDE.md" ] \
-   && ! grep -q '{{WORKSPACE_DIR}}' "$TEMPLATE_DIR/CLAUDE.md" 2>/dev/null; then
-    echo "ВНИМАНИЕ: FMT обработан setup.sh (плейсхолдер {{WORKSPACE_DIR}} в CLAUDE.md уже подставлен)."
+   && [ -f "$TEMPLATE_DIR/QWEN.md" ] \
+   && ! grep -q '{{WORKSPACE_DIR}}' "$TEMPLATE_DIR/QWEN.md" 2>/dev/null; then
+    echo "ВНИМАНИЕ: FMT обработан setup.sh (плейсхолдер {{WORKSPACE_DIR}} в QWEN.md уже подставлен)."
     echo ""
     echo "Pristine-режим (default) применим к:"
     echo "  • CI (.github/workflows/validate-template.yml)"
@@ -67,7 +67,7 @@ if [ "$MODE" = "pristine" ] \
     echo "Для проверки установленного workspace используйте один из:"
     echo "  bash setup.sh --validate                              # env + структурные чеки (делегат)"
     echo "  bash setup/validate-template.sh --mode=installed      # явно installed (4 универсальных чека)"
-    echo "  /audit-installation                                   # полный аудит (Claude Code skill)"
+    echo "  /audit-installation                                   # полный аудит (Qwen Code skill)"
     exit 0
 fi
 
@@ -195,12 +195,12 @@ is_author_context_exception() {
         'roles/strategist/prompts/week-review.md:Для этого запуска скрипт-обёртка уже открыла служебную сессию охраны (`week-review`, область `current/`) и закроет её сама. Свою сессию (`session-guard.sh open`) не открывай: на замороженном каталоге она отказана, а придуманное значение `--wp` охрана отвергает. В репозитории governance изменяй и коммить только файлы в `current/`; пост клуба (шаг 6) относится к репозиторию Knowledge Index (`DS-Knowledge-Index`), не к governance, и этой сессией не покрывается. Отказ охраны не обходи (`--force`, `--no-verify`, правка хуков): выведи дословный текст отказа в итоговый ответ. Скрипт-обёртка проверяет, что отчёт недели попал на сервер, и поднимет тревогу владельцу, если нет.'|\
         'roles/synchronizer/scripts/collectors.d/README.md:- `publications.sh` — публикации (если есть DS-Knowledge-Index-*/docs/)'|\
         'scripts/week-draft-init.sh:  echo "   knowledge_repo: \"DS-Knowledge-Index\""'|\
-        '.claude/hooks/rule-engine.sh:        if ! echo "$file_path" | grep -qE '"'"'DS-[^/]+-strategy/|DS-ecosystem-development/'"'"'; then'|\
+        '.qwen/hooks/rule-engine.sh:        if ! echo "$file_path" | grep -qE '"'"'DS-[^/]+-strategy/|DS-ecosystem-development/'"'"'; then'|\
         'update-manifest.json:    "scripts/session-dispatcher-tsekh.py",'|\
         'setup.sh:    echo "  ⚠ Не найден python3 >= 3.10 с библиотекой PyYAML — календарь, лента «Мир», обзор РП и core-скрипты (artifactor.py, session-dispatcher-tsekh.py) будут отключаться с явной ошибкой зависимости."'|\
         'generate-manifest.sh:    "scripts/session-dispatcher-tsekh.py"       # no references from delivered artifacts'|\
         'seed/strategy/scripts/lib/find-python3.sh:# core scripts (artifactor.py, session-dispatcher-tsekh.py). Reject 3.9 early'|\
-        '.claude/lib/find-python3.sh:# core scripts (artifactor.py, session-dispatcher-tsekh.py). Reject 3.9 early'|\
+        '.qwen/lib/find-python3.sh:# core scripts (artifactor.py, session-dispatcher-tsekh.py). Reject 3.9 early'|\
         'scripts/lib/find-python3.sh:# core scripts (artifactor.py, session-dispatcher-tsekh.py). Reject 3.9 early'|\
         'setup/build-runtime.sh:# bug-2026-09-17-tsekh1-recovery-backups-abort: under `set -eu`, a single'|\
         'setup/build-runtime.sh:# bug-2026-09-17-tsekh1-recovery-backups-abort (continuation): leftovers from'|\
@@ -274,11 +274,11 @@ for pattern in "tserentserenov" "PACK-MIM" "aist_bot_newarchitecture" \
     fi
 done
 
-# Protocol-only — forbidden in protocols/skills/hooks/CLAUDE.md (allowed in README/docs/onboarding as a product mention)
+# Protocol-only — forbidden in protocols/skills/hooks/QWEN.md (allowed in README/docs/onboarding as a product mention)
 for pattern in "@aist_me_bot" "digital-twin" "content-pipeline" \
                "knowledge-mcp" "gateway-mcp" "DS-agent-workspace/scheduler"; do
     hits=$(cd "$SCAN_ROOT" && grep -rn "$pattern" \
-            .claude/skills .claude/hooks .claude/rules memory CLAUDE.md 2>/dev/null \
+            .qwen/skills .qwen/hooks .qwen/rules memory QWEN.md 2>/dev/null \
             | grep -v 'CHANGELOG.md' || true)
     count=$(count_hits "$hits")
     if [ "$count" -gt 0 ]; then
@@ -378,7 +378,7 @@ fi
 # /bin), falling back to PATH-based `command -v` only for non-standard
 # layouts (NixOS) — an absolute-path-first resolver by design, not a
 # hardcoded personal path.
-HOMEBREW_SKIP_FILES_RE='^README\.md$|^docs/PLATFORM-COMPAT\.md$|^\.github/workflows/validate-template\.yml$|^\.claude/lib/find-python3\.sh$|^scripts/lib/find-python3\.sh$|^seed/strategy/scripts/lib/find-python3\.sh$|^\.claude/hooks/secret-bypass-lib\.sh$|^scripts/tests/test_issue_463_setup_reuses_resolved_python3\.sh$'
+HOMEBREW_SKIP_FILES_RE='^README\.md$|^docs/PLATFORM-COMPAT\.md$|^\.github/workflows/validate-template\.yml$|^\.qwen/lib/find-python3\.sh$|^scripts/lib/find-python3\.sh$|^seed/strategy/scripts/lib/find-python3\.sh$|^\.qwen/hooks/secret-bypass-lib\.sh$|^scripts/tests/test_issue_463_setup_reuses_resolved_python3\.sh$'
 homebrew_hits() {
     grep -rn '/opt/homebrew' "$SCAN_ROOT" "${HARDCODE_SCAN_INCLUDES[@]}" \
         --exclude='validate-template.sh' --exclude='setup.sh' \
@@ -424,7 +424,7 @@ fi
 # 5. Required files
 echo -n "[5/5] Required files... "
 MISSING=0
-for f in CLAUDE.md ONTOLOGY.md README.md \
+for f in QWEN.md ONTOLOGY.md README.md \
          memory/MEMORY.md memory/hard-distinctions.md \
          memory/protocol-open.md memory/protocol-close.md \
          memory/navigation.md \
@@ -453,7 +453,7 @@ for pattern in 'FMT-exocortex-template/scripts' \
                'bash (~|\$HOME)/IWE/scripts/'; do
     hits=$(grep -rnE "$pattern" \
             "$TEMPLATE_DIR/memory" \
-            "$TEMPLATE_DIR/.claude/skills" \
+            "$TEMPLATE_DIR/.qwen/skills" \
             --include="*.md" 2>/dev/null \
             | grep -v '\$IWE_' || true)
     if [ -n "$hits" ]; then
@@ -470,22 +470,22 @@ else
     echo "PASS"
 fi
 
-# 7. settings.json hooks ↔ .claude/hooks/ cross-ref (issue #13)
+# 7. settings.json hooks ↔ .qwen/hooks/ cross-ref (issue #13)
 # Check in both directions:
-#   (a) FAIL: hook mentioned in settings.json but the file is missing in .claude/hooks/
-#   (b) WARN: hook exists in .claude/hooks/ but is not mentioned in any settings.json
+#   (a) FAIL: hook mentioned in settings.json but the file is missing in .qwen/hooks/
+#   (b) WARN: hook exists in .qwen/hooks/ but is not mentioned in any settings.json
 #       (may be invoked directly, e.g. wakatime-heartbeat.sh)
-echo -n "[7/7] Hooks cross-ref (settings.json ↔ .claude/hooks/)... "
+echo -n "[7/7] Hooks cross-ref (settings.json ↔ .qwen/hooks/)... "
 CHECK7_FAIL=0
-HOOKS_DIR="$TEMPLATE_DIR/.claude/hooks"
+HOOKS_DIR="$TEMPLATE_DIR/.qwen/hooks"
 SETTINGS_FILES=()
-[ -f "$TEMPLATE_DIR/.claude/settings.json" ] && SETTINGS_FILES+=("$TEMPLATE_DIR/.claude/settings.json")
-[ -f "$TEMPLATE_DIR/.claude/settings.local.json" ] && SETTINGS_FILES+=("$TEMPLATE_DIR/.claude/settings.local.json")
+[ -f "$TEMPLATE_DIR/.qwen/settings.json" ] && SETTINGS_FILES+=("$TEMPLATE_DIR/.qwen/settings.json")
+[ -f "$TEMPLATE_DIR/.qwen/settings.local.json" ] && SETTINGS_FILES+=("$TEMPLATE_DIR/.qwen/settings.local.json")
 
 if [ ${#SETTINGS_FILES[@]} -eq 0 ] || [ ! -d "$HOOKS_DIR" ]; then
     echo "SKIP (no settings.json or hooks/ dir)"
 else
-    REFERENCED=$(grep -hoE '\.claude/hooks/[a-zA-Z0-9_-]+\.sh' "${SETTINGS_FILES[@]}" 2>/dev/null | sort -u || true)
+    REFERENCED=$(grep -hoE '\.qwen/hooks/[a-zA-Z0-9_-]+\.sh' "${SETTINGS_FILES[@]}" 2>/dev/null | sort -u || true)
     for ref in $REFERENCED; do
         if [ ! -f "$TEMPLATE_DIR/$ref" ]; then
             [ "$CHECK7_FAIL" -eq 0 ] && echo "FAIL"
@@ -495,7 +495,7 @@ else
         fi
     done
 
-    # Hooks intentionally user-deployed (installed to ~/.claude/hooks/ via skill,
+    # Hooks intentionally user-deployed (installed to ~/.qwen/hooks/ via skill,
     # registered in user settings.local.json — not project settings.json by design).
     USER_DEPLOYED_HOOKS=("wakatime-heartbeat.sh")
 
@@ -508,11 +508,11 @@ else
         # contract in its own header. A new unclassified file will still
         # produce a warning and require the owner's decision.
         grep -q '^# claude-hook: false — ' "$hook" && continue
-        # Skip known user-deployed hooks (see .claude/skills/setup-wakatime/SKILL.md)
+        # Skip known user-deployed hooks (see .qwen/skills/setup-wakatime/SKILL.md)
         skip=0
         for ud in "${USER_DEPLOYED_HOOKS[@]}"; do [ "$name" = "$ud" ] && skip=1 && break; done
         [ "$skip" -eq 1 ] && continue
-        if ! grep -q "\.claude/hooks/$name" "${SETTINGS_FILES[@]}" 2>/dev/null; then
+        if ! grep -q "\.qwen/hooks/$name" "${SETTINGS_FILES[@]}" 2>/dev/null; then
             if [ "$ORPHAN_WARN" -eq 0 ]; then
                 [ "$CHECK7_FAIL" -eq 0 ] && echo "PASS (with warnings)"
                 ORPHAN_WARN=1
@@ -535,7 +535,7 @@ if [ "$MODE" = "installed" ]; then
 else
     FPF_STALE_PATTERN='A\.6\.8|(mastery|мастерство).*A\.2([^0-9.]|$)'
     FPF_STALE_HITS=$(grep -rniE "$FPF_STALE_PATTERN" \
-        "$SCAN_ROOT/memory" "$SCAN_ROOT/.claude" "$SCAN_ROOT/docs" \
+        "$SCAN_ROOT/memory" "$SCAN_ROOT/.qwen" "$SCAN_ROOT/docs" \
         --include='*.md' 2>/dev/null || true)
 
     if [ -n "$FPF_STALE_HITS" ]; then
@@ -549,9 +549,9 @@ fi
 
 # 9. SKILL.md hook-claims must be registered (issue #1109).
 #
-# Check [7/7] above only WARNs when a hook file in .claude/hooks/ is not
+# Check [7/7] above only WARNs when a hook file in .qwen/hooks/ is not
 # referenced from settings.json — a legitimate state for a script that is
-# invoked directly rather than through Claude Code's PreToolUse dispatch
+# invoked directly rather than through Qwen Code's PreToolUse dispatch
 # (e.g. a library sourced by other hooks). But when a SKILL.md explicitly
 # documents a hook as ACTIVE protection ("Hook `x.sh` блокирует ..." / "hook
 # ... blocks ..."), an unregistered hook is not a benign unused file — it is
@@ -561,10 +561,10 @@ fi
 # This check escalates exactly that case from WARN to FAIL.
 #
 # Detection is mechanical, not NLP, to keep it reliable across the whole
-# .claude/skills/ tree (general version, not hardcoded to one hook): a
+# .qwen/skills/ tree (general version, not hardcoded to one hook): a
 # SKILL.md line counts as an "active protection" claim only when THREE
 # things co-occur on the SAME line —
-#   (a) the basename of a real file under .claude/hooks/*.sh,
+#   (a) the basename of a real file under .qwen/hooks/*.sh,
 #   (b) the word "hook" or "хук" (case-insensitive),
 #   (c) an enforcement verb — blocks/guards/prevents/denies/stops/enforces
 #       (EN) or блокир/защища/запрещ/отказ (RU), either case.
@@ -621,10 +621,10 @@ sys.exit(1)
         # (contains "deni") or a path through "…/hooks/…" failed this check on
         # someone else's file (WP-617 Ф4, 08.11). Splitting "path:line:text"
         # on ":" is no fix either: a path may contain a colon.
-        # find fails without .claude/skills; under pipefail that would end the
+        # find fails without .qwen/skills; under pipefail that would end the
         # whole validator here with no verdict, hence "|| true" on find.
         hits=$(
-            { find "$TEMPLATE_DIR/.claude/skills" -type f -name SKILL.md -print0 2>/dev/null || true; } |
+            { find "$TEMPLATE_DIR/.qwen/skills" -type f -name SKILL.md -print0 2>/dev/null || true; } |
             while IFS= read -r -d '' skill_file; do
                 { grep -nEi -- "$esc_name" "$skill_file" 2>/dev/null || true; } |
                 while IFS= read -r rec; do

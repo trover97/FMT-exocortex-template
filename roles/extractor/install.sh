@@ -1,4 +1,11 @@
 #!/bin/bash
+# === OFFLINE / NO-SCHEDULER GUARD (qwen-macos-offline) ===
+# Эта ветка: macOS, сознательно без планировщика (launchd) — политика офлайн-сборки.
+# Установка задач по расписанию не выполняется. Рабочие скрипты роли запускаются
+# ВРУЧНУЮ — см. MANUAL-JOBS.md в корне репозитория.
+echo "[$(basename "$(dirname "$0")")] Планировщик отключён (offline-сборка). Запуск задач — вручную, см. MANUAL-JOBS.md" >&2
+exit 0
+# === /GUARD ===
 # Extractor: installation of the launchd agent for inbox-check
 # Runs inbox-check every 3 hours.
 # WP-273 Stage 2: the plist is taken from $IWE_RUNTIME (Generated runtime, F).
@@ -28,7 +35,7 @@ fi
 if [ ! -f "$HOME/.secrets/claude_code_oauth_token" ] \
    && command -v claude >/dev/null 2>&1 \
    && ! claude auth status --json >/dev/null 2>&1; then
-    echo "  ⚠ Claude Code не подключён — автоматический inbox-check не сможет войти."
+    echo "  ⚠ Qwen Code не подключён — автоматический inbox-check не сможет войти."
     echo "    Выполните: bash \$IWE_TEMPLATE/roles/extractor/scripts/connect.sh"
 fi
 

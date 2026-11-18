@@ -613,15 +613,15 @@ jobs:
       # Root of the bug (May 2026): the detector caught legitimate uses (template identity,
       # python fallback, env override) as false positives. Fixed in validate-fmt-scripts.sh.
       # Gate: run in CI so as not to rely only on pre-commit (which is called
-      # only when .claude/settings.json is staged) and a manual run.
+      # only when .qwen/settings.json is staged) and a manual run.
       - name: Run validate-fmt-scripts (author-specific hardcodes & conventions)
         run: bash scripts/validate-fmt-scripts.sh
 
-      # issue #291: a path in backticks in the platform part of CLAUDE.md (start..SYNC-CORE-END,
+      # issue #291: a path in backticks in the platform part of QWEN.md (start..SYNC-CORE-END,
       # delivered to 100% of installations via update.sh §1-7 + Agent Core) must
       # exist in the repo or in update-manifest.json -- otherwise it is a dead link on
       # every user installation, not only the author's.
-      - name: Check CLAUDE.md platform-section links resolve (issue #291)
+      - name: Check QWEN.md platform-section links resolve (issue #291)
         run: python3 scripts/check-claude-md-links.py --strict
 
       # CI-only check: MCP -- servers connect via claude.ai/settings/connectors
@@ -690,7 +690,7 @@ jobs:
           # Прогон хука: имитируем PreToolUse с git commit DayPlan
           INPUT=$(jq -n --arg cmd "git add DS-strategy/current/DayPlan\\ 2026-04-22.md && git commit -m test" \
                   '{tool_name: "Bash", tool_input: {command: $cmd}}')
-          RESULT=$(echo "$INPUT" | bash .claude/hooks/protocol-artifact-validate.sh)
+          RESULT=$(echo "$INPUT" | bash .qwen/hooks/protocol-artifact-validate.sh)
           DECISION=$(echo "$RESULT" | jq -r '.decision // "allow"')
 
           if [ "$DECISION" = "block" ]; then
@@ -780,7 +780,7 @@ jobs:
 
       # WP-7 (template cleanup, 2026-11-01): check-seed-drift.sh only sees
       # copies marked SNAPSHOT. Byte-for-byte copies without the mark (seed/,
-      # extensions/agent-inbox/, .claude/lib/) were checked by nobody; we also catch
+      # extensions/agent-inbox/, .qwen/lib/) were checked by nobody; we also catch
       # new unregistered copies.
       - name: Check byte-identical copy pairs (drift guard)
         run: bash scripts/check-copy-pairs.sh
@@ -806,7 +806,7 @@ jobs:
 
       # issue #226: the test sat in the repo since 6 July, never wired into CI --
       # found 2026-08-10 during an audit of the delivery pipeline (WP-7 Phase 62). E2E smoke on
-      # 3 fixes of a real incident (CLAUDE.md conflict on merge, repair-pass
+      # 3 fixes of a real incident (QWEN.md conflict on merge, repair-pass
       # at TOTAL_CHANGES=0) -- guards exactly the class of regression that has already occurred.
       - name: Run update.sh issue #226 regression test
         run: bash setup/test-update-issue-226.sh
@@ -859,18 +859,18 @@ jobs:
       # as data; nothing is executed.
       - name: Run destructive-guard tests
         run: |
-          python3 .claude/hooks/tests/destructive-guard/hook_cases.py
-          python3 .claude/hooks/tests/destructive-guard/long_cases.py
-          python3 .claude/hooks/tests/destructive-guard/perf_cases.py
-          python3 .claude/hooks/tests/destructive-guard/guarded_rm_cases.py .claude/bin/guarded-rm
-          bash .claude/hooks/tests/test-destructive-guard-executed-command-scope.sh
-          bash .claude/hooks/tests/test-destructive-guard-indirect-input.sh
-          bash .claude/hooks/tests/test-destructive-guard-isolated-commit-and-deploy-key.sh
-          bash .claude/hooks/tests/test-destructive-guard-malformed-json.sh
-          bash .claude/hooks/tests/test-destructive-guard-find-delete.sh
-          bash .claude/hooks/tests/test-destructive-guard-file-writers.sh
-          bash .claude/hooks/tests/test-destructive-guard-git-branch-remote.sh
-          bash .claude/hooks/tests/test-destructive-guard-find-chain.sh
+          python3 .qwen/hooks/tests/destructive-guard/hook_cases.py
+          python3 .qwen/hooks/tests/destructive-guard/long_cases.py
+          python3 .qwen/hooks/tests/destructive-guard/perf_cases.py
+          python3 .qwen/hooks/tests/destructive-guard/guarded_rm_cases.py .qwen/bin/guarded-rm
+          bash .qwen/hooks/tests/test-destructive-guard-executed-command-scope.sh
+          bash .qwen/hooks/tests/test-destructive-guard-indirect-input.sh
+          bash .qwen/hooks/tests/test-destructive-guard-isolated-commit-and-deploy-key.sh
+          bash .qwen/hooks/tests/test-destructive-guard-malformed-json.sh
+          bash .qwen/hooks/tests/test-destructive-guard-find-delete.sh
+          bash .qwen/hooks/tests/test-destructive-guard-file-writers.sh
+          bash .qwen/hooks/tests/test-destructive-guard-git-branch-remote.sh
+          bash .qwen/hooks/tests/test-destructive-guard-find-chain.sh
           bash scripts/tests/test_issue_1010_memory_limit.sh
 
       # WP-529 F7 follow-up (pilot decision 2026-08-21): update.sh delivers the
@@ -890,7 +890,7 @@ jobs:
       - name: Run update.sh modified-hook test
         run: bash setup/test-update-modified-hook.sh
 
-      # WP-568 F11: an author host whose workspace .claude/ dirs are a read-only
+      # WP-568 F11: an author host whose workspace .qwen/ dirs are a read-only
       # mirror must finish the update (new file skipped with a warning) instead of
       # aborting on `cp: Permission denied` and leaving .update-incomplete behind.
       - name: Run update.sh author read-only mirror test
@@ -940,7 +940,7 @@ jobs:
         run: bash setup/test-update-step0-staged-rename.sh
 
       # WP-529 Ф270, 0.42 rc.9 row 3: an install made by setup.sh 0.36 keeps a substituted template
-      # merge base; an unedited template CLAUDE.md must update without a conflict, and a retry over a
+      # merge base; an unedited template QWEN.md must update without a conflict, and a retry over a
       # conflicted copy must stop instead of reporting "Всё актуально".
       - name: Run update.sh legacy template base test
         run: bash setup/test-update-legacy-template-base.sh
@@ -1007,7 +1007,7 @@ jobs:
       # a nested installer swallows their status or removes the audit record.
       # The calibration uses only private PATH stubs, never host services.
       - name: Calibrate disposable Red Team boundary (#1072)
-        run: bash .claude/skills/iwe-platform-redteam/tests/run-calibration.sh
+        run: bash .qwen/skills/iwe-platform-redteam/tests/run-calibration.sh
 
       # WP-529 Phase 6 (Evgenii's findings 18.08): PyYAML is a declared dependency
       # (requirements.txt, #463), but CI did not guarantee it, and the whole family
@@ -1043,15 +1043,15 @@ jobs:
             ALL=true
           else
             CHANGED=$(git diff --name-only --diff-filter=d "$BASE" HEAD)
-            if printf '%s\n' "$CHANGED" | grep -qxE 'scripts/generate-executor-catalog\.py|seed/strategy/scripts/generate-executor-catalog\.py|scripts/route-task\.sh|\.claude/skills/skill-creator/scripts/verify-skill\.(sh|py)|\.claude/skills/skill-creator/assets/skill-scaffold-[a-z]+\.md'; then
+            if printf '%s\n' "$CHANGED" | grep -qxE 'scripts/generate-executor-catalog\.py|seed/strategy/scripts/generate-executor-catalog\.py|scripts/route-task\.sh|\.qwen/skills/skill-creator/scripts/verify-skill\.(sh|py)|\.qwen/skills/skill-creator/assets/skill-scaffold-[a-z]+\.md'; then
               echo "Routing rules changed: checking every skill"
               ALL=true
             fi
           fi
           if [ "$ALL" = true ]; then
-            SKILLS=$(ls .claude/skills/*/SKILL.md)
+            SKILLS=$(ls .qwen/skills/*/SKILL.md)
           else
-            SKILLS=$(printf '%s\n' "$CHANGED" | grep -E '^\.claude/skills/[^/]+/SKILL\.md$' || true)
+            SKILLS=$(printf '%s\n' "$CHANGED" | grep -E '^\.qwen/skills/[^/]+/SKILL\.md$' || true)
           fi
           if [ -z "$SKILLS" ]; then
             echo "PASS: no SKILL.md changed since $BASE"
@@ -1104,8 +1104,8 @@ jobs:
             roles/extractor/tests/test_extractor_branches_prune.py
           # The skill directory contains a hyphen, so pytest cannot import it
           # as a package reliably; both files are executable unit suites.
-          python3 .claude/skills/residency-gate/tests/test_parser.py
-          python3 .claude/skills/residency-gate/tests/test_pre_grant.py
+          python3 .qwen/skills/residency-gate/tests/test_parser.py
+          python3 .qwen/skills/residency-gate/tests/test_pre_grant.py
 
       # A build-runtime failure must leave .update-incomplete and make update.sh fail
       # with a non-zero code; the TOTAL_CHANGES=0 recovery branch must do so as well.
@@ -1157,7 +1157,7 @@ jobs:
           GRM_BASH="$(cygpath -w "$BASH")"
           export GRM_BASH
           python -c 'import os, subprocess; subprocess.run([os.environ["GRM_BASH"], "-c", "command -v cygpath"], check=True)'
-          python .claude/hooks/tests/destructive-guard/guarded_rm_cases.py .claude/bin/guarded-rm
+          python .qwen/hooks/tests/destructive-guard/guarded_rm_cases.py .qwen/bin/guarded-rm
 
   # WP-529 Phase 3: single fail-closed receipt for this commit, built from the
   # results of THIS workflow run (needs.<job>.result — same trigger, same

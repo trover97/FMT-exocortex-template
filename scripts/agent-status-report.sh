@@ -5,7 +5,7 @@
 # the platform registry indicators.agent_status WHEN the LLM agent did not report itself.
 #
 # This is a FAIL-SAFE, not primary. Primary write path = the behavioral call of the MCP tool
-# agent_status_update by the agent itself (see Agent Core in CLAUDE.md/AGENTS.md). This helper
+# agent_status_update by the agent itself (see Agent Core in QWEN.md/AGENTS.md). This helper
 # writes directly to the DB (degraded path) — a deliberate exception for reliability, since OAuth
 # of Claude/Kimi is not refreshed like in Hermes runtime, and the dashboard must see the status even
 # if the LLM forgot to call the tool (fault-profile ~15-20%).

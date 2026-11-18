@@ -19,7 +19,7 @@ set -eu
 
 # Load unified environment: WORKSPACE_DIR, IWE_ROOT, IWE_SCRIPTS, etc.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/../.claude/lib/iwe-env-bootstrap.sh" || exit 1
+source "$SCRIPT_DIR/../.qwen/lib/iwe-env-bootstrap.sh" || exit 1
 MEMORY_DIR="$IWE_ROOT/memory"
 HOT_LIMIT=150
 HOT_DOWNGRADE_DAYS=14   # HOT → WARM if not mentioned for N days
@@ -27,8 +27,8 @@ WARM_DOWNGRADE_DAYS=30  # WARM → COLD
 COLD_ARCHIVE_DAYS=90    # COLD → archive
 HOT_ONLY=0
 # Instruction files have no memory frontmatter by design; day-close copies
-# CLAUDE.md/AGENTS.md next to memory in the exocortex/ backup (issue #1352).
-EXCLUDE="MEMORY.md CLAUDE.md AGENTS.md"
+# QWEN.md/AGENTS.md next to memory in the exocortex/ backup (issue #1352).
+EXCLUDE="MEMORY.md QWEN.md AGENTS.md"
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -42,12 +42,12 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-# #513: a single reader instead of a local copy — the shared .claude/lib/frontmatter.sh
+# #513: a single reader instead of a local copy — the shared .qwen/lib/frontmatter.sh
 # already normalizes both forms (flat and nested metadata:), the local awk saw
 # only the flat one and silently returned nothing on files written by the harness.
 _MEMORY_BLEED_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=../.claude/lib/frontmatter.sh
-source "$_MEMORY_BLEED_DIR/../.claude/lib/frontmatter.sh"
+# shellcheck source=../.qwen/lib/frontmatter.sh
+source "$_MEMORY_BLEED_DIR/../.qwen/lib/frontmatter.sh"
 
 # Age in calendar days since mtime, for every file at once: prints "<age>\t<path>"
 # per path read from stdin, age "-" when it cannot be computed (an empty field
@@ -188,7 +188,7 @@ while IFS=$'\t' read -r age f; do
     h=$(get_field "$f" "horizon")
     vf=$(get_field "$f" "valid_from")
 
-    # #1425: Claude Code auto-memory writes only name/description/metadata.type,
+    # #1425: Qwen Code auto-memory writes only name/description/metadata.type,
     # so these fields are absent from birth. Report them instead of dropping the
     # file from the demotion cycle.
     missing=""

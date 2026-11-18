@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check the language catalogs in .claude/lib/locale/ (WP-610 F9 step 2).
+"""Check the language catalogs in .qwen/lib/locale/ (WP-610 F9 step 2).
 
 Every catalog is a flat JSON object of strings with the same keys as the
 others. Template keys (msg.*, agent.*, format.*) use only %s and %%, with the
@@ -102,9 +102,9 @@ def main(argv: list[str]) -> int:
         print(__doc__, file=sys.stderr)
         return 2
     root = Path(argv[1] if len(argv) == 2 else Path(__file__).resolve().parent.parent)
-    files = sorted((root / ".claude/lib/locale").glob("*.json"))
+    files = sorted((root / ".qwen/lib/locale").glob("*.json"))
     if not files:
-        print(f"no catalogs in {root / '.claude/lib/locale'}", file=sys.stderr)
+        print(f"no catalogs in {root / '.qwen/lib/locale'}", file=sys.stderr)
         return 2
     if not (root / "update-manifest.json").is_file():
         print(f"no update-manifest.json in {root}", file=sys.stderr)

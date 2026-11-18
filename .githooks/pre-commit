@@ -163,12 +163,12 @@ if [ -n "$STAGED_NEW_SCRIPTS" ] && [ -x "scripts/smoke-clean-env.sh" ]; then
     fi
 fi
 
-# === Hook paths convention (.claude/settings.json) ===
+# === Hook paths convention (.qwen/settings.json) ===
 # Root of the bug (May 20, 2026): settings.json was manually copied to FMT with relative
-# paths .claude/hooks/X.sh. When cwd shifts (subagent/worktree/MCP) the hook is not found.
-# Convention: all hook commands must start with $CLAUDE_PROJECT_DIR/.
+# paths .qwen/hooks/X.sh. When cwd shifts (subagent/worktree/MCP) the hook is not found.
+# Convention: all hook commands must start with $QWEN_PROJECT_DIR/.
 STAGED_SETTINGS=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null \
-    | grep -E '^\.claude/settings\.json$' || true)
+    | grep -E '^\.qwen/settings\.json$' || true)
 if [ -n "$STAGED_SETTINGS" ] && [ -x "scripts/validate-fmt-scripts.sh" ]; then
     # FMT7 (#150): validate only staged scripts, not all of scripts/ —
     # otherwise pre-existing debt in someone else's file blocks registering a new hook.
@@ -229,10 +229,10 @@ fi
 # from the author's pre-0.29.5 IWE → 8 violations. Євгений found it on a fresh clone, but
 # our own validator was NOT run at commit time. Gate: the same script as
 # Євгений, on our own staged files. Escape hatch: `git commit --no-verify`.
-# Run only if staged files are within the validator scope (roles/, .claude/, setup/,
+# Run only if staged files are within the validator scope (roles/, .qwen/, setup/,
 # memory/, extensions/, update-manifest.json).
 STAGED_VALIDATOR_SCOPE=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null \
-    | grep -E '^(roles/|\.claude/|setup/|memory/|extensions/|seed/|update-manifest\.json)' || true)
+    | grep -E '^(roles/|\.qwen/|setup/|memory/|extensions/|seed/|update-manifest\.json)' || true)
 # issue #1234: setup/integration-contract-validator.sh is in update-manifest.json
 # excluded_paths (issue #1223) -- update.sh deliberately never ships it to forks,
 # the same reason validate-template.yml skips the jobs that need it via
@@ -296,7 +296,7 @@ fi
 # the whole-repo reconciliation is a non-blocking WARN (one foreign orphan must not
 # paralyze all commits of a fork; the full reconciliation stays in CI validate-template).
 STAGED_MANIFEST_SCOPE=$(git diff --cached --name-only --diff-filter=ACMR 2>/dev/null \
-    | grep -E '^(scripts/|\.claude/|roles/|exocortex/|memory/|\.githooks/|pack-templates/|shared/|update-manifest\.json)' || true)
+    | grep -E '^(scripts/|\.qwen/|roles/|exocortex/|memory/|\.githooks/|pack-templates/|shared/|update-manifest\.json)' || true)
 if [ -n "$STAGED_MANIFEST_SCOPE" ] && [ -f "scripts/check-manifest-coverage.py" ]; then
     # 1) Blocking: coverage of the staged files of the current commit.
     if ! printf '%s\n' "$STAGED_MANIFEST_SCOPE" | python3 scripts/check-manifest-coverage.py update-manifest.json >/tmp/iwe-manifest.$$ 2>&1; then
@@ -386,13 +386,13 @@ fi
 
 # === WP-387: diagnose-iwe rubric sync check ===
 # Ensures derived SKILL.md is in sync with YAML SoT
-if git diff --cached --name-only | grep -qE "shared/rubrics/|\.claude/skills/diagnose-iwe/"; then
+if git diff --cached --name-only | grep -qE "shared/rubrics/|\.qwen/skills/diagnose-iwe/"; then
   if [ -f "scripts/generate-diagnose-iwe-skill.py" ]; then
     python3 scripts/generate-diagnose-iwe-skill.py --check || {
       echo ""
       echo "RUBRIC-SYNC: diagnose-iwe/SKILL.md is out of sync with shared/rubrics/form-089.yaml"
       echo "  Fix: python3 scripts/generate-diagnose-iwe-skill.py"
-      echo "  Then: git add shared/rubrics/form-089.yaml .claude/skills/diagnose-iwe/SKILL.md"
+      echo "  Then: git add shared/rubrics/form-089.yaml .qwen/skills/diagnose-iwe/SKILL.md"
       exit 1
     }
   fi

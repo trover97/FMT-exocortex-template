@@ -107,7 +107,7 @@ EXCLUDED_EXACT=(
 # === Excluded from files but not in excluded_paths (user space) ===
 FILES_EXCLUDE_PATTERNS=(
     "seed/"
-    ".claude/settings.local.json"
+    ".qwen/settings.local.json"
 )
 
 FILES_EXCLUDE_EXACT=(

@@ -4,9 +4,9 @@
 # generate-skills-catalog.sh — generator of skills-catalog.yaml
 # see DP.SC.153
 #
-# Parses all .claude/skills/*/SKILL.md → builds skills-catalog.yaml with:
+# Parses all .qwen/skills/*/SKILL.md → builds skills-catalog.yaml with:
 #   - metadata from frontmatter (name, description, version, layer, status, triggers, depends_on)
-#   - computed invoked_by (from protocol-*.md + other SKILL.md + CLAUDE.md)
+#   - computed invoked_by (from protocol-*.md + other SKILL.md + QWEN.md)
 #
 # Usage:
 #   bash generate-skills-catalog.sh [--skills-dir <path>] [--output <path>] [--dry-run]
@@ -14,9 +14,9 @@
 set -uo pipefail
 
 IWE="${IWE_WORKSPACE:-$HOME/IWE}"
-SKILLS_DIR="${IWE}/.claude/skills"
+SKILLS_DIR="${IWE}/.qwen/skills"
 PROTOCOLS_DIR="${IWE}/memory"
-OUTPUT="${IWE}/.claude/skills-catalog.yaml"
+OUTPUT="${IWE}/.qwen/skills-catalog.yaml"
 dry_run=false
 
 while [[ $# -gt 0 ]]; do
@@ -86,13 +86,13 @@ get_triggers_slash() {
 build_invoked_by() {
     local skill_name="$1"
     local callers=""
-    # Look for /skill-name in protocol-*.md and CLAUDE.md
+    # Look for /skill-name in protocol-*.md and QWEN.md
     local search_files=""
     # Trailing slash: PROTOCOLS_DIR is usually memory/, a symlink to auto-memory
     # (junction on Windows). find does not descend into a symlinked start point
     # without it (issue #913) — 0 files found instead of 5.
     [[ -d "$PROTOCOLS_DIR" ]] && search_files+=" $(find "$PROTOCOLS_DIR/" -name "protocol-*.md" 2>/dev/null)"
-    [[ -f "${IWE}/CLAUDE.md" ]] && search_files+=" ${IWE}/CLAUDE.md"
+    [[ -f "${IWE}/QWEN.md" ]] && search_files+=" ${IWE}/QWEN.md"
     # Look in other SKILL.md files (depends_on)
     [[ -d "$SKILLS_DIR" ]] && search_files+=" $(find "$SKILLS_DIR" -name "SKILL.md" 2>/dev/null)"
 
@@ -102,7 +102,7 @@ build_invoked_by() {
             caller=$(basename "$(dirname "$f")")
             # For protocol-*.md take the file name
             [[ "$f" == *"protocol-"* ]] && caller=$(basename "$f" .md)
-            [[ "$f" == *"CLAUDE.md"* ]] && caller="CLAUDE.md"
+            [[ "$f" == *"QWEN.md"* ]] && caller="QWEN.md"
             callers+="    - ${caller}\n"
         fi
     done

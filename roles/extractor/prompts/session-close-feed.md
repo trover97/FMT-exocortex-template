@@ -1,7 +1,7 @@
 # Session-Close Feeder
 
 > Source-of-truth: WP-247 Ф-MULTI-SOURCE.1.
-> Этот промпт выполняется Claude Code headless после Quick Close — **non-interactive**.
+> Этот промпт выполняется Qwen Code headless после Quick Close — **non-interactive**.
 
 ## Роль
 

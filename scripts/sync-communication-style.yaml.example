@@ -7,7 +7,7 @@
 #   layer: l0 (base only) | l0+l1 (base + author layer)
 
 downstream:
-  - path: "FMT-exocortex-template/CLAUDE.md"
+  - path: "FMT-exocortex-template/QWEN.md"
     type: markdown
     layer: l0
 

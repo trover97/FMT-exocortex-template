@@ -16,6 +16,18 @@
 #
 set -euo pipefail
 
+# === LOCAL-GATEWAY GUARD (qwen-macos-offline branch) ===
+# Шлюз недоступен в этой сборке по трём независимым причинам: установка требует
+# сети (git clone + npm ci); демон рассчитан на постоянный сервис, которого
+# офлайн-установка не разворачивает; координация нужна лишь при нескольких
+# агентах, а offline-установка одиночная. Удали блок, если условия изменились.
+echo "Локальный шлюз координации агентов недоступен в сборке qwen-macos-offline:" >&2
+echo "  установка требует интернета, а демон рассчитан на постоянный сервис." >&2
+echo "  Шлюз нужен только при нескольких агентах на одной машине — одиночной установке он не требуется." >&2
+exit 0
+# === /LOCAL-GATEWAY GUARD ===
+
+
 # Upstream constants. The URL deliberately points to the platform author's repository,
 # not to the user's fork — it is a shared dependency of all installations.
 # GATEWAY_SHA duplicates the tag: a tag can be moved by force-push, a SHA cannot;

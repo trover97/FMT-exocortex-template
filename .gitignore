@@ -52,3 +52,7 @@ __pycache__/
 /.iwe-runtime/*
 !/.iwe-runtime/hot-files.list
 !/.iwe-runtime/roles/
+
+# Эталоны офлайн-ветки (update.sh): правила и память «что положили в прошлый раз».
+.qwen-rules.baseline/
+.qwen-memory.baseline/

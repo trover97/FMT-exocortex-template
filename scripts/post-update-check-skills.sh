@@ -9,7 +9,7 @@
 set -uo pipefail
 
 IWE="${IWE_ROOT:-$HOME/IWE}"
-SKILLS_DIR="$IWE/.claude/skills"
+SKILLS_DIR="$IWE/.qwen/skills"
 EXIT_CODE=0
 
 echo "=== Post-update SKILL.md routing check ==="

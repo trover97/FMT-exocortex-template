@@ -16,7 +16,7 @@
 #     alerted: true|false   a regression was delivered; reset when the status is good
 # NEVER write a URL, a token or the value of any variable into these files:
 # only presence, a program path, an OS name, a backup state word.
-# Source AFTER .claude/lib/iwe-env-bootstrap.sh (needs IWE_RUNTIME, IWE_OS,
+# Source AFTER .qwen/lib/iwe-env-bootstrap.sh (needs IWE_RUNTIME, IWE_OS,
 # WORKSPACE_DIR, IWE_ICLOUD_BACKUP_DIR). bash 3.2 safe (macOS /bin/bash).
 #
 # The probes run from scripts/iwe-capabilities.sh (setup, update, by hand), not

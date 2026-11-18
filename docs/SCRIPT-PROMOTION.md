@@ -124,7 +124,7 @@ env -i HOME="$HOME" PATH="$PATH" \
 - **DP.KR.001 §5.6** — классификация скриптов как исполнителей ролей
 - **DP.D.048** — Script ≠ Agent (детерминированный flow)
 - **DP.D.049** — Log ≠ Incident ≠ State file (артефакты исполнения)
-- **§9 CLAUDE.md** — авторский режим (`params.yaml: author_mode: true`)
+- **§9 QWEN.md** — авторский режим (`params.yaml: author_mode: true`)
 - **Extensions Gate** — пользовательская кастомизация только через `extensions/`
 
 ---
@@ -138,7 +138,7 @@ env -i HOME="$HOME" PATH="$PATH" \
 | ID | Имя | Симптом | Detector | Фикс |
 |----|-----|---------|----------|-----|
 | **B12a** | **Catalog drift** | `skills-catalog.yaml` в FMT stale: новый скилл промотирован, но не виден при discovery | `coverage-skills.sh --check-catalog` | `skill-promote.sh` теперь регенерирует FMT catalog (commit c2e96e6) |
-| **B12b** | **Missing drift** | Артефакт есть в author/.claude/skills/, нет в FMT/.claude/skills/ | `coverage-skills.sh --check-missing` | Запустить `skill-promote.sh <name>` |
+| **B12b** | **Missing drift** | Артефакт есть в author/.qwen/skills/, нет в FMT/.qwen/skills/ | `coverage-skills.sh --check-missing` | Запустить `skill-promote.sh <name>` |
 | **B12c** | **Reverse drift** | Артефакт промотирован однажды, обновления в author не доходят до FMT | `coverage-skills.sh --check-reverse` (normalize-перед-diff) | Расширенный `template-sync.sh` allowlist (commit d575a6b) |
 | **B12d** | **Deletion drift** | Артефакт удалён в author, остался в FMT (dead code в шаблоне) | `coverage-skills.sh --check-deletion` | Ручная очистка по сигналу + лог в `promotion-status.yaml` |
 | **B12e** | **Decay drift** | STAGING.md запись `testing` >30 дней без машинных критериев готовности | `staging-audit.sh` | Per-row frontmatter `decay_after` / `ready_signals` |

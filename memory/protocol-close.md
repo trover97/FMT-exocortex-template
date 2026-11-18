@@ -26,8 +26,8 @@ schema_version: 1
 | Триггер | Аргумент | Skill |
 |---------|---------|-------|
 | «закрываю сессию» / «всё» / «закрывай» | `close` или `close session` | Quick Close (ниже, inline) |
-| «закрываю день» / «итоги дня» | `close day` | `.claude/skills/day-close/SKILL.md` — **шаг «Мультипликатор IWE»** |
-| «закрываю неделю» / «итоги недели» | `week-close` | `.claude/skills/week-close/SKILL.md` |
+| «закрываю день» / «итоги дня» | `close day` | `.qwen/skills/day-close/SKILL.md` — **шаг «Мультипликатор IWE»** |
+| «закрываю неделю» / «итоги недели» | `week-close` | `.qwen/skills/week-close/SKILL.md` |
 
 > **`close` без уточнения** → Quick Close (сессия) по умолчанию.
 
@@ -46,12 +46,12 @@ schema_version: 1
 
 > **Порядок: сначала все правки и отчёт сессии, потом первый запуск раннера (РП-484 Ф280, 31.10).** После первого `process-runner.py start quick-close` новые коммиты в сессию не добавлять: подготовленное закрытие фиксирует снимок, и следующий коммит его ломает («снимок изменился, push запрещён»). Живой случай: РП581, 31.10 — «Осталось» и отчёт сессии дописали после подготовки, вышел только аварийный `--abandon-prepared`. Нужна ещё правка → довести закрытие до конца, потом открыть новую сессию.
 
-> **`IWE_SESSION_ID` обязателен для НЕ-Claude-агентов (WP-484, 15.09 — живой случай WP-579, Kimi).** `_env_session_id_fallback()` (`process-runner.py`) резолвит владельца карточки через `IWE_SESSION_ID`, затем `CLAUDE_CODE_SESSION_ID`. У Claude Code харнесс сам прокидывает `CLAUDE_CODE_SESSION_ID` в каждый вызов Bash — отдельный шаг не нужен. У Kimi/Hermes/Codex такого автопрокидывания нет — без явного `IWE_SESSION_ID` карточка получает `owner_session_id: null` и `session-guard.sh close` не может снять terminal proof («immutable owned snapshot»), закрытие зацикливается. Перед запуском раннера найти свой семафор точным совпадением по `slug:` (не по PID/mtime — эвристика ловит чужую параллельную сессию) среди `.iwe-runtime/sessions/<agent>-*.open` и прочитать его `session_id:`:
+> **`IWE_SESSION_ID` обязателен для НЕ-Claude-агентов (WP-484, 15.09 — живой случай WP-579, Kimi).** `_env_session_id_fallback()` (`process-runner.py`) резолвит владельца карточки через `IWE_SESSION_ID`, затем `CLAUDE_CODE_SESSION_ID`. У Qwen Code харнесс сам прокидывает `CLAUDE_CODE_SESSION_ID` в каждый вызов Bash — отдельный шаг не нужен. У Kimi/Hermes/Codex такого автопрокидывания нет — без явного `IWE_SESSION_ID` карточка получает `owner_session_id: null` и `session-guard.sh close` не может снять terminal proof («immutable owned snapshot»), закрытие зацикливается. Перед запуском раннера найти свой семафор точным совпадением по `slug:` (не по PID/mtime — эвристика ловит чужую параллельную сессию) среди `.iwe-runtime/sessions/<agent>-*.open` и прочитать его `session_id:`:
 > ```bash
 > _IWE_OWN_SEM=$(grep -l "^slug: <slug сессии>\$" .iwe-runtime/sessions/<agent>-*.open 2>/dev/null | head -1)
 > _IWE_SID=$(grep '^session_id: ' "$_IWE_OWN_SEM" | head -1 | cut -d' ' -f2-)
 > ```
-> Передать `IWE_SESSION_ID="$_IWE_SID"` инлайн на команде ниже. Для Claude Code это не меняет поведения (тот же приоритет, то же значение по смыслу) — можно опускать, если харнесс уже гарантированно проставляет `CLAUDE_CODE_SESSION_ID`.
+> Передать `IWE_SESSION_ID="$_IWE_SID"` инлайн на команде ниже. Для Qwen Code это не меняет поведения (тот же приоритет, то же значение по смыслу) — можно опускать, если харнесс уже гарантированно проставляет `CLAUDE_CODE_SESSION_ID`.
 
 ```bash
 # #512: для установки с author_mode: false исход известен заранее — раннер
@@ -106,7 +106,7 @@ python3 scripts/process-runner.py relocate-card <run_id> \
 
 ### 1. Pre-commit checks → Commit + Push (шаги `precommit-checks` → `commit-push` → `commit-push-check`) [[gate:AR.005]]
 
-**1a. Pre-commit checks (БЛОКИРУЮЩЕЕ).** `bash .claude/scripts/load-extensions.sh protocol-close checks` — exit 0 → `Read` каждый файл из вывода (alphabetic) → выполнить. Exit 1 → пропустить. **При ❌ commit запрещён** — исправить, повторить checks.
+**1a. Pre-commit checks (БЛОКИРУЮЩЕЕ).** `bash .qwen/scripts/load-extensions.sh protocol-close checks` — exit 0 → `Read` каждый файл из вывода (alphabetic) → выполнить. Exit 1 → пропустить. **При ❌ commit запрещён** — исправить, повторить checks.
 
 **1b. Commit + Push (БЛОКИРУЮЩЕЕ, шаг `commit-push`, вход `{"commits":[{"repo","paths","message"}, ...]}`).** `git status --short` по ВСЕМ репо, которых касалась сессия. Незафиксированные изменения → `git add <specific paths>` → commit → push. При доступном раннере использовать его хендлер и не обходить `blocked-push-failed`; в ручном режиме провал push так же блокирует переход к следующему шагу.
 
@@ -147,7 +147,7 @@ python3 scripts/process-runner.py relocate-card <run_id> \
    - in_progress → structured handoff
    - **`depends_on`/`valid_until`/`what_blocked` (WP-561 A/B, 2026-09-03, пир-сессия с Kimi+Codex).** `depends_on` — ТОЛЬКО список конкретных `WP-N` (машиночитаемый, не имя/описание словами), от которых зависит `what_next`; пусто — `[]`, не опустить поле. `valid_until` — конкретное событие («до Month Close августа»), ISO-дата, либо `н/п`. `what_blocked` — «нет» либо конкретная причина. Если `depends_on` непустой — записать в frontmatter карточки блок `handoff_snapshot` (по одной записи на каждый `WP-N` из `depends_on`), используя `wp-phase-digest.sh <WP-N>` (единственный источник дайджеста — ЗАКРЫВАЮЩАЯ сессия и следующая ОТКРЫВАЮЩАЯ обязаны использовать этот же скрипт, а не пересчитывать вручную):
      ```bash
-     bash "${IWE_WORKSPACE:-$HOME/IWE}/.claude/scripts/wp-phase-digest.sh" WP-484
+     bash "${IWE_WORKSPACE:-$HOME/IWE}/.qwen/scripts/wp-phase-digest.sh" WP-484
      # -> status=in_progress / phase_digest=64d50a10e003 / phase_count=28
      ```
      Записать в frontmatter текущей карточки:
@@ -193,7 +193,7 @@ python3 scripts/process-runner.py relocate-card <run_id> \
    - Source: peer-сессия [2026-07-09-17-close-actualization-gap](../DS-strategy/sessions/2026-07/2026-07-09-17-close-actualization-gap/report.md) — разрыв не в том, что Close «забывает» актуализировать, а в том, что требование факт-чека не было явным/проверяемым.
 
 **6. KE (шаг `ke-routing` — ai-контракт: вход `[what_learned]`, выход `[routed_to]`)** — прочитать поле «Что узнали» в «Осталось». Маршрутизировать: [[gate]]
-   - правило (1-3 строки) → `CLAUDE.md` или `distinctions.md`
+   - правило (1-3 строки) → `QWEN.md` или `distinctions.md`
    - доменное знание → Pack (конкретный файл)
    - урок → `memory/lessons_*.md` + строка в MEMORY.md
      - **слот «Feedback — HOT»: ≤8 строк** (WP-484 Ф2, 2026-09-10, `memory-lifecycle-spec.md §7.5` п.8); при добавлении 9-й строки той же узкой правкой перенести самую старую в `MEMORY-warm.md` — не откладывать до Week Close
@@ -244,7 +244,7 @@ python3 scripts/process-runner.py relocate-card <run_id> \
 **Память:** N Б / 17408 Б — в бюджете / превышение на N Б, кандидатов K (из memory-budget-check; WP-484 Ф3) — пропускать строку молча ЗАПРЕЩЕНО, даже при `exceeded: false`
 **Рефлексия:** [ответ на вопрос §18, если задавался] / — (известная длительность ≤15 мин)
 **Подтверждение:** Quick Close `<run_id>` = `completed`; запись `session_closed` = `ok` (из карточки раннера: terminal status + session-ledger-append.status). Если любой факт не подтверждён, писать `PENDING`, а не «сессия закрыта». Без раннера: `ручной режим, коммиты запушены ✅`; `run_id` не требуется.
-**EXTENSION POINT (protocol-close after):** `bash .claude/scripts/load-extensions.sh protocol-close after` — exit 0 → `Read` каждый файл из вывода (alphabetic) → выполнить. Exit 1 → пропустить. Поддерживает `extensions/protocol-close.after.md` И `extensions/protocol-close.after.<suffix>.md`.
+**EXTENSION POINT (protocol-close after):** `bash .qwen/scripts/load-extensions.sh protocol-close after` — exit 0 → `Read` каждый файл из вывода (alphabetic) → выполнить. Exit 1 → пропустить. Поддерживает `extensions/protocol-close.after.md` И `extensions/protocol-close.after.<suffix>.md`.
 **Handoff:** → WP context «Осталось» обновлён / done
 **Фон:** [если status=in_progress_background] «можно закрывать сессию, доработаю и пришлю итог в Telegram» (канал есть) / «доработаю при следующем открытии, сейчас можно продолжать или закрыть — но фоново ничего не идёт» (канала нет)
 **Дальше:** `python3 DS-strategy/scripts/render-close-next.py --run-id <run_id>` — вывод вставить как есть, не переформулировать; без раннера агент составляет строку сам по A12 из «Следующий шаг» карточки
@@ -256,7 +256,7 @@ python3 scripts/process-runner.py relocate-card <run_id> \
 
 > Условный шаг: если `params.yaml → verify_quick_close: false` → пропустить.
 > Исключения: сессия ≤15 мин, сессия-вопрос без изменений файлов.
-> **Trace-satisfaction (WP-481 Ф5.1):** перед запуском R23 — `bash .claude/hooks/rule-engine.sh check-trace-satisfaction --section "Quick Close"` (без `--section` гейты Week Close и Exit Protocol из этого же файла попадают в проверку тоже — блок гарантирован, они не выполняются за 3-минутную сессию). Набор gate — строки с `[[gate…]]` внутри секции, ключи через `list-gates --section "Quick Close"`; исполненные отмечать `mark-gate <key>` по ходу Close. Verdict block → вернуться на незакрытый gate, потом R23. JSON вердикта приложить к вводу R23.
+> **Trace-satisfaction (WP-481 Ф5.1):** перед запуском R23 — `bash .qwen/hooks/rule-engine.sh check-trace-satisfaction --section "Quick Close"` (без `--section` гейты Week Close и Exit Protocol из этого же файла попадают в проверку тоже — блок гарантирован, они не выполняются за 3-минутную сессию). Набор gate — строки с `[[gate…]]` внутри секции, ключи через `list-gates --section "Quick Close"`; исполненные отмечать `mark-gate <key>` по ходу Close. Verdict block → вернуться на незакрытый gate, потом R23. JSON вердикта приложить к вводу R23.
 > **Механика Ф151 принадлежит handler'у.** Перед моделью раннер выполняет
 > `verify-r23-mechanical`; реестр критериев читается только командой
 > `${IWE_GOVERNANCE_REPO:-DS-strategy}/scripts/processes/handlers/verify-r23-mechanical.sh --list quick`. В режимах
@@ -331,17 +331,17 @@ RUN-карточки тогда не является ❌.
 ## Week Close (Неделя)
 
 > **Роль:** R1 Стратег. **Бюджет:** ~20-30 мин. **Триггер:** «закрываю неделю» / `/week-close`.
-> Выполняется через `.claude/skills/week-close/SKILL.md` + платформенные шаги.
+> Выполняется через `.qwen/skills/week-close/SKILL.md` + платформенные шаги.
 
 ### Шаги Week Close
 
-> **Trace-satisfaction (WP-481 Ф5.1):** `bash .claude/hooks/rule-engine.sh check-trace-satisfaction --protocol memory/protocol-close.md --section "Week Close"` (без `--section` в проверку попадают ещё и гейты Quick Close). Вызывается из `.claude/skills/week-close/SKILL.md` шаг 14, перед R23.
+> **Trace-satisfaction (WP-481 Ф5.1):** `bash .qwen/hooks/rule-engine.sh check-trace-satisfaction --protocol memory/protocol-close.md --section "Week Close"` (без `--section` в проверку попадают ещё и гейты Quick Close). Вызывается из `.qwen/skills/week-close/SKILL.md` шаг 14, перед R23.
 
 1. **Бэкап + грязные репо** — `backup-icloud.sh` + `check-dirty-repos.sh` (платформа) [[gate]]
 2. **Memory Validate** — `memory-bleed.sh` (HOT-лимит, orphans, superseded_by) [[gate]]
 3. **ТО памяти (T, SC.024.3)** — проверка здоровья статической нагрузки: [[narrative]]
-   - `wc -l {{WORKSPACE_DIR}}/.claude/rules/distinctions.md` → **> 80 строк = drift-флаг** (по правилу DP.KR.001 §6: 1-3 строки на различение). Предложить аудит в WP-7.
-   - `wc -l` по MEMORY.md текущего проекта в `~/.claude/projects/<слаг-проекта>/memory/` (слаг = путь рабочей директории, `/` → `-`) → **> 200 строк = флаг** (превышен лимит).
+   - `wc -l {{WORKSPACE_DIR}}/.qwen/rules/distinctions.md` → **> 80 строк = drift-флаг** (по правилу DP.KR.001 §6: 1-3 строки на различение). Предложить аудит в WP-7.
+   - `wc -l` по MEMORY.md текущего проекта в `~/.qwen/projects/<слаг-проекта>/memory/` (слаг = путь рабочей директории, `/` → `-`) → **> 200 строк = флаг** (превышен лимит).
    - Feedback/lessons файлы в `memory/` с `mtime > 14 дней` без обращения → предложить понизить `horizon: warm`.
    - Флаги — информативно. Пользователь решает действие.
 4. **iwe-drift.sh** — полный drift-отчёт в Week Report (S) [[narrative]]
@@ -364,11 +364,11 @@ RUN-карточки тогда не является ❌.
 ## Month Close (Месяц)
 
 > **Роль:** R1 Стратег (выполнение), R23 Верификатор (Haiku, чеклист). **Бюджет:** 30-45 мин. **Триггер:** последние дни закрываемого месяца, либо первый Пн следующего месяца (если не сделано раньше), перед Strategy Session первой недели.
-> Выполняется через `.claude/skills/month-close/SKILL.md`.
+> Выполняется через `.qwen/skills/month-close/SKILL.md`.
 
 ### Шаги Month Close
 
-> **Trace-satisfaction (WP-484 Ф5a):** `bash .claude/hooks/rule-engine.sh check-trace-satisfaction --protocol memory/protocol-close.md --section "Month Close"` (без `--section` в проверку попадают гейты остальных масштабов тоже). Вызывается из `.claude/skills/month-close/SKILL.md` шаг 12, перед R23. До этой фазы (19.07) Month Close вообще не имел gate-трассировки — чек-лист внизу SKILL.md был единственной проверкой, ничем не подкреплённой автоматически.
+> **Trace-satisfaction (WP-484 Ф5a):** `bash .qwen/hooks/rule-engine.sh check-trace-satisfaction --protocol memory/protocol-close.md --section "Month Close"` (без `--section` в проверку попадают гейты остальных масштабов тоже). Вызывается из `.qwen/skills/month-close/SKILL.md` шаг 12, перед R23. До этой фазы (19.07) Month Close вообще не имел gate-трассировки — чек-лист внизу SKILL.md был единственной проверкой, ничем не подкреплённой автоматически.
 
 1. **Ревизия проектов P1-P6** — для каждого активного проекта: что двигало, застыл ли, баланс часов (шаг 4 `month-close/SKILL.md`) [[gate]]
 2. **R-вопросник M1-M6** — ответы записаны в `MonthClose YYYY-MM.md` (шаг 5 `month-close/SKILL.md`) [[gate]]
@@ -386,7 +386,7 @@ RUN-карточки тогда не является ❌.
 
 ## Мультипликатор IWE (WP-299 Ф5, шаг 6 Day Close)
 
-> **Полная спецификация → `.claude/skills/day-close/SKILL.md` § 6.**
+> **Полная спецификация → `.qwen/skills/day-close/SKILL.md` § 6.**
 
 - **WakaTime-источник:** сводка WakaTime за дату закрытия `T="${IWE_TEMPLATE:-$HOME/IWE/FMT-exocortex-template}"; "$(bash "$T/scripts/lib/find-python3.sh" --stdlib-only)" "$T/scripts/wakatime-day-total.py" YYYY-MM-DD` (не `wakatime-cli --today`: только день вызова, пусто на части установок, issues #732, #1414) → если недоступна: Neon `domain_event WHERE event_type='coding_time'` за дату (fallback).
 - **Мультипликатор** = сумма бюджетов закрытых РП за день / WakaTime (сек). Формат: `N.Nx`.

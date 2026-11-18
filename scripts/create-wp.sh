@@ -40,7 +40,7 @@
 # older callers while making the missing strategic basis visible in frontmatter.
 #
 # Precondition: the consent state file must exist:
-#   touch ${IWE_ROOT:-$HOME/IWE}/.claude/state/wp-consent-{N}
+#   touch ${IWE_ROOT:-$HOME/IWE}/.qwen/state/wp-consent-{N}
 #
 # Compatibility: bash 3.2+ (macOS), bash 4+ (Linux)
 
@@ -59,7 +59,7 @@ fi
 STRATEGY="$IWE/$GOV_REPO"
 REGISTRY="$STRATEGY/docs/WP-REGISTRY.md"
 INBOX="$STRATEGY/inbox"
-STATE_DIR="$IWE/.claude/state"
+STATE_DIR="$IWE/.qwen/state"
 
 # --- Parameters ---
 TITLE=""

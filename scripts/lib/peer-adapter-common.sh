@@ -241,7 +241,7 @@ peer_adapter_check_language() {
 # Phase 15 "two hops") is swallowed the same way.
 peer_adapter_check_style() {
   local agent_name="${1-}" output="${2-}"
-  local wrapper="${IWE_ROOT:-$HOME/IWE}/.claude/hooks/style-check-text.sh"
+  local wrapper="${IWE_ROOT:-$HOME/IWE}/.qwen/hooks/style-check-text.sh"
   [ -x "$wrapper" ] || return 0
   local tmp_file
   tmp_file=$(mktemp) || return 0

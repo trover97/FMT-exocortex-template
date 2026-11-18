@@ -15,7 +15,7 @@ import sys
 import tempfile
 
 repo = Path(sys.argv[1])
-skill = (repo / '.claude/skills/wp-new/SKILL.md').read_text()
+skill = (repo / '.qwen/skills/wp-new/SKILL.md').read_text()
 match = re.search(r'```bash\n(WP_GOVERNANCE_REPO=.*?)\n```', skill, re.S)
 assert match, 'Missing executable governance routing block in wp-new'
 command = match.group(1) + '\nIWE_GOVERNANCE_REPO="$WP_GOVERNANCE_REPO" bash "$CREATE_WP" "$@"\n'
@@ -27,7 +27,7 @@ def snapshot(directory):
 
 
 def check_creation(root, governance, environment):
-    state = root / '.claude/state'
+    state = root / '.qwen/state'
     state.mkdir(parents=True)
     (state / 'wp-consent-1').touch()
     artifact = root / 'artifact.json'
@@ -79,7 +79,7 @@ with tempfile.TemporaryDirectory(prefix='issue-1257-') as temporary:
         check_creation(root, governance, env)
         if scenario == 'isolated':
             assert snapshot(canon) == before, 'Canonical files changed'
-            assert not (governance / '.claude/state').exists(), 'Private number counter created'
+            assert not (governance / '.qwen/state').exists(), 'Private number counter created'
         print(f'PASS: {scenario}: card, registry, WeekPlan, active-wp, shared counter')
 
     before = snapshot(base)

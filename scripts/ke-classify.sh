@@ -14,7 +14,7 @@
 #    - another domain → pending-review (unknown category).
 # 2. Secondary (for allowed domains):
 #    - Body size (without frontmatter) ≤30 lines
-#    - No regex matches on paths: `.claude/`, `scripts/`, `extensions/`, `memory/feedback_*.md`
+#    - No regex matches on paths: `.qwen/`, `scripts/`, `extensions/`, `memory/feedback_*.md`
 #    Both conditions → auto-accept. Otherwise → pending-review.
 #
 # Stdout output in one line:
@@ -67,8 +67,8 @@ if [ "$BODY_LINES" -gt 30 ]; then
 fi
 
 # Regex over paths to code/feedback
-if grep -qE '\.claude/|scripts/|extensions/|memory/feedback_' "$FILE"; then
-  MATCHES=$(grep -oE '\.claude/[^[:space:]]*|scripts/[^[:space:]]*|extensions/[^[:space:]]*|memory/feedback_[^[:space:]]*' "$FILE" | head -2 | tr '\n' ' ')
+if grep -qE '\.qwen/|scripts/|extensions/|memory/feedback_' "$FILE"; then
+  MATCHES=$(grep -oE '\.qwen/[^[:space:]]*|scripts/[^[:space:]]*|extensions/[^[:space:]]*|memory/feedback_[^[:space:]]*' "$FILE" | head -2 | tr '\n' ' ')
   echo "PENDING_REVIEW: contains code/feedback paths ($MATCHES)"
   exit 1
 fi

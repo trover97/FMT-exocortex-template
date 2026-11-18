@@ -23,8 +23,8 @@ set -eu
 # frontmatter.sh source below still resolves relative to THIS script (issue #229).
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 _MEMORY_VALIDATE_DIR="$SCRIPT_DIR"
-source "$SCRIPT_DIR/../.claude/lib/iwe-env-bootstrap.sh" || exit 1
-source "$_MEMORY_VALIDATE_DIR/../.claude/lib/frontmatter.sh" || exit 1
+source "$SCRIPT_DIR/../.qwen/lib/iwe-env-bootstrap.sh" || exit 1
+source "$_MEMORY_VALIDATE_DIR/../.qwen/lib/frontmatter.sh" || exit 1
 MEMORY_DIR="$IWE_ROOT/memory"
 QUIET=0
 TARGET=""
@@ -80,7 +80,7 @@ validate_file() {
     done
 
     # Check 2b (#513): the canonical form is flat. A nested metadata:
-    # (written by the Claude Code system instruction, cannot be forbidden) is read by
+    # (written by the Qwen Code system instruction, cannot be forbidden) is read by
     # a single reader; a conflict «one key in both forms with different
     # values» is an error, silent priority is forbidden.
     if awk '/^---/{f++; next} f!=1{next} /^metadata:[ \t\r]*$/{found=1; exit} END{exit !found}' "$file"; then

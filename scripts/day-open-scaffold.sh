@@ -42,11 +42,11 @@ source "$TEMPLATE_SCRIPTS_DIR/lib/common.sh" || {
 IWE="$(iwe_resolve_root)"
 IWE_ROOT="$IWE"
 export IWE_ROOT IWE
-# The template copy finds the library under its own .claude/; a copy promoted to
+# The template copy finds the library under its own .qwen/; a copy promoted to
 # the governance repo uses the workspace's installed one.
-I18N_LIB="$SCRIPT_DIR/../.claude/lib/i18n.sh"
-[ -f "$I18N_LIB" ] || I18N_LIB="$IWE/.claude/lib/i18n.sh"
-source "$I18N_LIB" || { echo "FATAL: i18n.sh not found (looked next to the template and in $IWE/.claude/lib)" >&2; exit 1; }
+I18N_LIB="$SCRIPT_DIR/../.qwen/lib/i18n.sh"
+[ -f "$I18N_LIB" ] || I18N_LIB="$IWE/.qwen/lib/i18n.sh"
+source "$I18N_LIB" || { echo "FATAL: i18n.sh not found (looked next to the template and in $IWE/.qwen/lib)" >&2; exit 1; }
 DATE="${1:-$(date +%Y-%m-%d)}"
 CONFIG="$IWE/memory/day-rhythm-config.yaml"
 # issue #1149: the path is pasted into Python source text, and Git Bash converts
@@ -1253,7 +1253,7 @@ INCEOF
   fi
 
   # gate_log activity (Phase 1 check)
-  local gate_log="$IWE/.claude/logs/gate_log.jsonl"
+  local gate_log="$IWE/.qwen/logs/gate_log.jsonl"
   if [ -f "$gate_log" ]; then
     local recent
     recent=$(awk -v d="$DATE" '$0 ~ d' "$gate_log" 2>/dev/null | wc -l | tr -d ' ')

@@ -1,10 +1,4 @@
 {
   "mcpServers": {
-
-    "iwe-knowledge": {
-      "type": "http",
-      "url": "https://mcp.aisystant.com/mcp"
-    }
-
   }
 }

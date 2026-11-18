@@ -64,7 +64,7 @@ day_open_sync_marker_file() {
   local root
   # Keyed by the physical top level, so a symlinked path and its target share one marker.
   root=$(git -C "$1" rev-parse --show-toplevel 2>/dev/null || printf '%s' "$1")
-  printf '%s/day-open-sync-blocked.%s.marker\n' "${DAY_OPEN_STATE_DIR:-$HOME/.claude/state}" \
+  printf '%s/day-open-sync-blocked.%s.marker\n' "${DAY_OPEN_STATE_DIR:-$HOME/.qwen/state}" \
     "$(printf '%s' "$root" | cksum | cut -d' ' -f1)"
 }
 
@@ -130,7 +130,7 @@ day_open_prune_superseded() {
 # The list of our unpublished DayPlan commits survives a failed run; a retry
 # publishes exactly that list, never "whatever happens to be ahead of origin".
 day_open_pending_file() {
-  printf '%s/day-open-pending-publish.list\n' "${DAY_OPEN_STATE_DIR:-$HOME/.claude/state}"
+  printf '%s/day-open-pending-publish.list\n' "${DAY_OPEN_STATE_DIR:-$HOME/.qwen/state}"
 }
 
 # One destination (remote + remote branch) for fetch, verification and push.
@@ -1070,13 +1070,13 @@ if [ "$FORCE" != "true" ]; then
     # Without this, every day the two machines settle this D2 race the "losing"
     # side never writes success — its watchdog fires a false dead-man's-switch
     # alert even though a DayPlan genuinely exists for today.
-    mkdir -p "$HOME/.claude/state"
+    mkdir -p "$HOME/.qwen/state"
     jq -n \
       --arg date "$DATE" \
       --arg commit "$OTHER_COMMIT" \
       --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
       '{date: $date, commit_hash: $commit, timestamp: $ts, status: "success", note: "done by the other machine"}' \
-      > "$HOME/.claude/state/day-open-pipeline-last-success.json"
+      > "$HOME/.qwen/state/day-open-pipeline-last-success.json"
     exit 0
   fi
   LOCAL_COMMIT=$(git log -1 --format=%H HEAD --since="$DATE 00:00:00" --until="$DATE 23:59:59" -- "$DAYPLAN_FILE" 2>/dev/null) || LOCAL_COMMIT=""
@@ -1086,13 +1086,13 @@ if [ "$FORCE" != "true" ]; then
     if day_open_publish "$DS_STRATEGY" "$LOCAL_COMMIT"; then
       echo "  DayPlan was committed locally but not published; published now ($DAY_OPEN_PUBLISHED_SHA) — nothing to regenerate."
       tg_notify "📋 DayPlan $DATE опубликован из локального коммита (восстановление после сбоя публикации)." terminal
-      mkdir -p "$HOME/.claude/state"
+      mkdir -p "$HOME/.qwen/state"
       jq -n \
         --arg date "$DATE" \
         --arg commit "$DAY_OPEN_PUBLISHED_SHA" \
         --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
         '{date: $date, commit_hash: $commit, timestamp: $ts, status: "success", note: "published from a local commit after an earlier failure"}' \
-        > "$HOME/.claude/state/day-open-pipeline-last-success.json"
+        > "$HOME/.qwen/state/day-open-pipeline-last-success.json"
       exit 0
     fi
     echo "  DayPlan is committed locally and publication still fails; the commit stays recorded, regeneration skipped."
@@ -1122,7 +1122,7 @@ echo $$ > "$LOCK_FILE"
 # a duplicate trap here would just get overwritten by that later `trap ... EXIT`.
 
 # --- State store (pipeline heartbeat) ---
-STATE_DIR="$HOME/.claude/state"
+STATE_DIR="$HOME/.qwen/state"
 HEARTBEAT_FILE="$STATE_DIR/day-open-pipeline-last-success.json"
 mkdir -p "$STATE_DIR"
 

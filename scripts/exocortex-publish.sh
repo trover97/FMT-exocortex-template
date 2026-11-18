@@ -20,7 +20,7 @@
 #   publish   — in a persistent isolated worktree of the governance repo (reset to the
 #               freshly fetched origin tip before each attempt) applies the snapshot to
 #               exocortex/ under the #536 ownership contract: it copies only what day-close
-#               owns (manifest files, CLAUDE.md/AGENTS.md/params.yaml/day-rhythm, rules/,
+#               owns (manifest files, QWEN.md/AGENTS.md/params.yaml/day-rhythm, rules/,
 #               extensions/) and deletes only files origin's own manifest lists as owned,
 #               with a matching hash, that the snapshot no longer has. Unknown entries and
 #               roots of other writers are never touched. It commits only exocortex/ paths
@@ -56,7 +56,7 @@
 # process group (setsid, else perl setpgrp), so a group kill of the caller does not
 # abort them. The hook throttles its own triggers (see memory-exocortex-sync.sh).
 #
-# Paths (KEEP IN SYNC with .claude/hooks/memory-exocortex-sync.sh, which reads the stamp):
+# Paths (KEEP IN SYNC with .qwen/hooks/memory-exocortex-sync.sh, which reads the stamp):
 #   $RUNTIME_DIR/exocortex-publish/snapshot/        the snapshot (exocortex/ content)
 #   $RUNTIME_DIR/exocortex-publish/snapshot.stamp   mtime = start of the last good snapshot
 #   $RUNTIME_DIR/exocortex-publish/worktree/        the isolated worktree
@@ -76,7 +76,7 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SELF="$SCRIPT_DIR/$(basename "${BASH_SOURCE[0]}")"
 # shellcheck source=/dev/null
-source "$SCRIPT_DIR/../.claude/lib/iwe-env-bootstrap.sh" || exit 1
+source "$SCRIPT_DIR/../.qwen/lib/iwe-env-bootstrap.sh" || exit 1
 
 GOVERNANCE_REPO="${GOVERNANCE_REPO:-${IWE_GOVERNANCE_REPO:-DS-strategy}}"
 CANON="$WORKSPACE_DIR/$GOVERNANCE_REPO"
@@ -341,7 +341,7 @@ preserved = set(sys.argv[3].split())
 base_path, next_base_path, diverged_path = (Path(a) for a in sys.argv[4:7])
 tip_ref, last_published = sys.argv[7], sys.argv[8]
 MANIFEST = ".day-close-backup-manifest.json"
-SPECIALS = ["CLAUDE.md", "AGENTS.md", "params.yaml", "day-rhythm-config.yaml", MANIFEST]
+SPECIALS = ["QWEN.md", "AGENTS.md", "params.yaml", "day-rhythm-config.yaml", MANIFEST]
 OWNED_TREES = ["rules", "extensions"]
 
 def owned_files(root):
